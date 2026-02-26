@@ -88,17 +88,12 @@ vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
 with st.sidebar:
     st.header("Filters")
 
-    # Select All Toggle
-    select_all = st.toggle("Select All Vehicles", value=True)
-
-    if select_all:
-        selected_vehicle = vehicles
-    else:
-        selected_vehicle = st.multiselect(
-            "Choose Vehicle(s)",
-            options=vehicles,
-            placeholder="Select vehicle(s)..."
-        )
+    selected_vehicle = st.multiselect(
+        "🚚 Vehicle",
+        options=vehicles,
+        default=vehicles,
+        help="You can search and select multiple vehicles"
+    )
 
     min_date = df["date"].min()
     max_date = df["date"].max()
