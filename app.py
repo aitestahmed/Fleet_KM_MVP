@@ -83,9 +83,21 @@ df = load_and_standardize(uploaded)
 # Filters
 with st.sidebar:
     st.header("Filters")
-    vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
-    selected_vehicle = st.multiselect("Vehicle", vehicles, default=vehicles)
 
+    select_all = st.checkbox("Select All Vehicles", value=True)
+
+    if select_all:
+        selected_vehicle = st.multiselect(
+            "Vehicle",
+            vehicles,
+            default=vehicles
+        )
+    else:
+        selected_vehicle = st.multiselect(
+            "Vehicle",
+            vehicles,
+            default=[]
+        )
     min_date = df["date"].min()
     max_date = df["date"].max()
     date_range = st.date_input("Date range", value=(min_date.date(), max_date.date()))
