@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid import AgGrid, GridOptionsBuilder,
 
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 
@@ -108,15 +108,16 @@ with st.sidebar:
 
     grid_options = gb.build()
 
-    grid_response = AgGrid(
-        vehicles_df,
-        gridOptions=grid_options,
-        height=320,
-        update_mode=GridUpdateMode.SELECTION_CHANGED,
-        fit_columns_on_grid_load=True,
-        allow_unsafe_jscode=True,
-    )
-
+   grid_response = AgGrid(
+    vehicles_df,
+    gridOptions=grid_options,
+    height=320,
+    fit_columns_on_grid_load=True,
+    update_mode="SELECTION_CHANGED",
+    data_return_mode="FILTERED_AND_SORTED",
+    allow_unsafe_jscode=True,
+    key="vehicle_filter_grid"
+)
     # ✅ التاريخ لازم يكون هنا دائمًا (مش داخل else)
     min_date = df["date"].min()
     max_date = df["date"].max()
@@ -129,12 +130,13 @@ with st.sidebar:
 selected_rows = grid_response.get("selected_rows", [])
 
 # AgGrid غالبًا يرجع list[dict]
-if isinstance(selected_rows, list) and len(selected_rows) > 0:
-    selected_vehicle = [str(row.get("vehicle_id")) for row in selected_rows if row.get("vehicle_id") is not None]
-else:
-    # لو مفيش اختيار => اختار الكل
-    selected_vehicle = vehicles_df["vehicle_id"].astype(str).tolist()
+selected_rows = grid_response.get("selected_rows", [])
 
+if selected_rows:
+    selected_vehicle = [str(row["vehicle_id"]) for row in selected_rows]
+else:
+    selected_vehicle = vehicles_df["vehicle_id"].tolist()
+    
 # ---------------- Apply Filters ----------------
 df_f = df.copy()
 df_f["vehicle_id"] = df_f["vehicle_id"].astype(str)
