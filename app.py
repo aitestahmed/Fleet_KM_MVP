@@ -132,23 +132,39 @@ with col4:
 st.divider()
 
 # Charts Row 1
+# ===== Performance Snapshot =====
+st.markdown("## 📊 Performance Snapshot")
+
 colA, colB = st.columns(2)
 
+# 🔴 Top 5 Worst Vehicles by Cost/KM
+worst_vehicles = vehicle.sort_values("cost_per_km", ascending=False).head(5)
+
 fig1 = px.bar(
-    vehicle.sort_values("cost_per_km", ascending=False),
-    x="vehicle_id", y="cost_per_km",
-    title="Cost per KM by Vehicle"
+    worst_vehicles,
+    x="cost_per_km",
+    y="vehicle_id",
+    orientation="h",
+    title="🔴 Top 5 Highest Cost per KM",
+    color="cost_per_km",
+    color_continuous_scale="Reds"
 )
+
 colA.plotly_chart(fig1, use_container_width=True)
 
-daily_trend = daily.groupby("date", as_index=False).agg(
-    cost_per_km=("cost_per_km","mean"),
-    profit=("profit","sum")
+# 🟢 Top 5 Most Profitable Vehicles
+best_vehicles = vehicle.sort_values("total_profit", ascending=False).head(5)
+
+fig2 = px.bar(
+    best_vehicles,
+    x="total_profit",
+    y="vehicle_id",
+    orientation="h",
+    title="🟢 Top 5 Most Profitable Vehicles",
+    color="total_profit",
+    color_continuous_scale="Greens"
 )
-fig2 = px.line(
-    daily_trend, x="date", y="cost_per_km",
-    title="Trend: Avg Daily Cost per KM"
-)
+
 colB.plotly_chart(fig2, use_container_width=True)
 
 # Charts Row 2
