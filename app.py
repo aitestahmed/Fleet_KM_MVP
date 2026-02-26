@@ -149,9 +149,14 @@ fig1 = px.bar(
     title="🔴 Top 5 Highest Cost per KM",
     color="cost_per_km",
     color_continuous_scale="Reds"
-    fig1.update_layout(yaxis=dict(type="category"))
-fig1.update_traces(marker_line_width=0)
 )
+
+fig1.update_layout(
+    yaxis=dict(type="category"),
+    yaxis_categoryorder="total ascending"   # يرتبهم صح
+)
+
+fig1.update_traces(marker_line_width=0)
 
 colA.plotly_chart(fig1, use_container_width=True)
 
@@ -166,9 +171,14 @@ fig2 = px.bar(
     title="🟢 Top 5 Most Profitable Vehicles",
     color="total_profit",
     color_continuous_scale="Greens"
-    fig1.update_layout(yaxis=dict(type="category"))
-fig1.update_traces(marker_line_width=0)
 )
+
+fig2.update_layout(
+    yaxis=dict(type="category"),
+    yaxis_categoryorder="total ascending"
+)
+
+fig2.update_traces(marker_line_width=0)
 
 colB.plotly_chart(fig2, use_container_width=True)
 
