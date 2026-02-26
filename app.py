@@ -153,7 +153,8 @@ fig1 = px.bar(
 
 fig1.update_layout(
     yaxis=dict(type="category"),
-    yaxis_categoryorder="total ascending"   # يرتبهم صح
+    yaxis_categoryorder="total ascending",
+    coloraxis_showscale=False   # ← هذا السطر مهم
 )
 
 fig1.update_traces(marker_line_width=0)
@@ -175,7 +176,8 @@ fig2 = px.bar(
 
 fig2.update_layout(
     yaxis=dict(type="category"),
-    yaxis_categoryorder="total ascending"
+    yaxis_categoryorder="total ascending",
+    coloraxis_showscale=False
 )
 
 fig2.update_traces(marker_line_width=0)
