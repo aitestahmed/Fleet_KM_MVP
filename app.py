@@ -102,10 +102,17 @@ with st.sidebar:
         fit_columns_on_grid_load=True
     )
 
-    selected_rows = grid_response.get("selected_rows", [])
+selected_rows = grid_response.get("selected_rows", [])
 
-if selected_rows is not None and len(selected_rows) > 0:
+# لو رجع DataFrame (وهو الغالب في الإصدارات الجديدة)
+if isinstance(selected_rows, pd.DataFrame) and not selected_rows.empty:
+    selected_vehicle = selected_rows["vehicle_id"].astype(str).tolist()
+
+# لو رجع List of dict (إصدارات قديمة)
+elif isinstance(selected_rows, list) and len(selected_rows) > 0:
     selected_vehicle = [str(row["vehicle_id"]) for row in selected_rows]
+
+# لو مفيش اختيار → اختار الكل
 else:
     selected_vehicle = df["vehicle_id"].astype(str).unique().tolist()
     
