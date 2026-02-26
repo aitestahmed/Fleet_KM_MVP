@@ -146,15 +146,19 @@ fig1 = px.bar(
     x="cost_per_km",
     y="vehicle_id",
     orientation="h",
-    title="🔴 Top 5 Highest Cost per KM",
-    color="cost_per_km",
-    color_continuous_scale="Reds"
+    title="🔴 Top 5 Highest Cost per KM"
+)
+
+fig1.update_traces(
+    marker_color="#D32F2F",   # أحمر احترافي
+    marker_line_width=0,
+    texttemplate='%{x:,.2f}',
+    textposition='outside'
 )
 
 fig1.update_layout(
     yaxis=dict(type="category"),
-    yaxis_categoryorder="total ascending",
-    coloraxis_showscale=False   # ← هذا السطر مهم
+    yaxis_categoryorder="total ascending"
 )
 
 fig1.update_traces(marker_line_width=0)
@@ -169,15 +173,19 @@ fig2 = px.bar(
     x="total_profit",
     y="vehicle_id",
     orientation="h",
-    title="🟢 Top 5 Most Profitable Vehicles",
-    color="total_profit",
-    color_continuous_scale="Greens"
+    title="🟢 Top 5 Most Profitable Vehicles"
+)
+
+fig2.update_traces(
+    marker_color="#2E7D32",   # أخضر احترافي
+    marker_line_width=0,
+    texttemplate='%{x:,.0f}',
+    textposition='outside'
 )
 
 fig2.update_layout(
     yaxis=dict(type="category"),
-    yaxis_categoryorder="total ascending",
-    coloraxis_showscale=False
+    yaxis_categoryorder="total ascending"
 )
 
 fig2.update_traces(marker_line_width=0)
