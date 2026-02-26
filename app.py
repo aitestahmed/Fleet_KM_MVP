@@ -197,8 +197,17 @@ colC, colD = st.columns(2)
 
 fig3 = px.bar(
     vehicle.sort_values("total_profit", ascending=False),
-    x="vehicle_id", y="total_profit",
+    x=vehicle["vehicle_id"].astype(str),  # تحويل لنص
+    y="total_profit",
     title="Total Profit by Vehicle"
+)
+
+fig3.update_layout(
+    xaxis=dict(type="category"),
+)
+fig3.update_traces(
+    marker_color="#1565C0",
+    marker_line_width=0
 )
 colC.plotly_chart(fig3, use_container_width=True)
 
