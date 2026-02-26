@@ -78,17 +78,13 @@ if not uploaded:
     st.info("Upload an Excel file to start.")
     st.stop()
 
-df = load_and_standardize(uploaded)
-
-# Filters
-df = load_and_standardize(uploaded)
-
+# تحميل البيانات مرة واحدة فقط
 df = load_and_standardize(uploaded)
 
 # تجهيز قائمة العربيات
 vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
 
-# Filters
+# ---------------- Filters ----------------
 with st.sidebar:
     st.header("Filters")
 
@@ -109,11 +105,25 @@ with st.sidebar:
 
     min_date = df["date"].min()
     max_date = df["date"].max()
+
     date_range = st.date_input(
         "Date range",
         value=(min_date.date(), max_date.date())
     )
 
+# ---------------- Apply Filters ----------------
+df_f = df.copy()
+df_f["vehicle_id"] = df_f["vehicle_id"].astype(str)
+df_f = df_f[df_f["vehicle_id"].isin(selected_vehicle)]
+
+start_date, end_date = date_range
+df_f = df_f[
+    (df_f["date"].dt.date >= start_date) &
+    (df_f["date"].dt.date <= end_date)
+]
+
+# ---------------- Compute KPIs ----------------
+daily, vehicle, fleet = compute_kpis(df_f)
 # KPI Cards
 st.markdown("## 🚛 Executive Fleet Overview")
 
