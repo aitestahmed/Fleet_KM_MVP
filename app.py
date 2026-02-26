@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import streamlit as st
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 
@@ -81,19 +82,32 @@ if not uploaded:
 # تحميل البيانات مرة واحدة فقط
 df = load_and_standardize(uploaded)
 
-# تجهيز قائمة العربيات
-vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
-
-# ---------------- Filters ----------------
+# ---------------- Advanced Vehicle Filter ----------------
 with st.sidebar:
     st.header("Filters")
 
-    selected_vehicle = st.multiselect(
-        "🚚 Vehicle",
-        options=vehicles,
-        default=vehicles,
-        help="You can search and select multiple vehicles"
+    gb = GridOptionsBuilder.from_dataframe(
+        pd.DataFrame({"vehicle_id": df["vehicle_id"].astype(str).unique()})
     )
+
+    gb.configure_selection("multiple", use_checkbox=True)
+    gb.configure_default_column(filter=True)
+
+    grid_options = gb.build()
+
+    grid_response = AgGrid(
+        pd.DataFrame({"vehicle_id": df["vehicle_id"].astype(str).unique()}),
+        gridOptions=grid_options,
+        height=300,
+        fit_columns_on_grid_load=True
+    )
+
+    selected_rows = grid_response["selected_rows"]
+
+    if selected_rows:
+        selected_vehicle = [row["vehicle_id"] for row in selected_rows]
+    else:
+        selected_vehicle = df["vehicle_id"].astype(str).unique().tolist()
 
     min_date = df["date"].min()
     max_date = df["date"].max()
@@ -241,4 +255,24 @@ colD.plotly_chart(fig4, use_container_width=True)
 
 st.divider()
 st.subheader("Data Preview")
-st.dataframe(df_f.head(50))
+st.divider()
+st.subheader("📊 Interactive Data Table")
+
+gb = GridOptionsBuilder.from_dataframe(df_f)
+
+gb.configure_default_column(
+    filter=True,
+    sortable=True,
+    resizable=True
+)
+
+gb.configure_selection("multiple", use_checkbox=True)
+
+grid_options = gb.build()
+
+AgGrid(
+    df_f,
+    gridOptions=grid_options,
+    height=450,
+    fit_columns_on_grid_load=True
+)
