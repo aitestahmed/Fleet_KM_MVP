@@ -129,7 +129,12 @@ df_f = df.copy()
 df_f["vehicle_id"] = df_f["vehicle_id"].astype(str)
 df_f = df_f[df_f["vehicle_id"].isin(selected_vehicle)]
 
-start_date, end_date = date_range
+if isinstance(date_range, tuple):
+    start_date, end_date = date_range
+else:
+    start_date = date_range
+    end_date = date_range
+
 df_f = df_f[
     (df_f["date"].dt.date >= start_date) &
     (df_f["date"].dt.date <= end_date)
