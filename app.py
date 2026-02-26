@@ -101,12 +101,33 @@ df_f = df_f[(df_f["date"].dt.date >= start_date) & (df_f["date"].dt.date <= end_
 daily, vehicle, fleet = compute_kpis(df_f)
 
 # KPI Cards
-c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Total Cost", f"{fleet['total_cost']:.2f}")
-c2.metric("Total Revenue", f"{fleet['total_revenue']:.2f}")
-c3.metric("Total KM", f"{fleet['total_km']:.2f}")
-c4.metric("Fleet Cost/KM", f"{fleet['fleet_cost_per_km']:.2f}")
-c5.metric("Profit Margin %", f"{fleet['profit_margin_pct']:.2f}%")
+st.markdown("## 🚛 Executive Fleet Overview")
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.metric(
+        "💸 Cost per KM",
+        f"{fleet['fleet_cost_per_km']:,.2f}"
+    )
+
+with col2:
+    st.metric(
+        "💰 Revenue per KM",
+        f"{(fleet['total_revenue']/fleet['total_km'] if fleet['total_km']>0 else 0):,.2f}"
+    )
+
+with col3:
+    st.metric(
+        "📈 Profit Margin %",
+        f"{fleet['profit_margin_pct']:,.2f}%"
+    )
+
+with col4:
+    st.metric(
+        "🚛 Total KM",
+        f"{fleet['total_km']:,.0f}"
+    )
 
 st.divider()
 
