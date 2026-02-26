@@ -138,7 +138,8 @@ st.markdown("## 📊 Performance Snapshot")
 colA, colB = st.columns(2)
 
 # 🔴 Top 5 Worst Vehicles by Cost/KM
-worst_vehicles = vehicle.sort_values("cost_per_km", ascending=False).head(5)
+worst_vehicles = vehicle.sort_values("cost_per_km", ascending=False).head(5).copy()
+worst_vehicles["vehicle_id"] = worst_vehicles["vehicle_id"].astype(str)
 
 fig1 = px.bar(
     worst_vehicles,
@@ -148,13 +149,15 @@ fig1 = px.bar(
     title="🔴 Top 5 Highest Cost per KM",
     color="cost_per_km",
     color_continuous_scale="Reds"
+    fig1.update_layout(yaxis=dict(type="category"))
+fig1.update_traces(marker_line_width=0)
 )
 
 colA.plotly_chart(fig1, use_container_width=True)
 
 # 🟢 Top 5 Most Profitable Vehicles
-best_vehicles = vehicle.sort_values("total_profit", ascending=False).head(5)
-
+best_vehicles = vehicle.sort_values("total_profit", ascending=False).head(5).copy()
+best_vehicles["vehicle_id"] = best_vehicles["vehicle_id"].astype(str)
 fig2 = px.bar(
     best_vehicles,
     x="total_profit",
@@ -163,6 +166,8 @@ fig2 = px.bar(
     title="🟢 Top 5 Most Profitable Vehicles",
     color="total_profit",
     color_continuous_scale="Greens"
+    fig1.update_layout(yaxis=dict(type="category"))
+fig1.update_traces(marker_line_width=0)
 )
 
 colB.plotly_chart(fig2, use_container_width=True)
