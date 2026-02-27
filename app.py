@@ -97,27 +97,25 @@ vehicles_df = pd.DataFrame({"vehicle_id": sorted(df["vehicle_id"].astype(str).un
 with st.sidebar:
     st.header("Filters")
 
-    st.caption("✅ Select vehicles like Excel filter (checkbox list + search)")
+    vehicles_df = pd.DataFrame({
+        "vehicle_id": sorted(df["vehicle_id"].astype(str).unique())
+    })
 
     gb = GridOptionsBuilder.from_dataframe(vehicles_df)
-    gb.configure_default_column(filter=True, sortable=True, resizable=True)
     gb.configure_selection("multiple", use_checkbox=True)
-
-    # تحسين شكل الأعمدة
-    gb.configure_column("vehicle_id", header_name="vehicle_id", width=120)
+    gb.configure_default_column(filter=True)
 
     grid_options = gb.build()
 
-  grid_response = AgGrid(
-    vehicles_df,
-    gridOptions=grid_options,
-    height=320,
-    fit_columns_on_grid_load=True,
-    update_mode=GridUpdateMode.SELECTION_CHANGED,
-    data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
-    allow_unsafe_jscode=True,
-    key="vehicle_filter_grid"
-)
+    grid_response = AgGrid(
+        vehicles_df,
+        gridOptions=grid_options,
+        height=320,
+        fit_columns_on_grid_load=True,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+        key="vehicle_filter_grid"
+    )
     # ✅ التاريخ لازم يكون هنا دائمًا (مش داخل else)
     min_date = df["date"].min()
     max_date = df["date"].max()
