@@ -82,25 +82,42 @@ if not uploaded:
 df = load_and_standardize(uploaded)
 
 # تجهيز قائمة العربيات
+# تجهيز قائمة العربيات
 vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
+
+# تهيئة القيم الافتراضية في session
+if "selected_vehicle" not in st.session_state:
+    st.session_state.selected_vehicle = vehicles
+
+if "date_range" not in st.session_state:
+    st.session_state.date_range = (
+        df["date"].min().date(),
+        df["date"].max().date()
+    )
 
 # ---------------- Filters ----------------
 with st.sidebar:
     st.header("Filters")
 
+    # زرار Clear
+    if st.button("🔄 Clear Filters"):
+        st.session_state.selected_vehicle = vehicles
+        st.session_state.date_range = (
+            df["date"].min().date(),
+            df["date"].max().date()
+        )
+
     selected_vehicle = st.multiselect(
         "🚚 Vehicle",
         options=vehicles,
-        default=vehicles,
-        help="You can search and select multiple vehicles"
+        default=st.session_state.selected_vehicle,
+        key="selected_vehicle"
     )
-
-    min_date = df["date"].min()
-    max_date = df["date"].max()
 
     date_range = st.date_input(
         "Date range",
-        value=(min_date.date(), max_date.date())
+        value=st.session_state.date_range,
+        key="date_range"
     )
 
 # ---------------- Apply Filters ----------------
