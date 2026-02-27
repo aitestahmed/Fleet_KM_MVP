@@ -3,7 +3,56 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import streamlit as st
+from supabase import create_client
 
+
+# --- Supabase init ---
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_ANON_KEY = st.secrets["SUPABASE_ANON_KEY"]
+supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+# --- Session state defaults ---
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+def auth_ui():
+    st.sidebar.title("🔐 Account")
+
+    tab1, tab2 = st.sidebar.tabs(["Login", "Sign up"])
+
+    with tab1:
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_pass")
+        if st.button("Login"):
+            try:
+                res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                st.session_state.user = res.user
+                st.success("Logged in ✅")
+                st.rerun()
+            except Exception as e:
+                st.error("Login failed. Check email/password.")
+
+    with tab2:
+        email = st.text_input("Email", key="signup_email")
+        password = st.text_input("Password", type="password", key="signup_pass")
+        if st.button("Create account"):
+            try:
+                supabase.auth.sign_up({"email": email, "password": password})
+                st.success("Account created ✅ (check your email if confirmation is enabled)")
+            except Exception as e:
+                st.error("Sign up failed.")
+
+    if st.session_state.user:
+        st.sidebar.success(f"✅ Logged in: {st.session_state.user.email}")
+        if st.sidebar.button("Logout"):
+            supabase.auth.sign_out()
+            st.session_state.user = None
+            st.rerun()
+
+# --- Gate ---
+auth_ui()
+if not st.session_state.user:
+    st.stop()
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 
 st.title("Fleet Intelligence Dashboard")
