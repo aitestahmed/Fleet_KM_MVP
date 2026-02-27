@@ -125,15 +125,25 @@ with st.sidebar:
     )
 
 # ---------------- Read selected vehicles ----------------
-selected_rows = grid_response.get("selected_rows", [])
+selected_rows = grid_response.get("selected_rows", None)
 
-# AgGrid غالبًا يرجع list[dict]
-selected_rows = grid_response.get("selected_rows", [])
+# لو رجع DataFrame (الإصدار الجديد)
+if isinstance(selected_rows, pd.DataFrame):
+    if not selected_rows.empty:
+        selected_vehicle = selected_rows["vehicle_id"].astype(str).tolist()
+    else:
+        selected_vehicle = df["vehicle_id"].astype(str).unique().tolist()
 
-if selected_rows:
-    selected_vehicle = [str(row["vehicle_id"]) for row in selected_rows]
+# لو رجع List (الإصدار القديم)
+elif isinstance(selected_rows, list):
+    if len(selected_rows) > 0:
+        selected_vehicle = [str(row["vehicle_id"]) for row in selected_rows]
+    else:
+        selected_vehicle = df["vehicle_id"].astype(str).unique().tolist()
+
+# احتياطي أمان
 else:
-    selected_vehicle = vehicles_df["vehicle_id"].tolist()
+    selected_vehicle = df["vehicle_id"].astype(str).unique().tolist()
     
 # ---------------- Apply Filters ----------------
 df_f = df.copy()
