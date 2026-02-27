@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 
@@ -108,13 +108,13 @@ with st.sidebar:
 
     grid_options = gb.build()
 
-   grid_response = AgGrid(
+  grid_response = AgGrid(
     vehicles_df,
     gridOptions=grid_options,
     height=320,
     fit_columns_on_grid_load=True,
-    update_mode="SELECTION_CHANGED",
-    data_return_mode="FILTERED_AND_SORTED",
+    update_mode=GridUpdateMode.SELECTION_CHANGED,
+    data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
     allow_unsafe_jscode=True,
     key="vehicle_filter_grid"
 )
