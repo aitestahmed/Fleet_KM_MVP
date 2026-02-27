@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder,
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 
