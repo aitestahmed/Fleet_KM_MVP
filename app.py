@@ -7,8 +7,8 @@ from supabase import create_client
 
 
 # --- Supabase init ---
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_ANON_KEY = st.secrets["SUPABASE_ANON_KEY"]
+SUPABASE_URL = st.secrets["https://ambvqvcnfvdsqocqcput.supabase.co"]
+SUPABASE_ANON_KEY = st.secrets["sb_publishable_YuVVv44-QVZSAVspMmvXfw_Dkqa03eR"]
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 # --- Session state defaults ---
