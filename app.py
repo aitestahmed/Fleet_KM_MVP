@@ -213,7 +213,7 @@ with col3:
 
 with col4:
     st.metric(
-        "🚛 Total KM",
+        "🚛 إجمالي الكيلومترات",
         f"{fleet['total_km']:,.0f}"
     )
 
@@ -221,7 +221,7 @@ st.divider()
 
 # Charts Row 1
 # ===== Performance Snapshot =====
-st.markdown("## 📊 Performance Snapshot")
+st.markdown("## 📊 نظرة عامة على الأداء")
 
 colA, colB = st.columns(2)
 
@@ -250,6 +250,10 @@ fig1.update_layout(
 )
 
 fig1.update_traces(marker_line_width=0)
+fig1.update_layout(
+    xaxis_title="تكلفة الكيلومتر",
+    yaxis_title="رقم السيارة"
+)
 
 colA.plotly_chart(fig1, use_container_width=True)
 
