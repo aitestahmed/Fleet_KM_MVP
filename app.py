@@ -18,8 +18,8 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-/* الاتجاه العام */
-html, body, [data-testid="stAppViewContainer"] {
+/* نخلي النصوص RTL فقط */
+body {
     direction: rtl;
     text-align: right;
 }
@@ -30,12 +30,7 @@ section[data-testid="stSidebar"] {
     text-align: right;
 }
 
-/* العناوين */
-h1, h2, h3, h4, h5 {
-    text-align: right !important;
-}
-
-/* Metric Cards */
+/* Metrics */
 [data-testid="stMetric"] {
     text-align: right;
 }
@@ -45,40 +40,8 @@ h1, h2, h3, h4, h5 {
     direction: rtl;
 }
 
-/* Tabs */
-button[role="tab"] {
-    float: right;
-}
-
-/* File uploader */
-[data-testid="stFileUploader"] {
-    direction: rtl;
-}
-
-/* Selectbox & Multiselect */
-[data-baseweb="select"] {
-    direction: rtl;
-    text-align: right;
-}
-
-/* Date input */
-[data-testid="stDateInput"] {
-    direction: rtl;
-}
-
-/* Buttons */
-button {
-    direction: rtl;
-}
-
-/* Plotly container */
-.js-plotly-plot {
-    direction: ltr;  /* مهم جدًا علشان الجرافات ما تتلخبطش */
-}
-
 </style>
 """, unsafe_allow_html=True)
-
 # ==============================
 # 3️⃣ Supabase init
 # ==============================
