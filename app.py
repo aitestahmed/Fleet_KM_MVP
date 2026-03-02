@@ -1,109 +1,66 @@
+
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import streamlit as st
 from supabase import create_client
 
-# ==============================
-# 1️⃣ Page Config (يجب أن يكون أول st.*)
-# ==============================
-st.set_page_config(
-    page_title="لوحة تحليل أسطول النقل",
-    layout="wide"
-)
 
-# ==============================
-# 2️⃣ RTL Style
-# ==============================
-st.markdown("""
-<style>
-
-/* نخلي النصوص RTL فقط */
-body {
-    direction: rtl;
-    text-align: right;
-}
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    direction: rtl;
-    text-align: right;
-}
-
-/* Metrics */
-[data-testid="stMetric"] {
-    text-align: right;
-}
-
-/* DataFrame */
-[data-testid="stDataFrame"] {
-    direction: rtl;
-}
-
-</style>
-""", unsafe_allow_html=True)
-# ==============================
-# 3️⃣ Supabase init
-# ==============================
+# --- Supabase init ---
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_ANON_KEY = st.secrets["SUPABASE_KEY"]
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-# ==============================
-# 4️⃣ Session state defaults
-# ==============================
+# --- Session state defaults ---
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# ==============================
-# 5️⃣ Auth UI
-# ==============================
 def auth_ui():
-    st.sidebar.title("🔐 الحساب")
+    st.sidebar.title("🔐 Account")
 
-    tab1, tab2 = st.sidebar.tabs(["تسجيل الدخول", "إنشاء حساب"])
+    tab1, tab2 = st.sidebar.tabs(["Login", "Sign up"])
 
     with tab1:
-        email = st.text_input("البريد الإلكتروني", key="login_email")
-        password = st.text_input("كلمة المرور", type="password", key="login_pass")
-        if st.button("دخول"):
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_pass")
+        if st.button("Login"):
             try:
-                res = supabase.auth.sign_in_with_password({
-                    "email": email,
-                    "password": password
-                })
+                res = supabase.auth.sign_in_with_password({"email": email, "password": password})
                 st.session_state.user = res.user
-                st.success("تم تسجيل الدخول ✅")
+                st.success("Logged in ✅")
                 st.rerun()
-            except Exception:
-                st.error("فشل تسجيل الدخول. تأكد من البيانات.")
+            except Exception as e:
+                st.error("Login failed. Check email/password.")
 
     with tab2:
-        email = st.text_input("البريد الإلكتروني", key="signup_email")
-        password = st.text_input("كلمة المرور", type="password", key="signup_pass")
-        if st.button("إنشاء حساب"):
+        email = st.text_input("Email", key="signup_email")
+        password = st.text_input("Password", type="password", key="signup_pass")
+        if st.button("Create account"):
             try:
-                supabase.auth.sign_up({
-                    "email": email,
-                    "password": password
-                })
-                st.success("تم إنشاء الحساب ✅")
-            except Exception:
-                st.error("فشل إنشاء الحساب.")
+                supabase.auth.sign_up({"email": email, "password": password})
+                st.success("Account created ✅ (check your email if confirmation is enabled)")
+            except Exception as e:
+                st.error("Sign up failed.")
 
     if st.session_state.user:
-        st.sidebar.success(f"✅ مسجل: {st.session_state.user.email}")
-        if st.sidebar.button("تسجيل الخروج"):
+        st.sidebar.success(f"✅ Logged in: {st.session_state.user.email}")
+        if st.sidebar.button("Logout"):
             supabase.auth.sign_out()
             st.session_state.user = None
             st.rerun()
 
-# ==============================
-# 6️⃣ Gate
-# ==============================
+# --- Gate ---
 auth_ui()
 if not st.session_state.user:
     st.stop()
+st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
+st.markdown("""
+    <style>
+        body {direction: rtl;}
+        .stMetric {text-align: right;}
+        .stDataFrame {direction: rtl;}
+    </style>
+""", unsafe_allow_html=True)
 
 st.title("لوحة تحليل أسطول النقل")
 st.caption("رفع ملف إكسل → توحيد البيانات → حساب المؤشرات → عرض الرسوم البيانية")
