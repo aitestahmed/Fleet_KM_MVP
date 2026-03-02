@@ -54,9 +54,16 @@ auth_ui()
 if not st.session_state.user:
     st.stop()
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
+st.markdown("""
+    <style>
+        body {direction: rtl;}
+        .stMetric {text-align: right;}
+        .stDataFrame {direction: rtl;}
+    </style>
+""", unsafe_allow_html=True)
 
-st.title("Fleet Intelligence Dashboard")
-st.caption("Upload Excel → Standardize → KPIs → Interactive Charts")
+st.title("لوحة تحليل أسطول النقل")
+st.caption("رفع ملف إكسل → توحيد البيانات → حساب المؤشرات → عرض الرسوم البيانية")
 
 # --------- Helpers ---------
 def load_and_standardize(file):
@@ -121,8 +128,7 @@ def compute_kpis(df):
     return daily, vehicle, fleet
 
 # --------- UI ---------
-uploaded = st.file_uploader("Upload your Excel file (.xlsx)", type=["xlsx"])
-
+uploaded = st.file_uploader("📂 قم برفع ملف الإكسل (.xlsx)", type=["xlsx"])
 if not uploaded:
     st.info("Upload an Excel file to start.")
     st.stop()
@@ -146,10 +152,10 @@ if "date_range" not in st.session_state:
 
 # ---------------- Filters ----------------
 with st.sidebar:
-    st.header("Filters")
-
+    st.header("🔎 الفلاتر")
+    
     # زرار Clear
-    if st.button("🔄 Clear Filters"):
+    if st.button("🔄 إعادة ضبط الفلاتر"):
         st.session_state.selected_vehicle = vehicles
         st.session_state.date_range = (
             df["date"].min().date(),
@@ -157,14 +163,14 @@ with st.sidebar:
         )
 
     selected_vehicle = st.multiselect(
-        "🚚 Vehicle",
+        "🚚 اختيار السيارة",
         options=vehicles,
         default=st.session_state.selected_vehicle,
         key="selected_vehicle"
     )
 
     date_range = st.date_input(
-        "Date range",
+        "نطاق التاريخ",
         value=st.session_state.date_range,
         key="date_range"
     )
@@ -183,25 +189,25 @@ df_f = df_f[
 # ---------------- Compute KPIs ----------------
 daily, vehicle, fleet = compute_kpis(df_f)
 # KPI Cards
-st.markdown("## 🚛 Executive Fleet Overview")
+st.markdown("## 🚛 الملخص التنفيذي للأسطول")
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric(
-        "💸 Cost per KM",
+        "💸 تكلفة الكيلومتر",
         f"{fleet['fleet_cost_per_km']:,.2f}"
     )
 
 with col2:
     st.metric(
-        "💰 Revenue per KM",
+        "💰 الإيراد لكل كيلومتر",
         f"{(fleet['total_revenue']/fleet['total_km'] if fleet['total_km']>0 else 0):,.2f}"
     )
 
 with col3:
     st.metric(
-        "📈 Profit Margin %",
+        "📈 نسبة الربحية %",
         f"{fleet['profit_margin_pct']:,.2f}%"
     )
 
@@ -228,7 +234,7 @@ fig1 = px.bar(
     x="cost_per_km",
     y="vehicle_id",
     orientation="h",
-    title="🔴 Top 5 Highest Cost per KM"
+    title="🔴 أعلى 5 سيارات من حيث تكلفة الكيلومتر"
 )
 
 fig1.update_traces(
@@ -255,7 +261,7 @@ fig2 = px.bar(
     x="total_profit",
     y="vehicle_id",
     orientation="h",
-    title="🟢 Top 5 Most Profitable Vehicles"
+    title="🟢 أفضل 5 سيارات من حيث صافي الربح"
 )
 
 fig2.update_traces(
@@ -281,7 +287,7 @@ fig3 = px.bar(
     vehicle.sort_values("total_profit", ascending=False),
     x=vehicle["vehicle_id"].astype(str),  # تحويل لنص
     y="total_profit",
-    title="Total Profit by Vehicle"
+    title="إجمالي الربح لكل سيارة"
 )
 
 fig3.update_layout(
@@ -301,10 +307,10 @@ cost_breakdown = (
 fig4 = px.bar(
     cost_breakdown,
     x="account_type", y="total_expense",
-    title="Cost Breakdown by Account Type"
+    title="توزيع المصروفات حسب نوع الحساب"
 )
 colD.plotly_chart(fig4, use_container_width=True)
 
 st.divider()
-st.subheader("Data Preview")
+st.subheader("معاينة البيانات")
 st.dataframe(df_f.head(50))
