@@ -16,21 +16,67 @@ st.set_page_config(
 # 2️⃣ RTL Style
 # ==============================
 st.markdown("""
-    <style>
-        html, body, [class*="css"]  {
-            direction: rtl;
-            text-align: right;
-        }
-        .stSidebar {
-            direction: rtl;
-        }
-        .stMetric {
-            text-align: right;
-        }
-        .stDataFrame {
-            direction: rtl;
-        }
-    </style>
+<style>
+
+/* الاتجاه العام */
+html, body, [data-testid="stAppViewContainer"] {
+    direction: rtl;
+    text-align: right;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    direction: rtl;
+    text-align: right;
+}
+
+/* العناوين */
+h1, h2, h3, h4, h5 {
+    text-align: right !important;
+}
+
+/* Metric Cards */
+[data-testid="stMetric"] {
+    text-align: right;
+}
+
+/* DataFrame */
+[data-testid="stDataFrame"] {
+    direction: rtl;
+}
+
+/* Tabs */
+button[role="tab"] {
+    float: right;
+}
+
+/* File uploader */
+[data-testid="stFileUploader"] {
+    direction: rtl;
+}
+
+/* Selectbox & Multiselect */
+[data-baseweb="select"] {
+    direction: rtl;
+    text-align: right;
+}
+
+/* Date input */
+[data-testid="stDateInput"] {
+    direction: rtl;
+}
+
+/* Buttons */
+button {
+    direction: rtl;
+}
+
+/* Plotly container */
+.js-plotly-plot {
+    direction: ltr;  /* مهم جدًا علشان الجرافات ما تتلخبطش */
+}
+
+</style>
 """, unsafe_allow_html=True)
 
 # ==============================
