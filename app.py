@@ -251,8 +251,8 @@ fig1.update_layout(
 
 fig1.update_traces(marker_line_width=0)
 fig1.update_layout(
-    xaxis_title="تكلفة الكيلومتر",
-    yaxis_title=None
+    yaxis=dict(type="category"),
+    yaxis_categoryorder="total ascending"
 )
 colA.plotly_chart(fig1, use_container_width=True)
 
@@ -275,10 +275,9 @@ fig2.update_traces(
 )
 
 fig2.update_layout(
-    xaxis_title="صافي الربح",
-    yaxis_title=None
+    yaxis=dict(type="category"),
+    yaxis_categoryorder="total ascending"
 )
-
 fig2.update_traces(marker_line_width=0)
 
 colB.plotly_chart(fig2, use_container_width=True)
