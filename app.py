@@ -20,77 +20,89 @@ def auth_ui():
 
     tab1, tab2 = st.sidebar.tabs(["Login", "Sign up"])
 
+    # -------- LOGIN --------
     with tab1:
         email = st.text_input("Email", key="login_email")
         password = st.text_input("Password", type="password", key="login_pass")
-     if st.button("Login"):
-    try:
-        res = supabase.auth.sign_in_with_password({
-            "email": email,
-            "password": password
-        })
 
-        st.session_state.user = res.user
+        if st.button("Login"):
+            try:
+                res = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password
+                })
 
-        # 🔹 جلب بيانات profile
-        user_id = res.user.id
+                st.session_state.user = res.user
 
-        profile = supabase.table("profiles") \
-            .select("company_id, role") \
-            .eq("id", user_id) \
-            .single() \
-            .execute()
+                # 🔹 جلب بيانات profile
+                user_id = res.user.id
 
-        if not profile.data:
-            st.error("This account is not linked to a company.")
-            st.stop()
+                profile = supabase.table("profiles") \
+                    .select("company_id, role") \
+                    .eq("id", user_id) \
+                    .single() \
+                    .execute()
 
-        company_id = profile.data["company_id"]
-        role = profile.data["role"]
+                if not profile.data:
+                    st.error("Account not linked to a company.")
+                    st.stop()
 
-        # 🔹 جلب بيانات الشركة
-        company = supabase.table("Companies") \
-            .select("name, max_users") \
-            .eq("id", company_id) \
-            .single() \
-            .execute()
+                company_id = profile.data["company_id"]
+                role = profile.data["role"]
 
-        st.session_state.company_id = company_id
-        st.session_state.role = role
-        st.session_state.company_name = company.data["name"]
-        st.session_state.max_users = company.data["max_users"]
+                # 🔹 جلب بيانات الشركة
+                company = supabase.table("Companies") \
+                    .select("name, max_users") \
+                    .eq("id", company_id) \
+                    .single() \
+                    .execute()
 
-        st.success("Logged in ✅")
-        st.rerun()
+                st.session_state.company_id = company_id
+                st.session_state.role = role
+                st.session_state.company_name = company.data["name"]
+                st.session_state.max_users = company.data["max_users"]
 
-    except Exception:
-        st.error("Login failed. Check email/password.")
+                st.success("Logged in ✅")
+                st.rerun()
+
             except Exception as e:
-                st.error("Login failed. Check email/password.")
+                st.error("Login failed.")
 
+    # -------- SIGN UP --------
     with tab2:
         email = st.text_input("Email", key="signup_email")
         password = st.text_input("Password", type="password", key="signup_pass")
+
         if st.button("Create account"):
             try:
-                supabase.auth.sign_up({"email": email, "password": password})
-                st.success("Account created ✅ (check your email if confirmation is enabled)")
-            except Exception as e:
+                supabase.auth.sign_up({
+                    "email": email,
+                    "password": password
+                })
+                st.success("Account created ✅")
+            except Exception:
                 st.error("Sign up failed.")
 
+    # -------- Logged state --------
     if st.session_state.user:
         st.sidebar.success(f"✅ Logged in: {st.session_state.user.email}")
+        st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name','-')}")
+        st.sidebar.markdown(f"👤 Role: {st.session_state.get('role','-')}")
+
         if st.sidebar.button("Logout"):
             supabase.auth.sign_out()
             st.session_state.user = None
             st.rerun()
 
 # --- Gate ---
-st.sidebar.markdown(f"🏢 Company: {st.session_state.company_name}")
-st.sidebar.markdown(f"👤 Role: {st.session_state.role}")
 auth_ui()
+
 if not st.session_state.user:
     st.stop()
+
+# بعد التأكد إن فيه مستخدم
+st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name','-')}")
+st.sidebar.markdown(f"👤 Role: {st.session_state.get('role','-')}")
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 st.markdown(
     """
