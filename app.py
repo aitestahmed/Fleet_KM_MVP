@@ -505,4 +505,20 @@ df_preview = df_f.rename(columns={
     "kilometers": "الكيلومترات"
 })
 
+st.markdown(
+    """
+    <style>
+    /* جعل الجدول بالكامل RTL */
+    div[data-testid="stDataFrame"] div[role="table"] {
+        direction: rtl !important;
+    }
+
+    /* محاذاة النصوص يمين */
+    div[data-testid="stDataFrame"] div {
+        text-align: right !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 st.dataframe(df_preview.head(50), use_container_width=True)
