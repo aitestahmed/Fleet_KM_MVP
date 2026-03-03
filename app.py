@@ -192,8 +192,10 @@ df_f = df_f[
 # ---------------- Compute KPIs ----------------
 daily, vehicle, fleet = compute_kpis(df_f)
 # KPI Cards
-st.markdown("## 🚛 الملخص التنفيذي للأسطول")
-
+st.markdown(
+    "<h2 style='text-align: right; font-weight: 700;'>🚛 الملخص التنفيذي للأسطول</h2>",
+    unsafe_allow_html=True
+)
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
