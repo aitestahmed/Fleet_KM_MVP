@@ -481,19 +481,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.markdown(
-    """
-    <style>
-    div[data-testid="stDataFrame"] {
-        direction: rtl;
-        text-align: right;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# تعريب الأعمدة (نسخة عرض فقط)
 df_preview = df_f.rename(columns={
     "vehicle_id": "رقم السيارة",
     "date": "التاريخ",
@@ -505,20 +492,7 @@ df_preview = df_f.rename(columns={
     "kilometers": "الكيلومترات"
 })
 
-st.markdown(
-    """
-    <style>
-    /* جعل الجدول بالكامل RTL */
-    div[data-testid="stDataFrame"] div[role="table"] {
-        direction: rtl !important;
-    }
+# عكس الأعمدة
+df_preview = df_preview[df_preview.columns[::-1]]
 
-    /* محاذاة النصوص يمين */
-    div[data-testid="stDataFrame"] div {
-        text-align: right !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-st.dataframe(df_preview.head(50), use_container_width=True)
+st.data_editor(df_preview.head(50), use_container_width=True)
