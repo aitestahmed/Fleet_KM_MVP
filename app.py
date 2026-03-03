@@ -358,27 +358,54 @@ colB.plotly_chart(fig2, use_container_width=True)
 # Charts Row 2
 colC, colD = st.columns(2)
 
+# 🔵 إجمالي الربح لكل سيارة
+sorted_vehicle = vehicle.sort_values("total_profit", ascending=False).copy()
+sorted_vehicle["vehicle_id"] = sorted_vehicle["vehicle_id"].astype(str)
+
 fig3 = px.bar(
-    vehicle.sort_values("total_profit", ascending=False),
-    x=vehicle["vehicle_id"].astype(str),  # تحويل لنص
+    sorted_vehicle,
+    x="vehicle_id",
     y="total_profit",
-    title="إجمالي الربح لكل سيارة"
+    title="🔵 إجمالي الربح لكل سيارة"
+)
+
+fig3.update_traces(
+    marker_color="#1565C0",
+    marker_line_width=0,
+    texttemplate='<b>%{y:,.0f}</b>',
+    textposition='outside'
 )
 
 fig3.update_layout(
-    xaxis=dict(type="category"),
-)
-fig3.update_traces(
-    marker_color="#1565C0",
-    marker_line_width=0
-)
-colC.plotly_chart(fig3, use_container_width=True)
+    title=dict(
+        text="🔵 إجمالي الربح لكل سيارة",
+        x=1,
+        xanchor="right",
+        font=dict(size=18)
+    ),
 
-cost_breakdown = (
-    df_f.groupby("account_type", as_index=False)
-        .agg(total_expense=("expense_amount","sum"))
-        .sort_values("total_expense", ascending=False)
+    xaxis=dict(
+        title=dict(
+            text="<b>رقم السيارة</b>",
+            font=dict(size=14)
+        ),
+        type="category",
+        tickangle=-45
+    ),
+
+    yaxis=dict(
+        title=dict(
+            text="<b>إجمالي الربح</b>",
+            font=dict(size=14)
+        )
+    ),
+
+    font=dict(size=12)
 )
+
+fig3.update_yaxes(title="<b>إجمالي الربح</b>")
+
+colC.plotly_chart(fig3, use_container_width=True)
 # 🟣 توزيع المصروفات حسب نوع الحساب
 fig4 = px.bar(
     cost_breakdown,
