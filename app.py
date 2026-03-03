@@ -471,5 +471,22 @@ fig4.update_layout(
 colD.plotly_chart(fig4, use_container_width=True)
 
 st.divider()
-st.subheader("معاينة البيانات")
-st.dataframe(df_f.head(50))
+
+st.markdown(
+    "<h3 style='text-align: right;'>📋 معاينة البيانات</h3>",
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    """
+    <style>
+    div[data-testid="stDataFrame"] {
+        direction: rtl;
+        text-align: right;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+st.dataframe(df_f.head(50), use_container_width=True)
