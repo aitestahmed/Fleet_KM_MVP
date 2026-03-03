@@ -470,6 +470,10 @@ fig4.update_layout(
 
 colD.plotly_chart(fig4, use_container_width=True)
 
+# ==============================
+# 🔽 بداية معاينة البيانات
+# ==============================
+
 st.divider()
 
 st.markdown(
@@ -489,4 +493,16 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.dataframe(df_f.head(50), use_container_width=True)
+# تعريب الأعمدة (نسخة عرض فقط)
+df_preview = df_f.rename(columns={
+    "vehicle_id": "رقم السيارة",
+    "date": "التاريخ",
+    "location": "الموقع",
+    "vehicle_type": "نوع المركبة",
+    "account_type": "نوع الحساب",
+    "expense_amount": "قيمة المصروف",
+    "revenue": "الإيراد",
+    "kilometers": "الكيلومترات"
+})
+
+st.dataframe(df_preview.head(50), use_container_width=True)
