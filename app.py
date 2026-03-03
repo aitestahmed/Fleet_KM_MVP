@@ -159,30 +159,40 @@ with st.sidebar:
 
     # تجهيز قائمة السيارات
     vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
-    vehicle_options = ["الكل"] + vehicles
 
-    # زر إعادة الضبط
-    if st.button("🔄 إعادة ضبط الفلاتر"):
-        st.session_state.selected_vehicle_single = "الكل"
+    # تهيئة Session State
+    if "selected_vehicle_multi" not in st.session_state:
+        st.session_state.selected_vehicle_multi = vehicles
+
+    if "date_range" not in st.session_state:
         st.session_state.date_range = (
             df["date"].min().date(),
             df["date"].max().date()
         )
 
-    # فلتر السيارة (Dropdown)
-    selected_vehicle = st.selectbox(
-        "🚚 اختيار السيارة",
-        options=vehicle_options,
-        key="selected_vehicle_single"
-    )
-
-    # فلتر التاريخ
-    date_range = st.date_input(
-        "📅 نطاق التاريخ",
-        value=(
+    # زر إعادة الضبط
+    if st.button("🔄 إعادة ضبط الفلاتر"):
+        st.session_state.selected_vehicle_multi = vehicles
+        st.session_state.date_range = (
             df["date"].min().date(),
             df["date"].max().date()
-        ),
+        )
+        st.rerun()
+
+    # فلتر السيارات (MultiSelect احترافي)
+    selected_vehicle = st.multiselect(
+        "🚚 اختيار السيارة",
+        options=vehicles,
+        default=st.session_state.selected_vehicle_multi,
+        key="selected_vehicle_multi"
+    )
+
+    # فلتر التاريخ (Range + يوم واحد مدعوم)
+    date_range = st.date_input(
+        "📅 نطاق التاريخ",
+        value=st.session_state.date_range,
+        min_value=df["date"].min().date(),
+        max_value=df["date"].max().date(),
         key="date_range"
     )
 
@@ -191,13 +201,16 @@ with st.sidebar:
 df_f = df.copy()
 df_f["vehicle_id"] = df_f["vehicle_id"].astype(str)
 
-# فلترة السيارة
-if selected_vehicle != "الكل":
-    df_f = df_f[df_f["vehicle_id"] == selected_vehicle]
+# فلترة السيارات
+if selected_vehicle:
+    df_f = df_f[df_f["vehicle_id"].isin(selected_vehicle)]
 
 # فلترة التاريخ بشكل آمن
 if isinstance(date_range, tuple):
-    start_date, end_date = date_range
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+    else:
+        start_date = end_date = date_range[0]
 else:
     start_date = end_date = date_range
 
