@@ -23,12 +23,48 @@ def auth_ui():
     with tab1:
         email = st.text_input("Email", key="login_email")
         password = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Login"):
-            try:
-                res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                st.session_state.user = res.user
-                st.success("Logged in ✅")
-                st.rerun()
+     if st.button("Login"):
+    try:
+        res = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password
+        })
+
+        st.session_state.user = res.user
+
+        # 🔹 جلب بيانات profile
+        user_id = res.user.id
+
+        profile = supabase.table("profiles") \
+            .select("company_id, role") \
+            .eq("id", user_id) \
+            .single() \
+            .execute()
+
+        if not profile.data:
+            st.error("This account is not linked to a company.")
+            st.stop()
+
+        company_id = profile.data["company_id"]
+        role = profile.data["role"]
+
+        # 🔹 جلب بيانات الشركة
+        company = supabase.table("Companies") \
+            .select("name, max_users") \
+            .eq("id", company_id) \
+            .single() \
+            .execute()
+
+        st.session_state.company_id = company_id
+        st.session_state.role = role
+        st.session_state.company_name = company.data["name"]
+        st.session_state.max_users = company.data["max_users"]
+
+        st.success("Logged in ✅")
+        st.rerun()
+
+    except Exception:
+        st.error("Login failed. Check email/password.")
             except Exception as e:
                 st.error("Login failed. Check email/password.")
 
