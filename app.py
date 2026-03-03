@@ -156,43 +156,48 @@ if "date_range" not in st.session_state:
 # ---------------- Filters ----------------
 with st.sidebar:
     st.header("🔎 الفلاتر")
-    
-    # زرار Clear
+
+    # تجهيز قائمة السيارات
+    vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
+    vehicle_options = ["الكل"] + vehicles
+
+    # زر إعادة الضبط
     if st.button("🔄 إعادة ضبط الفلاتر"):
-        st.session_state.selected_vehicle = vehicles
+        st.session_state.selected_vehicle_single = "الكل"
         st.session_state.date_range = (
             df["date"].min().date(),
             df["date"].max().date()
         )
 
-# تجهيز قائمة السيارات + خيار الكل
-vehicle_options = ["الكل"] + vehicles
+    # فلتر السيارة (Dropdown)
+    selected_vehicle = st.selectbox(
+        "🚚 اختيار السيارة",
+        options=vehicle_options,
+        key="selected_vehicle_single"
+    )
 
-selected_vehicle = st.selectbox(
-    "🚚 اختيار السيارة",
-    options=vehicle_options,
-    index=0,   # يبدأ بـ "الكل"
-    key="selected_vehicle_single"
-)
-
+    # فلتر التاريخ
     date_range = st.date_input(
-        "نطاق التاريخ",
-        value=st.session_state.date_range,
+        "📅 نطاق التاريخ",
+        value=(
+            df["date"].min().date(),
+            df["date"].max().date()
+        ),
         key="date_range"
     )
+
 
 # ---------------- Apply Filters ----------------
 df_f = df.copy()
 df_f["vehicle_id"] = df_f["vehicle_id"].astype(str)
-df_f = df_f[df_f["vehicle_id"].isin(selected_vehicle)]
 
-# ---------------- Apply Date Filter Safely ----------------
+# فلترة السيارة
+if selected_vehicle != "الكل":
+    df_f = df_f[df_f["vehicle_id"] == selected_vehicle]
 
+# فلترة التاريخ بشكل آمن
 if isinstance(date_range, tuple):
-    if len(date_range) == 2:
-        start_date, end_date = date_range
-    else:
-        start_date = end_date = date_range[0]
+    start_date, end_date = date_range
 else:
     start_date = end_date = date_range
 
