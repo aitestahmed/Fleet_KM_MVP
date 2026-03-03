@@ -245,37 +245,30 @@ fig1.update_traces(
 )
 
 fig1.update_layout(
-    # عنوان الرسم يمين وبخط أكبر
     title=dict(
         text="🔴 أعلى 5 سيارات من حيث تكلفة الكيلومتر",
         x=1,
         xanchor="right",
-        font=dict(size=18, family="Arial", color="black")
+        font=dict(size=18)
     ),
 
-    # محور X
     xaxis=dict(
         title=dict(
-            text="<b>تكلفة الكيلومتر</b>",
+            text="تكلفة الكيلومتر",
             font=dict(size=14)
-        ),
-        side="top",  # 👈 يخلي العنوان فوق
+        )
     ),
 
-    # محور Y
     yaxis=dict(
         title=dict(
-            text="<b>رقم السيارة</b>",
+            text="رقم السيارة",
             font=dict(size=14)
         ),
         type="category",
         categoryorder="total ascending"
     ),
 
-    font=dict(
-        family="Arial",
-        size=12
-    )
+    font=dict(size=12)
 )
 
 fig1.update_traces(marker_line_width=0)
