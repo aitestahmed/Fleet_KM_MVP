@@ -307,9 +307,42 @@ fig2.update_traces(
 )
 
 fig2.update_layout(
-    yaxis=dict(type="category"),
-    yaxis_categoryorder="total ascending"
+    title=dict(
+        text="🟢 أفضل 5 سيارات من حيث صافي الربح",
+        x=1,
+        xanchor="right",
+        font=dict(size=18)
+    ),
+
+    xaxis=dict(
+        title=dict(
+            text="<b>صافي الربح</b>",
+            font=dict(size=14)
+        )
+    ),
+
+    yaxis=dict(
+        type="category",
+        categoryorder="total ascending",
+        title=None
+    ),
+
+    annotations=[
+        dict(
+            text="<b>رقم السيارة</b>",
+            xref="paper",
+            yref="paper",
+            x=0,
+            y=1.08,
+            showarrow=False,
+            font=dict(size=14)
+        )
+    ],
+
+    font=dict(size=12)
 )
+
+fig2.update_yaxes(title=None)
 fig2.update_traces(marker_line_width=0)
 
 colB.plotly_chart(fig2, use_container_width=True)
