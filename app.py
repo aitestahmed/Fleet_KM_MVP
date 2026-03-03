@@ -254,14 +254,15 @@ fig1.update_layout(
 
     xaxis=dict(
         title=dict(
-            text="تكلفة الكيلومتر",
+            text="<b>تكلفة الكيلومتر</b>",
             font=dict(size=14)
         )
     ),
 
     yaxis=dict(
         type="category",
-        categoryorder="total ascending"
+        categoryorder="total ascending",
+        title=None
     ),
 
     annotations=[
@@ -269,13 +270,17 @@ fig1.update_layout(
             text="<b>رقم السيارة</b>",
             xref="paper",
             yref="paper",
-            x=0,        # أقصى اليسار
-            y=1.08,     # فوق الرسم
+            x=0,
+            y=1.08,
             showarrow=False,
             font=dict(size=14)
         )
-    ]
+    ],
+
+    font=dict(size=12)
 )
+
+fig1.update_yaxes(title=None)
 fig1.update_traces(marker_line_width=0)
 fig1.update_layout(
     yaxis=dict(type="category"),
