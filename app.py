@@ -86,6 +86,8 @@ def auth_ui():
             st.rerun()
 
 # --- Gate ---
+st.sidebar.markdown(f"🏢 Company: {st.session_state.company_name}")
+st.sidebar.markdown(f"👤 Role: {st.session_state.role}")
 auth_ui()
 if not st.session_state.user:
     st.stop()
