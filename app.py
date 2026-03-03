@@ -260,17 +260,22 @@ fig1.update_layout(
     ),
 
     yaxis=dict(
-        title=dict(
-            text="رقم السيارة",
-            font=dict(size=14)
-        ),
         type="category",
         categoryorder="total ascending"
     ),
 
-    font=dict(size=12)
+    annotations=[
+        dict(
+            text="<b>رقم السيارة</b>",
+            xref="paper",
+            yref="paper",
+            x=0,        # أقصى اليسار
+            y=1.08,     # فوق الرسم
+            showarrow=False,
+            font=dict(size=14)
+        )
+    ]
 )
-
 fig1.update_traces(marker_line_width=0)
 fig1.update_layout(
     yaxis=dict(type="category"),
