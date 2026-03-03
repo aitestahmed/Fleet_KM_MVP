@@ -1,5 +1,5 @@
 
-import pandas as pd
+import pandas as pd 
 import numpy as np
 import plotly.express as px
 import streamlit as st
@@ -183,12 +183,20 @@ df_f = df.copy()
 df_f["vehicle_id"] = df_f["vehicle_id"].astype(str)
 df_f = df_f[df_f["vehicle_id"].isin(selected_vehicle)]
 
-start_date, end_date = date_range
+# ---------------- Apply Date Filter Safely ----------------
+
+if isinstance(date_range, tuple):
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+    else:
+        start_date = end_date = date_range[0]
+else:
+    start_date = end_date = date_range
+
 df_f = df_f[
     (df_f["date"].dt.date >= start_date) &
     (df_f["date"].dt.date <= end_date)
 ]
-
 # ---------------- Compute KPIs ----------------
 daily, vehicle, fleet = compute_kpis(df_f)
 # KPI Cards
