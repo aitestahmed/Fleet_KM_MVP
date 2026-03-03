@@ -54,13 +54,17 @@ auth_ui()
 if not st.session_state.user:
     st.stop()
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
-st.markdown("""
-    <style>
-        body {direction: rtl;}
-        .stMetric {text-align: right;}
-        .stDataFrame {direction: rtl;}
-    </style>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <h1 style='text-align: right; font-weight: 800;'>
+        لوحة تحليل أسطول النقل
+    </h1>
+    <p style='text-align: right; color: gray; margin-top: -10px;'>
+        رفع ملف إكسل → توحيد البيانات → حساب المؤشرات → عرض الرسوم البيانية
+    </p>
+    """,
+    unsafe_allow_html=True
+)
 
 st.title("لوحة تحليل أسطول النقل")
 st.caption("رفع ملف إكسل → توحيد البيانات → حساب المؤشرات → عرض الرسوم البيانية")
