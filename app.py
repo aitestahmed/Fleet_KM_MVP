@@ -100,9 +100,7 @@ auth_ui()
 if not st.session_state.user:
     st.stop()
 
-# بعد التأكد إن فيه مستخدم
-st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name','-')}")
-st.sidebar.markdown(f"👤 Role: {st.session_state.get('role','-')}")
+
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 st.markdown(
     """
