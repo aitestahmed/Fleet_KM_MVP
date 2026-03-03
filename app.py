@@ -379,11 +379,46 @@ cost_breakdown = (
         .agg(total_expense=("expense_amount","sum"))
         .sort_values("total_expense", ascending=False)
 )
+# 🟣 توزيع المصروفات حسب نوع الحساب
 fig4 = px.bar(
     cost_breakdown,
-    x="account_type", y="total_expense",
-    title="توزيع المصروفات حسب نوع الحساب"
+    x="account_type",
+    y="total_expense",
+    title="🟣 توزيع المصروفات حسب نوع الحساب"
 )
+
+fig4.update_traces(
+    marker_color="#1565C0",   # أزرق احترافي
+    marker_line_width=0,
+    texttemplate='<b>%{y:,.0f}</b>',
+    textposition='outside'
+)
+
+fig4.update_layout(
+    title=dict(
+        text="🟣 توزيع المصروفات حسب نوع الحساب",
+        x=1,
+        xanchor="right",
+        font=dict(size=18)
+    ),
+
+    xaxis=dict(
+        title=dict(
+            text="<b>نوع الحساب</b>",
+            font=dict(size=14)
+        )
+    ),
+
+    yaxis=dict(
+        title=dict(
+            text="<b>إجمالي المصروف</b>",
+            font=dict(size=14)
+        )
+    ),
+
+    font=dict(size=12)
+)
+
 colD.plotly_chart(fig4, use_container_width=True)
 
 st.divider()
