@@ -358,8 +358,15 @@ colB.plotly_chart(fig2, use_container_width=True)
 # Charts Row 2
 colC, colD = st.columns(2)
 
-# 🔵 إجمالي الربح لكل سيارة
-sorted_vehicle = vehicle.sort_values("total_profit", ascending=False).copy()
+# ==============================
+# 🔵 إجمالي الربح لكل سيارة (fig3)
+# ==============================
+
+sorted_vehicle = (
+    vehicle.sort_values("total_profit", ascending=False)
+           .copy()
+)
+
 sorted_vehicle["vehicle_id"] = sorted_vehicle["vehicle_id"].astype(str)
 
 fig3 = px.bar(
@@ -403,10 +410,24 @@ fig3.update_layout(
     font=dict(size=12)
 )
 
-fig3.update_yaxes(title="<b>إجمالي الربح</b>")
-
 colC.plotly_chart(fig3, use_container_width=True)
-# 🟣 توزيع المصروفات حسب نوع الحساب
+
+
+# ==============================
+# 🟣 إنشاء cost_breakdown أولاً (مهم جداً)
+# ==============================
+
+cost_breakdown = (
+    df_f.groupby("account_type", as_index=False)
+        .agg(total_expense=("expense_amount", "sum"))
+        .sort_values("total_expense", ascending=False)
+)
+
+
+# ==============================
+# 🟣 توزيع المصروفات حسب نوع الحساب (fig4)
+# ==============================
+
 fig4 = px.bar(
     cost_breakdown,
     x="account_type",
@@ -415,7 +436,7 @@ fig4 = px.bar(
 )
 
 fig4.update_traces(
-    marker_color="#1565C0",   # أزرق احترافي
+    marker_color="#1565C0",
     marker_line_width=0,
     texttemplate='<b>%{y:,.0f}</b>',
     textposition='outside'
@@ -433,7 +454,8 @@ fig4.update_layout(
         title=dict(
             text="<b>نوع الحساب</b>",
             font=dict(size=14)
-        )
+        ),
+        tickangle=-30
     ),
 
     yaxis=dict(
