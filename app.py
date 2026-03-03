@@ -165,12 +165,15 @@ with st.sidebar:
             df["date"].max().date()
         )
 
-    selected_vehicle = st.multiselect(
-        "🚚 اختيار السيارة",
-        options=vehicles,
-        default=st.session_state.selected_vehicle,
-        key="selected_vehicle"
-    )
+# تجهيز قائمة السيارات + خيار الكل
+vehicle_options = ["الكل"] + vehicles
+
+selected_vehicle = st.selectbox(
+    "🚚 اختيار السيارة",
+    options=vehicle_options,
+    index=0,   # يبدأ بـ "الكل"
+    key="selected_vehicle_single"
+)
 
     date_range = st.date_input(
         "نطاق التاريخ",
