@@ -66,8 +66,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("لوحة تحليل أسطول النقل")
-st.caption("رفع ملف إكسل → توحيد البيانات → حساب المؤشرات → عرض الرسوم البيانية")
+
 
 # --------- Helpers ---------
 def load_and_standardize(file):
