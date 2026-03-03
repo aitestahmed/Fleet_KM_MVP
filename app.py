@@ -221,7 +221,10 @@ st.divider()
 
 # Charts Row 1
 # ===== Performance Snapshot =====
-st.markdown("## 📊 نظرة عامة على الأداء")
+st.markdown(
+    "<h2 style='text-align: right;'>📊 نظرة عامة على الأداء</h2>",
+    unsafe_allow_html=True
+)
 
 colA, colB = st.columns(2)
 
