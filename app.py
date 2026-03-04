@@ -185,6 +185,7 @@ trips_file = st.file_uploader(
     "🚚 رفع ملف الرحلات / المأموريات",
     type=["xlsx"],
     key="trips_file"
+)
 
     
 if not uploaded:
