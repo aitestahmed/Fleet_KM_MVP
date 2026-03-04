@@ -180,6 +180,23 @@ def compute_kpis(df):
 
 # --------- UI ---------
 uploaded = st.file_uploader("📂 قم برفع ملف الإكسل (.xlsx)", type=["xlsx"])
+# --------- Trips File Upload ---------
+trips_file = st.sidebar.file_uploader(
+    "🚚 رفع ملف الرحلات / المأموريات",
+    type=["xlsx"],
+    key="trips_file"
+)
+
+if trips_file is not None:
+    trips_df = pd.read_excel(trips_file)
+
+    st.subheader("📄 معاينة ملف الرحلات")
+    st.write("أسماء الأعمدة في الملف:")
+
+    st.write(list(trips_df.columns))
+
+    st.dataframe(trips_df.head(10), use_container_width=True)
+    
 if not uploaded:
     st.info("Upload an Excel file to start.")
     st.stop()
