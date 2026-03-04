@@ -200,6 +200,18 @@ if trips_file is not None:
 if not uploaded:
     st.info("Upload an Excel file to start.")
     st.stop()
+    
+# --------- Load Trips File ---------
+if trips_file is not None:
+
+    trips_df = pd.read_excel(trips_file)
+
+    st.subheader("🚚 بيانات الرحلات")
+
+    st.write("أسماء الأعمدة:")
+    st.write(list(trips_df.columns))
+
+    st.dataframe(trips_df.head(10), use_container_width=True)
 
 # تحميل البيانات مرة واحدة فقط
 df = load_and_standardize(uploaded)
