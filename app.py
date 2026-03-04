@@ -185,26 +185,20 @@ trips_file = st.file_uploader(
     "🚚 رفع ملف الرحلات / المأموريات",
     type=["xlsx"],
     key="trips_file"
-)
 
-if trips_file is not None:
-    trips_df = pd.read_excel(trips_file)
-
-    st.subheader("📄 معاينة ملف الرحلات")
-    st.write("أسماء الأعمدة في الملف:")
-
-    st.write(list(trips_df.columns))
-
-    st.dataframe(trips_df.head(10), use_container_width=True)
     
 if not uploaded:
     st.info("Upload an Excel file to start.")
     st.stop()
     
 # --------- Load Trips File ---------
+# -------- Load Trips File --------
 if trips_file is not None:
 
     trips_df = pd.read_excel(trips_file)
+
+    # تنظيف أسماء الأعمدة
+    trips_df.columns = trips_df.columns.str.strip()
 
     st.subheader("🚚 بيانات الرحلات")
 
@@ -212,7 +206,6 @@ if trips_file is not None:
     st.write(list(trips_df.columns))
 
     st.dataframe(trips_df.head(10), use_container_width=True)
-
 # تحميل البيانات مرة واحدة فقط
 df = load_and_standardize(uploaded)
 
