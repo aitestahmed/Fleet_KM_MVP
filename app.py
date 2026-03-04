@@ -181,7 +181,7 @@ def compute_kpis(df):
 # --------- UI ---------
 uploaded = st.file_uploader("📂 قم برفع ملف الإكسل (.xlsx)", type=["xlsx"])
 # --------- Trips File Upload ---------
-trips_file = st.sidebar.file_uploader(
+trips_file = st.file_uploader(
     "🚚 رفع ملف الرحلات / المأموريات",
     type=["xlsx"],
     key="trips_file"
