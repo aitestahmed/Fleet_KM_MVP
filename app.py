@@ -180,53 +180,10 @@ def compute_kpis(df):
 
 # --------- UI ---------
 uploaded = st.file_uploader("📂 قم برفع ملف الإكسل (.xlsx)", type=["xlsx"])
-# --------- Trips File Upload ---------
-trips_file = st.file_uploader(
-    "🚚 رفع ملف الرحلات / المأموريات",
-    type=["xlsx"],
-    key="trips_file"
-)
-
-    
 if not uploaded:
     st.info("Upload an Excel file to start.")
     st.stop()
-    
-# --------- Load Trips File ---------
-# -------- Load Trips File --------
-if trips_file is not None:
 
-    trips_df = pd.read_excel(trips_file)
-
-    # تنظيف أسماء الأعمدة
-    trips_df.columns = trips_df.columns.str.strip()
-
-    st.subheader("🚚 بيانات الرحلات")
-
-    st.write("أسماء الأعمدة:")
-    st.write(list(trips_df.columns))
-
-    st.dataframe(trips_df.head(10), use_container_width=True)
-    # -------- Total Distance per Truck --------
-
-if "كود الشاحنة" in trips_df.columns and "إجمالي المسافة المقطوعة" in trips_df.columns:
-
-    distance_per_truck = trips_df.groupby("كود الشاحنة")["إجمالي المسافة المقطوعة"].sum().reset_index()
-
-    st.subheader("📊 إجمالي المسافة لكل شاحنة")
-
-    st.dataframe(distance_per_truck)
-
-    import plotly.express as px
-
-    fig = px.bar(
-        distance_per_truck,
-        x="كود الشاحنة",
-        y="إجمالي المسافة المقطوعة",
-        title="إجمالي المسافة لكل شاحنة"
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
 # تحميل البيانات مرة واحدة فقط
 df = load_and_standardize(uploaded)
 
