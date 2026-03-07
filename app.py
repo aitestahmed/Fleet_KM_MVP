@@ -375,22 +375,21 @@ if st.button("Generate AI Insight"):
 
 with st.expander("📊 AI Executive Report"):
 
-    st.markdown(
-        f"""
-        <div style="
-            background-color:#f9fafb;
-            padding:25px;
-            border-radius:10px;
-            border:1px solid #e5e7eb;
-            line-height:1.8;
-            font-size:16px;
-        ">
-        {report_html}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
+ st.markdown(
+    f"""
+    <div style="
+        background-color:#f9fafb;
+        padding:25px;
+        border-radius:10px;
+        border:1px solid #e5e7eb;
+        line-height:1.8;
+        font-size:16px;
+    ">
+    {report_html}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
     # زر تحميل التقرير
     st.download_button(
         label="⬇ Download Fleet Report",
