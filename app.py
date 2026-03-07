@@ -273,6 +273,26 @@ daily, vehicle, fleet = compute_kpis(df_f)
 st.divider()
 st.markdown("## 🤖 AI Fleet Analysis")
 
+st.markdown("### 💡 Suggested Insights")
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    if st.button("🔴 Highest Cost per KM"):
+        st.dataframe(vehicle.sort_values("cost_per_km", ascending=False).head(5))
+
+with col2:
+    if st.button("🟢 Most Profitable Vehicles"):
+        st.dataframe(vehicle.sort_values("total_profit", ascending=False).head(5))
+
+with col3:
+    if st.button("🟣 Expense Categories"):
+        st.dataframe(cost_breakdown.sort_values("total_expense", ascending=False))
+
+with col4:
+    if st.button("⚠ Lowest Profit Vehicles"):
+        st.dataframe(vehicle.sort_values("total_profit").head(5))
+
 if st.button("Generate AI Insight"):
 
     summary = f"""
@@ -287,16 +307,37 @@ if st.button("Generate AI Insight"):
     Profit Margin: {fleet['profit_margin_pct']}
     """
 
-    prompt = f"""
-    قم بتحليل بيانات أسطول النقل التالية وقدّم:
+    top_cost = vehicle.sort_values("cost_per_km", ascending=False).head(5)
 
-    1- المشكلات التشغيلية الرئيسية
-    2- فرص خفض التكاليف
-    3- توصيات لتحسين الكفاءة التشغيلية
+top_profit = vehicle.sort_values("total_profit", ascending=False).head(5)
 
-    البيانات:
-    {summary}
-    """
+cost_types = cost_breakdown.head(10)
+
+top_cost_text = top_cost.to_string(index=False)
+top_profit_text = top_profit.to_string(index=False)
+cost_types_text = cost_types.to_string(index=False)
+
+
+
+   prompt = f"""
+قم بتحليل بيانات أسطول النقل التالية وقدّم:
+
+1- المشكلات التشغيلية الرئيسية
+2- فرص خفض التكاليف
+3- توصيات لتحسين الكفاءة التشغيلية
+
+Fleet Summary:
+{summary}
+
+Top Vehicles by Cost per KM:
+{top_cost_text}
+
+Top Vehicles by Profit:
+{top_profit_text}
+
+Expense Breakdown:
+{cost_types_text}
+"""
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
