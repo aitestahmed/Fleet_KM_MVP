@@ -270,6 +270,11 @@ df_f = df_f[
 ]
 # ---------------- Compute KPIs ----------------
 daily, vehicle, fleet = compute_kpis(df_f)
+cost_breakdown = (
+    df_f.groupby("account_type", as_index=False)
+        .agg(total_expense=("expense_amount", "sum"))
+        .sort_values("total_expense", ascending=False)
+)
 st.divider()
 st.markdown("## 🤖 AI Fleet Analysis")
 
@@ -287,7 +292,7 @@ with col2:
 
 with col3:
     if st.button("🟣 Expense Categories"):
-        st.dataframe(cost_breakdown.sort_values("total_expense", ascending=False))
+        st.dataframe(cost_breakdown)
 
 with col4:
     if st.button("⚠ Lowest Profit Vehicles"):
