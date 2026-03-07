@@ -304,36 +304,44 @@ if "report_html" not in st.session_state:
 
 if st.button("Generate AI Insight"):
 
-    summary = f"""
-    Fleet Summary
+    with st.spinner("AI is analyzing fleet data..."):
 
-    Total KM: {fleet['total_km']}
-    Total Revenue: {fleet['total_revenue']}
-    Total Cost: {fleet['total_cost']}
-    Total Profit: {fleet['total_profit']}
+        summary = f"""
+        Fleet Summary
 
-    Fleet Cost per KM: {fleet['fleet_cost_per_km']}
-    Profit Margin: {fleet['profit_margin_pct']}
-    """
+        Total KM: {fleet['total_km']}
+        Total Revenue: {fleet['total_revenue']}
+        Total Cost: {fleet['total_cost']}
+        Total Profit: {fleet['total_profit']}
 
-    top_cost = vehicle.sort_values("cost_per_km", ascending=False).head(5)
-    top_profit = vehicle.sort_values("total_profit", ascending=False).head(5)
-    cost_types = cost_breakdown.head(10)
+        Fleet Cost per KM: {fleet['fleet_cost_per_km']}
+        Profit Margin: {fleet['profit_margin_pct']}
+        """
 
-    prompt = f"""
-    قم بتحليل بيانات أسطول النقل التالية...
-    """
+        prompt = f"""
+        قم بتحليل بيانات أسطول النقل التالية وقدم تقرير تنفيذي واضح.
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=400
-    )
+        {summary}
 
-    st.session_state.report_html = response.choices[0].message.content
+        اشرح:
+        - المشكلات التشغيلية
+        - السيارات الأعلى تكلفة
+        - فرص تقليل التكلفة
+        - توصيات الإدارة
+        """
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=500
+        )
+
+        st.session_state.report_html = response.choices[0].message.content
+
+        st.rerun()
 
 if st.session_state.report_html:
 
