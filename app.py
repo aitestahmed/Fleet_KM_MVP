@@ -295,6 +295,8 @@ with col4:
 
 if st.button("Generate AI Insight"):
 
+if st.button("Generate AI Insight"):
+
     summary = f"""
     Fleet Summary
 
@@ -307,37 +309,35 @@ if st.button("Generate AI Insight"):
     Profit Margin: {fleet['profit_margin_pct']}
     """
 
+    # --- Tables for AI analysis ---
+
     top_cost = vehicle.sort_values("cost_per_km", ascending=False).head(5)
-
     top_profit = vehicle.sort_values("total_profit", ascending=False).head(5)
-
     cost_types = cost_breakdown.head(10)
 
     top_cost_text = top_cost.to_string(index=False)
     top_profit_text = top_profit.to_string(index=False)
     cost_types_text = cost_types.to_string(index=False)
 
+    prompt = f"""
+    قم بتحليل بيانات أسطول النقل التالية وقدّم:
 
+    1- المشكلات التشغيلية الرئيسية
+    2- فرص خفض التكاليف
+    3- توصيات لتحسين الكفاءة التشغيلية
 
-   prompt = f"""
-قم بتحليل بيانات أسطول النقل التالية وقدّم:
+    Fleet Summary:
+    {summary}
 
-1- المشكلات التشغيلية الرئيسية
-2- فرص خفض التكاليف
-3- توصيات لتحسين الكفاءة التشغيلية
+    Top Vehicles by Cost per KM:
+    {top_cost_text}
 
-Fleet Summary:
-{summary}
+    Top Vehicles by Profit:
+    {top_profit_text}
 
-Top Vehicles by Cost per KM:
-{top_cost_text}
-
-Top Vehicles by Profit:
-{top_profit_text}
-
-Expense Breakdown:
-{cost_types_text}
-"""
+    Expense Breakdown:
+    {cost_types_text}
+    """
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
