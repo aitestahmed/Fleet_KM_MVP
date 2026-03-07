@@ -300,8 +300,6 @@ with col4:
 
 if st.button("Generate AI Insight"):
 
-
-
     summary = f"""
     Fleet Summary
 
@@ -314,8 +312,6 @@ if st.button("Generate AI Insight"):
     Profit Margin: {fleet['profit_margin_pct']}
     """
 
-    # --- Tables for AI analysis ---
-
     top_cost = vehicle.sort_values("cost_per_km", ascending=False).head(5)
     top_profit = vehicle.sort_values("total_profit", ascending=False).head(5)
     cost_types = cost_breakdown.head(10)
@@ -325,11 +321,25 @@ if st.button("Generate AI Insight"):
     cost_types_text = cost_types.to_string(index=False)
 
     prompt = f"""
-    قم بتحليل بيانات أسطول النقل التالية وقدّم:
+    قم بتحليل بيانات أسطول النقل التالية وارجع التقرير بصيغة HTML منسقة.
 
-    1- المشكلات التشغيلية الرئيسية
-    2- فرص خفض التكاليف
-    3- توصيات لتحسين الكفاءة التشغيلية
+    استخدم هذا الهيكل:
+
+    <h2>Executive Fleet Report</h2>
+
+    <h3>⚠️ المشكلات التشغيلية</h3>
+    قائمة نقطية
+
+    <h3>💰 فرص خفض التكاليف</h3>
+    قائمة نقطية
+
+    <h3>📊 تحليل أداء المركبات</h3>
+    شرح مختصر
+
+    <h3>🚀 التوصيات التشغيلية</h3>
+    قائمة نقطية
+
+    البيانات:
 
     Fleet Summary:
     {summary}
@@ -349,17 +359,64 @@ if st.button("Generate AI Insight"):
         messages=[
             {
                 "role": "system",
-                "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل. قدم التحليل باللغة العربية بشكل احترافي."
+                "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."
             },
             {
                 "role": "user",
                 "content": prompt
             }
         ],
-        max_tokens=300
+        max_tokens=400
     )
 
-    st.write(response.choices[0].message.content)
+    report_html = response.choices[0].message.content
+
+    st.markdown("## 📑 AI Fleet Executive Report")
+
+with st.expander("📊 AI Executive Report"):
+
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#f9fafb;
+            padding:25px;
+            border-radius:10px;
+            border:1px solid #e5e7eb;
+            line-height:1.8;
+            font-size:16px;
+        ">
+        {report_html}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # زر تحميل التقرير
+    st.download_button(
+        label="⬇ Download Fleet Report",
+        data=report_html,
+        file_name="fleet_report.html",
+        mime="text/html"
+    )
+
+    st.markdown("## 📑 AI Fleet Executive Report")
+
+    with st.container():
+        st.markdown(
+            f"""
+            <div style="
+                background-color:#f9fafb;
+                padding:25px;
+                border-radius:10px;
+                border:1px solid #e5e7eb;
+                line-height:1.8;
+                font-size:16px;
+            ">
+            {report_html}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 # KPI Cards
 st.markdown(
     "<h2 style='text-align: right; font-weight: 700;'>🚛 الملخص التنفيذي للأسطول</h2>",
