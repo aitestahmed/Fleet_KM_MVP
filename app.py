@@ -370,6 +370,12 @@ if st.button("Generate AI Insight"):
     )
 
     report_html = response.choices[0].message.content
+    st.markdown("## 📑 AI Fleet Executive Report")
+
+st.markdown(
+    report_html,
+    unsafe_allow_html=True
+)
 
 # # st.markdown("## 📑 AI Fleet Executive Report")
 
