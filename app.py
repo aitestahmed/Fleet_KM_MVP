@@ -371,7 +371,7 @@ if st.button("Generate AI Insight"):
 
     report_html = response.choices[0].message.content
 
-    st.markdown("## 📑 AI Fleet Executive Report")
+st.markdown("## 📑 AI Fleet Executive Report")
 
 with st.expander("📊 AI Executive Report"):
 
