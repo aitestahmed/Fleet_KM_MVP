@@ -390,7 +390,7 @@ font-size:16px;
 
 st.markdown(formatted_report, unsafe_allow_html=True)
 
-    st.download_button(
+st.download_button(
         label="⬇ Download Fleet Report",
         data=report_html,
         file_name="fleet_report.html",
