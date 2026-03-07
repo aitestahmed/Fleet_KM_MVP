@@ -309,13 +309,13 @@ if st.button("Generate AI Insight"):
 
     top_cost = vehicle.sort_values("cost_per_km", ascending=False).head(5)
 
-top_profit = vehicle.sort_values("total_profit", ascending=False).head(5)
+    top_profit = vehicle.sort_values("total_profit", ascending=False).head(5)
 
-cost_types = cost_breakdown.head(10)
+    cost_types = cost_breakdown.head(10)
 
-top_cost_text = top_cost.to_string(index=False)
-top_profit_text = top_profit.to_string(index=False)
-cost_types_text = cost_types.to_string(index=False)
+    top_cost_text = top_cost.to_string(index=False)
+    top_profit_text = top_profit.to_string(index=False)
+    cost_types_text = cost_types.to_string(index=False)
 
 
 
