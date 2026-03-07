@@ -375,7 +375,7 @@ if st.button("Generate AI Insight"):
 
 with st.expander("📊 AI Executive Report"):
 
-    formatted_report = f"""
+formatted_report = f"""
 <div style="
 background-color:#f9fafb;
 padding:25px;
