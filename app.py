@@ -356,10 +356,7 @@ if st.session_state.report_html:
     )
     st.markdown("## 📑 AI Fleet Executive Report")
 
-st.markdown(
-    report_html,
-    unsafe_allow_html=True
-)
+
 
 # # st.markdown("## 📑 AI Fleet Executive Report")
 
