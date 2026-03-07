@@ -300,15 +300,22 @@ if st.button("Generate AI Insight"):
     {summary}
     """
 
- response = client.chat.completions.create(
+response = client.chat.completions.create(
     model="gpt-4o-mini",
     messages=[
-        {"role":"system","content":"أنت محلل بيانات تشغيلية لأساطيل النقل. قم بتحليل البيانات وقدم النتائج باللغة العربية وبأسلوب احترافي واضح."},
-        {"role":"user","content":prompt}
+        {
+            "role": "system",
+            "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل. قم بتحليل البيانات وقدم النتائج باللغة العربية وبأسلوب احترافي واضح."
+        },
+        {
+            "role": "user",
+            "content": prompt
+        }
     ],
     max_tokens=300
 )
-    st.write(response.choices[0].message.content)
+
+st.write(response.choices[0].message.content)
 # KPI Cards
 st.markdown(
     "<h2 style='text-align: right; font-weight: 700;'>🚛 الملخص التنفيذي للأسطول</h2>",
