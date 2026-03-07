@@ -4,12 +4,14 @@ import numpy as np
 import plotly.express as px
 import streamlit as st
 from supabase import create_client
+from openai import OpenAI
 
 
 # --- Supabase init ---
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_ANON_KEY = st.secrets["SUPABASE_KEY"]
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- Session state defaults ---
 if "user" not in st.session_state:
@@ -268,6 +270,43 @@ df_f = df_f[
 ]
 # ---------------- Compute KPIs ----------------
 daily, vehicle, fleet = compute_kpis(df_f)
+st.divider()
+st.markdown("## 🤖 AI Fleet Analysis")
+
+if st.button("Generate AI Insight"):
+
+    summary = f"""
+    Fleet Summary
+
+    Total KM: {fleet['total_km']}
+    Total Revenue: {fleet['total_revenue']}
+    Total Cost: {fleet['total_cost']}
+    Total Profit: {fleet['total_profit']}
+
+    Fleet Cost per KM: {fleet['fleet_cost_per_km']}
+    Profit Margin: {fleet['profit_margin_pct']}
+    """
+
+    prompt = f"""
+    You are a fleet management expert.
+
+    Analyze this fleet performance and give:
+
+    - main operational problems
+    - cost reduction opportunities
+    - fleet optimization suggestions
+
+    Data:
+    {summary}
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role":"user","content":prompt}],
+        max_tokens=300
+    )
+
+    st.write(response.choices[0].message.content)
 # KPI Cards
 st.markdown(
     "<h2 style='text-align: right; font-weight: 700;'>🚛 الملخص التنفيذي للأسطول</h2>",
