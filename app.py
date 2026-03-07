@@ -397,7 +397,7 @@ st.download_button(
         mime="text/html"
     )
 
-    st.markdown("## 📑 AI Fleet Executive Report")
+st.markdown("## 📑 AI Fleet Executive Report")
 
     with st.container():
         st.markdown(
