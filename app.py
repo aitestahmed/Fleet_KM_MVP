@@ -295,7 +295,7 @@ with col4:
 
 if st.button("Generate AI Insight"):
 
-if st.button("Generate AI Insight"):
+
 
     summary = f"""
     Fleet Summary
