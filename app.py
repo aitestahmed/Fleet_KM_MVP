@@ -399,7 +399,7 @@ st.download_button(
 
 st.markdown("## 📑 AI Fleet Executive Report")
 
-    with st.container():
+with st.container():
         st.markdown(
             f"""
             <div style="
