@@ -288,34 +288,32 @@ if st.button("Generate AI Insight"):
     """
 
     prompt = f"""
-    You are a fleet management expert.
+    قم بتحليل بيانات أسطول النقل التالية وقدّم:
 
-    Analyze this fleet performance and give:
+    1- المشكلات التشغيلية الرئيسية
+    2- فرص خفض التكاليف
+    3- توصيات لتحسين الكفاءة التشغيلية
 
-    - main operational problems
-    - cost reduction opportunities
-    - fleet optimization suggestions
-
-    Data:
+    البيانات:
     {summary}
     """
 
-response = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[
-        {
-            "role": "system",
-            "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل. قم بتحليل البيانات وقدم النتائج باللغة العربية وبأسلوب احترافي واضح."
-        },
-        {
-            "role": "user",
-            "content": prompt
-        }
-    ],
-    max_tokens=300
-)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل. قدم التحليل باللغة العربية بشكل احترافي."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        max_tokens=300
+    )
 
-st.write(response.choices[0].message.content)
+    st.write(response.choices[0].message.content)
 # KPI Cards
 st.markdown(
     "<h2 style='text-align: right; font-weight: 700;'>🚛 الملخص التنفيذي للأسطول</h2>",
