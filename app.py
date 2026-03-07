@@ -297,6 +297,10 @@ with col3:
 with col4:
     if st.button("⚠ Lowest Profit Vehicles"):
         st.dataframe(vehicle.sort_values("total_profit").head(5))
+        
+if "report_html" not in st.session_state:
+    st.session_state.report_html = None
+
 
 if st.button("Generate AI Insight"):
 
@@ -316,60 +320,39 @@ if st.button("Generate AI Insight"):
     top_profit = vehicle.sort_values("total_profit", ascending=False).head(5)
     cost_types = cost_breakdown.head(10)
 
-    top_cost_text = top_cost.to_string(index=False)
-    top_profit_text = top_profit.to_string(index=False)
-    cost_types_text = cost_types.to_string(index=False)
-
     prompt = f"""
-    قم بتحليل بيانات أسطول النقل التالية وارجع التقرير بصيغة HTML منسقة.
-
-    استخدم هذا الهيكل:
-
-    <h2>Executive Fleet Report</h2>
-
-    <h3>⚠️ المشكلات التشغيلية</h3>
-    قائمة نقطية
-
-    <h3>💰 فرص خفض التكاليف</h3>
-    قائمة نقطية
-
-    <h3>📊 تحليل أداء المركبات</h3>
-    شرح مختصر
-
-    <h3>🚀 التوصيات التشغيلية</h3>
-    قائمة نقطية
-
-    البيانات:
-
-    Fleet Summary:
-    {summary}
-
-    Top Vehicles by Cost per KM:
-    {top_cost_text}
-
-    Top Vehicles by Profit:
-    {top_profit_text}
-
-    Expense Breakdown:
-    {cost_types_text}
+    قم بتحليل بيانات أسطول النقل التالية...
     """
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {
-                "role": "system",
-                "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
+            {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."},
+            {"role": "user", "content": prompt}
         ],
         max_tokens=400
     )
 
-    report_html = response.choices[0].message.content
+    st.session_state.report_html = response.choices[0].message.content
+    if st.session_state.report_html:
+
+    st.markdown("## 📑 AI Fleet Executive Report")
+
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#f9fafb;
+            padding:25px;
+            border-radius:10px;
+            border:1px solid #e5e7eb;
+            line-height:1.8;
+            font-size:16px;
+        ">
+        {st.session_state.report_html}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     st.markdown("## 📑 AI Fleet Executive Report")
 
 st.markdown(
