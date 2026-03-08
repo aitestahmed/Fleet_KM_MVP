@@ -180,7 +180,20 @@ def compute_kpis(df):
 
     return daily, vehicle, fleet
 
+# -------- Test OpenAI Connection --------
+if st.button("Test AI"):
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "user", "content": "قل مرحبا"}
+        ]
+    )
+
+    st.write(response.choices[0].message.content)
+
 # --------- UI ---------
+
 uploaded = st.file_uploader("📂 قم برفع ملف الإكسل (.xlsx)", type=["xlsx"])
 if not uploaded:
     st.info("Upload an Excel file to start.")
