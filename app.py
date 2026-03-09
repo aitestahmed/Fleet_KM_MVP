@@ -376,6 +376,8 @@ if st.button("Generate AI Insight"):
     max_tokens=500
     )
 
+    st.write("Tokens used:", response.usage)
+    
     # حساب التوكين
     tokens_used = calculate_tokens(response)
 
