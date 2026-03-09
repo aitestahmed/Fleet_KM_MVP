@@ -115,15 +115,16 @@ auth_ui()
 
 if not st.session_state.user:
     st.stop()
-    # -------- Reload Credits from Supabase --------
+    # -------- Reload Credits from DB --------
+if "company_id" in st.session_state:
 
-company = supabase.table("Companies") \
-    .select("credits") \
-    .eq("id", st.session_state.company_id) \
-    .single() \
-    .execute()
+    company = supabase.table("Companies") \
+        .select("credits") \
+        .eq("id", st.session_state.company_id) \
+        .single() \
+        .execute()
 
-st.session_state.credits = company.data["credits"]
+    st.session_state.credits = company.data["credits"]
 
 
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
