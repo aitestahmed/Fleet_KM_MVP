@@ -60,7 +60,7 @@ def auth_ui():
                     .select("name, max_users, credits") \
                     .eq("id", company_id) \
                     .single() \
-                    .execute())
+                    .execute()
 
                 st.session_state.company_id = company_id
                 st.session_state.role = role
