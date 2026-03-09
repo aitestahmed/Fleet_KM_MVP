@@ -141,7 +141,7 @@ def calculate_tokens(response):
 
 
 def tokens_to_credit(tokens):
-    return tokens / 5000
+    return tokens / 1000
 
 def load_and_standardize(file):
     df = pd.read_excel(file, header=0)
