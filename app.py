@@ -68,6 +68,20 @@ def auth_ui():
                 st.session_state.max_users = company.data["max_users"]
                 st.session_state.credits = company.data["credits"]
 
+                # تحميل الكريديت من قاعدة البيانات
+                try:
+                    company = supabase.table("Companies") \
+                        .select("credits") \
+                        .eq("id", company_id) \
+                        .single() \
+                        .execute()
+                
+                    if company.data:
+                        st.session_state.credits = company.data["credits"]
+                
+                except Exception as e:
+                    st.error(e)
+
                 st.success("Logged in ✅")
                 st.rerun()
 
@@ -116,22 +130,7 @@ auth_ui()
 # منع الدخول إذا لم يتم تسجيل الدخول
 if not st.session_state.user:
     st.stop()
-   # تحميل الكريديت من قاعدة البيانات
-if "company_id" in st.session_state:
-
-    try:
-        company = supabase.table("Companies") \
-            .select("credits") \
-            .eq("id", st.session_state.company_id) \
-            .single() \
-            .execute()
-
-        if company.data:
-            st.session_state.credits = company.data["credits"]
-
-    except Exception:
-        st.session_state.credits = 0
-
+  
 
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 st.markdown(
