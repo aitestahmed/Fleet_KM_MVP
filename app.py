@@ -367,7 +367,7 @@ if st.button("Generate AI Insight"):
         - توصيات الإدارة
         """
 
-       response = client.chat.completions.create(
+    response = client.chat.completions.create(
     model="gpt-4o-mini",
     messages=[
         {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."},
