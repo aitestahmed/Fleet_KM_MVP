@@ -15,6 +15,10 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- Session state defaults ---
 if "user" not in st.session_state:
+    
+    if "credits" not in st.session_state:
+    st.session_state.credits = 100  # رصيد مبدئي
+
     st.session_state.user = None
 
 def auth_ui():
@@ -70,6 +74,8 @@ def auth_ui():
             except Exception as e:
                 st.error("Login failed.")
 
+
+    
     # -------- SIGN UP --------
     with tab2:
         email = st.text_input("Email", key="signup_email")
@@ -90,6 +96,13 @@ def auth_ui():
         st.sidebar.success(f"✅ Logged in: {st.session_state.user.email}")
         st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name','-')}")
         st.sidebar.markdown(f"👤 Role: {st.session_state.get('role','-')}")
+
+        st.sidebar.markdown("### 💳 Credits")
+
+st.sidebar.metric(
+    "الرصيد المتبقي",
+    f"{st.session_state.credits:.2f} جنيه"
+)
 
         if st.sidebar.button("Logout"):
             supabase.auth.sign_out()
@@ -119,6 +132,17 @@ st.markdown(
 
 
 # --------- Helpers ---------
+def calculate_tokens(response):
+    try:
+        tokens = response.usage.total_tokens
+    except:
+        tokens = 0
+    return tokens
+
+
+def tokens_to_credit(tokens):
+    return tokens / 5000
+
 def load_and_standardize(file):
     df = pd.read_excel(file, header=0)
     df.columns = df.columns.str.strip()
@@ -343,18 +367,28 @@ if st.button("Generate AI Insight"):
         - توصيات الإدارة
         """
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=500
-        )
+       response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[
+        {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."},
+        {"role": "user", "content": prompt}
+    ],
+    max_tokens=500
+)
 
-        st.session_state.report_html = response.choices[0].message.content
+# حساب التوكين
+tokens_used = calculate_tokens(response)
 
-        st.rerun()
+# تحويل التوكين إلى كريديت
+credit_used = tokens_to_credit(tokens_used)
+
+# خصم من الرصيد
+st.session_state.credits -= credit_used
+
+
+st.session_state.report_html = response.choices[0].message.content
+
+st.rerun()
 
 if st.session_state.report_html:
 
