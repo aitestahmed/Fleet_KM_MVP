@@ -93,22 +93,22 @@ def auth_ui():
 
     # -------- Logged state --------
     # -------- Logged state --------
-if st.session_state.user:
-    st.sidebar.success(f"✅ Logged in: {st.session_state.user.email}")
-    st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name','-')}")
-    st.sidebar.markdown(f"👤 Role: {st.session_state.get('role','-')}")
-
-    st.sidebar.markdown("### 💳 Credits")
-
-    st.sidebar.metric(
-        "الرصيد المتبقي",
-        f"{st.session_state.credits:.2f} جنيه"
-    )
-
-    if st.sidebar.button("Logout"):
-        supabase.auth.sign_out()
-        st.session_state.user = None
-        st.rerun()
+    if st.session_state.user:
+        st.sidebar.success(f"✅ Logged in: {st.session_state.user.email}")
+        st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name','-')}")
+        st.sidebar.markdown(f"👤 Role: {st.session_state.get('role','-')}")
+    
+        st.sidebar.markdown("### 💳 Credits")
+    
+        st.sidebar.metric(
+            "الرصيد المتبقي",
+            f"{st.session_state.credits:.2f} جنيه"
+        )
+    
+        if st.sidebar.button("Logout"):
+            supabase.auth.sign_out()
+            st.session_state.user = None
+            st.rerun()
 
 # --- Gate ---
 auth_ui()
