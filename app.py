@@ -14,13 +14,12 @@ supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --- Session state defaults ---
+# --- Session state defaults ---
 if "user" not in st.session_state:
-    
-    if "credits" not in st.session_state:
-    st.session_state.credits = 100  # رصيد مبدئي
-
     st.session_state.user = None
 
+if "credits" not in st.session_state:
+    st.session_state.credits = 100
 def auth_ui():
     st.sidebar.title("🔐 Account")
 
