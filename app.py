@@ -113,18 +113,24 @@ def auth_ui():
 # --- Gate ---
 auth_ui()
 
+# منع الدخول إذا لم يتم تسجيل الدخول
 if not st.session_state.user:
     st.stop()
-    # -------- Reload Credits from DB --------
+   # تحميل الكريديت من قاعدة البيانات
 if "company_id" in st.session_state:
 
-    company = supabase.table("Companies") \
-        .select("credits") \
-        .eq("id", st.session_state.company_id) \
-        .single() \
-        .execute()
+    try:
+        company = supabase.table("Companies") \
+            .select("credits") \
+            .eq("id", st.session_state.company_id) \
+            .single() \
+            .execute()
 
-    st.session_state.credits = company.data["credits"]
+        if company.data:
+            st.session_state.credits = company.data["credits"]
+
+    except Exception:
+        st.session_state.credits = 0
 
 
 st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
