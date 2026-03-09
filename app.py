@@ -390,13 +390,10 @@ if st.button("Generate AI Insight"):
     tokens_used = calculate_tokens(response)
 
     # تحويل التوكين إلى كريديت
-    credit_used = tokens_to_credit(tokens_used)
+    credit_used = 2
 
     # خصم من الرصيد
-    new_credit = st.session_state.credits - credit_used
-    if "company_id" not in st.session_state:
-        st.error("Company not loaded")
-        st.stop()
+    new_credit = float(st.session_state.credits) - float(credit_used)
 
     supabase.table("Companies").update({
         "credits": new_credit
