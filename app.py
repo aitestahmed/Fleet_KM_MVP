@@ -57,15 +57,16 @@ def auth_ui():
 
                 # 🔹 جلب بيانات الشركة
                 company = supabase.table("Companies") \
-                    .select("name, max_users") \
+                    .select("name, max_users, credits") \
                     .eq("id", company_id) \
                     .single() \
-                    .execute()
+                    .execute())
 
                 st.session_state.company_id = company_id
                 st.session_state.role = role
                 st.session_state.company_name = company.data["name"]
                 st.session_state.max_users = company.data["max_users"]
+                st.session_state.credits = company.data["credits"]
 
                 st.success("Logged in ✅")
                 st.rerun()
@@ -340,6 +341,10 @@ if "report_html" not in st.session_state:
 
 
 if st.button("Generate AI Insight"):
+    # فحص الرصيد قبل تشغيل AI
+    if st.session_state.credits <= 0:
+        st.error("رصيدك انتهى. يرجى شحن الحساب.")
+        st.stop()
 
     with st.spinner("AI is analyzing fleet data..."):
 
@@ -385,7 +390,13 @@ if st.button("Generate AI Insight"):
     credit_used = tokens_to_credit(tokens_used)
 
     # خصم من الرصيد
-    st.session_state.credits -= credit_used
+    new_credit = st.session_state.credits - credit_used
+
+    supabase.table("Companies").update({
+        "credits": new_credit
+    }).eq("id", st.session_state.company_id).execute()
+    
+    st.session_state.credits = new_credit
 
 
     st.session_state.report_html = response.choices[0].message.content
