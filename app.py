@@ -374,21 +374,21 @@ if st.button("Generate AI Insight"):
         {"role": "user", "content": prompt}
     ],
     max_tokens=500
-)
+    )
 
-# حساب التوكين
-tokens_used = calculate_tokens(response)
+    # حساب التوكين
+    tokens_used = calculate_tokens(response)
 
-# تحويل التوكين إلى كريديت
-credit_used = tokens_to_credit(tokens_used)
+    # تحويل التوكين إلى كريديت
+    credit_used = tokens_to_credit(tokens_used)
 
-# خصم من الرصيد
-st.session_state.credits -= credit_used
+    # خصم من الرصيد
+    st.session_state.credits -= credit_used
 
 
-st.session_state.report_html = response.choices[0].message.content
+    st.session_state.report_html = response.choices[0].message.content
 
-st.rerun()
+    st.rerun()
 
 if st.session_state.report_html:
 
