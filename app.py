@@ -19,7 +19,7 @@ if "user" not in st.session_state:
     st.session_state.user = None
 
 if "credits" not in st.session_state:
-    st.session_state.credits = 100
+    st.session_state.credits = 0
 def auth_ui():
     st.sidebar.title("🔐 Account")
 
@@ -372,14 +372,16 @@ if st.button("Generate AI Insight"):
         - توصيات الإدارة
         """
 
-    response = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[
-        {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."},
-        {"role": "user", "content": prompt}
-    ],
-    max_tokens=500
-    )
+    with st.spinner("AI is analyzing fleet data..."):
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=500
+        )
 
     st.write("Tokens used:", response.usage)
     
@@ -391,6 +393,9 @@ if st.button("Generate AI Insight"):
 
     # خصم من الرصيد
     new_credit = st.session_state.credits - credit_used
+    if "company_id" not in st.session_state:
+        st.error("Company not loaded")
+        st.stop()
 
     supabase.table("Companies").update({
         "credits": new_credit
