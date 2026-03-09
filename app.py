@@ -68,20 +68,6 @@ def auth_ui():
                 st.session_state.max_users = company.data["max_users"]
                 st.session_state.credits = company.data["credits"]
 
-                # تحميل الكريديت من قاعدة البيانات
-                try:
-                    company = supabase.table("Companies") \
-                        .select("credits") \
-                        .eq("id", company_id) \
-                        .single() \
-                        .execute()
-                
-                    if company.data:
-                        st.session_state.credits = company.data["credits"]
-                
-                except Exception as e:
-                    st.error(e)
-
                 st.success("Logged in ✅")
                 st.rerun()
 
