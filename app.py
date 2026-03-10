@@ -837,6 +837,9 @@ st.data_editor(df_preview.head(50), use_container_width=True)
 # 💬 CHAT WITH YOUR DATA
 # =========================================
 
+# =========================================
+# 💬 CHAT WITH YOUR DATA
+# =========================================
 
 st.divider()
 
@@ -927,26 +930,25 @@ if question:
             max_tokens=120
         )
 
-       code = response.choices[0].message.content
+        code = response.choices[0].message.content
 
-# تنظيف الكود
+        # تنظيف الكود
         code = code.replace("```python", "")
         code = code.replace("```", "")
         code = code.strip()
 
         st.markdown("### 🔎 Generated Analysis")
-        
-        st.code(code)
-        
-        try:
-        
-            result = eval(code)
-        
-            st.markdown("### 📊 Result")
-        
-            st.write(result)
-        
-        except Exception as e:
-        
-            st.error("لم يتمكن النظام من تحليل السؤال.")
 
+        st.code(code)
+
+        try:
+
+            result = eval(code, {"df_f": df_f, "vehicle": vehicle, "fleet": fleet})
+
+            st.markdown("### 📊 Result")
+
+            st.write(result)
+
+        except Exception:
+
+            st.error("لم يتمكن النظام من تحليل السؤال.")
