@@ -934,19 +934,19 @@ if question:
         code = code.replace("```", "")
         code = code.strip()
 
-st.markdown("### 🔎 Generated Analysis")
-
-st.code(code)
-
-try:
-
-    result = eval(code)
-
-    st.markdown("### 📊 Result")
-
-    st.write(result)
-
-except Exception as e:
-
-    st.error("لم يتمكن النظام من تحليل السؤال.")
+        st.markdown("### 🔎 Generated Analysis")
+        
+        st.code(code)
+        
+        try:
+        
+            result = eval(code)
+        
+            st.markdown("### 📊 Result")
+        
+            st.write(result)
+        
+        except Exception as e:
+        
+            st.error("لم يتمكن النظام من تحليل السؤال.")
 
