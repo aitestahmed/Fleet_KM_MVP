@@ -345,5 +345,224 @@ df_f = df_f[
 # 11️⃣ DASHBOARD
 # =========================================
 
+# =========================================
+# 12 KPI ENGINE
+# =========================================
+
+daily, vehicle, fleet = compute_kpis(df_f)
+
+cost_breakdown = (
+    df_f.groupby("account_type", as_index=False)
+        .agg(total_expense=("expense_amount", "sum"))
+        .sort_values("total_expense", ascending=False)
+)
+# =========================================
+# 13 QUICK INSIGHTS
+# =========================================
+
+st.divider()
+st.markdown("## 🤖 Fleet Quick Insights")
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    if st.button("🔴 Highest Cost per KM"):
+        st.dataframe(vehicle.sort_values("cost_per_km", ascending=False).head(5))
+
+with col2:
+    if st.button("🟢 Most Profitable Vehicles"):
+        st.dataframe(vehicle.sort_values("total_profit", ascending=False).head(5))
+
+with col3:
+    if st.button("🟣 Expense Categories"):
+        st.dataframe(cost_breakdown)
+
+with col4:
+    if st.button("⚠ Lowest Profit Vehicles"):
+        st.dataframe(vehicle.sort_values("total_profit").head(5))
+
+# =========================================
+# 14 AI ENGINE
+# =========================================
+
+if "report_html" not in st.session_state:
+    st.session_state.report_html = None
+
+if st.button("Generate AI Insight"):
+
+    if st.session_state.credits <= 0:
+        st.error("رصيدك انتهى. يرجى شحن الحساب.")
+        st.stop()
+
+    summary = f"""
+    Fleet Summary
+
+    Total KM: {fleet['total_km']}
+    Total Revenue: {fleet['total_revenue']}
+    Total Cost: {fleet['total_cost']}
+    Total Profit: {fleet['total_profit']}
+
+    Fleet Cost per KM: {fleet['fleet_cost_per_km']}
+    Profit Margin: {fleet['profit_margin_pct']}
+    """
+
+    prompt = f"""
+    قم بتحليل بيانات أسطول النقل التالية وقدم تقرير تنفيذي واضح.
+
+    {summary}
+
+    اشرح:
+    - المشكلات التشغيلية
+    - السيارات الأعلى تكلفة
+    - فرص تقليل التكلفة
+    - توصيات الإدارة
+    """
+
+    with st.spinner("AI is analyzing fleet data..."):
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=500
+        )
+
+    tokens_used = calculate_tokens(response)
+
+    credit_used = 2
+
+    new_credit = float(st.session_state.credits) - float(credit_used)
+
+    supabase.table("Companies").update({
+        "credits": new_credit
+    }).eq("id", st.session_state.company_id).execute()
+
+    st.session_state.credits = new_credit
+
+    st.session_state.report_html = response.choices[0].message.content
+
+    st.rerun()
+
+
+if st.session_state.report_html:
+
+    st.markdown("## 📑 AI Fleet Executive Report")
+
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#f9fafb;
+            padding:25px;
+            border-radius:10px;
+            border:1px solid #e5e7eb;
+            line-height:1.8;
+            font-size:16px;
+        ">
+        {st.session_state.report_html}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+# =========================================
+# 15 KPI DASHBOARD
+# =========================================
+
+st.markdown(
+    "<h2 style='text-align: right; font-weight: 700;'>🚛 الملخص التنفيذي للأسطول</h2>",
+    unsafe_allow_html=True
+)
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.metric(
+        "💸 تكلفة الكيلومتر",
+        f"{fleet['fleet_cost_per_km']:,.2f}"
+    )
+
+with col2:
+    st.metric(
+        "💰 الإيراد لكل كيلومتر",
+        f"{(fleet['total_revenue']/fleet['total_km'] if fleet['total_km']>0 else 0):,.2f}"
+    )
+
+with col3:
+    st.metric(
+        "📈 نسبة الربحية %",
+        f"{fleet['profit_margin_pct']:,.2f}%"
+    )
+
+with col4:
+    st.metric(
+        "🚛 إجمالي الكيلومترات",
+        f"{fleet['total_km']:,.0f}"
+    )
+
+# =========================================
+# 16 VISUALIZATION ENGINE
+# =========================================
+
+st.divider()
+
+st.markdown(
+    "<h2 style='text-align: right;'>📊 نظرة عامة على الأداء</h2>",
+    unsafe_allow_html=True
+)
+
+colA, colB = st.columns(2)
+
+worst_vehicles = vehicle.sort_values("cost_per_km", ascending=False).head(5).copy()
+
+fig1 = px.bar(
+    worst_vehicles,
+    x="cost_per_km",
+    y="vehicle_id",
+    orientation="h",
+    title="🔴 أعلى 5 سيارات من حيث تكلفة الكيلومتر"
+)
+
+colA.plotly_chart(fig1, use_container_width=True)
+
+best_vehicles = vehicle.sort_values("total_profit", ascending=False).head(5).copy()
+
+fig2 = px.bar(
+    best_vehicles,
+    x="total_profit",
+    y="vehicle_id",
+    orientation="h",
+    title="🟢 أفضل 5 سيارات من حيث صافي الربح"
+)
+
+colB.plotly_chart(fig2, use_container_width=True)
+
+# =========================================
+# 17 DATA PREVIEW
+# =========================================
+
+st.divider()
+
+st.markdown(
+    "<h3 style='text-align: right;'>📋 معاينة البيانات</h3>",
+    unsafe_allow_html=True
+)
+
+df_preview = df_f.rename(columns={
+    "vehicle_id": "رقم السيارة",
+    "date": "التاريخ",
+    "location": "الموقع",
+    "vehicle_type": "نوع المركبة",
+    "account_type": "نوع الحساب",
+    "expense_amount": "قيمة المصروف",
+    "revenue": "الإيراد",
+    "kilometers": "الكيلومترات"
+})
+
+df_preview = df_preview[df_preview.columns[::-1]]
+
+st.data_editor(df_preview.head(50), use_container_width=True)
+
 
 
