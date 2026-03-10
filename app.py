@@ -833,5 +833,116 @@ df_preview = df_preview[df_preview.columns[::-1]]
 
 st.data_editor(df_preview.head(50), use_container_width=True)
 
+# =========================================
+# 💬 CHAT WITH YOUR DATA
+# =========================================
+
+
+st.divider()
+
+st.markdown(
+    "<h2 style='text-align:right;'>💬 اسأل عن بياناتك</h2>",
+    unsafe_allow_html=True
+)
+
+st.info(
+"""
+يمكنك سؤال النظام عن بيانات التشغيل مثل:
+
+• أعلى سيارة ربح  
+• أقل سيارة ربح  
+• أعلى تكلفة كيلومتر  
+• إجمالي الكيلومترات  
+• أكثر نوع مصروف  
+
+⚠️ يفضل أن يكون السؤال قصيرًا (حتى 5 كلمات).
+"""
+)
+
+question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 5 كلمات)")
+
+if question:
+
+    # منع الأسئلة الطويلة
+    words = question.split()
+
+    if len(words) > 5:
+        st.error("السؤال يجب ألا يزيد عن 5 كلمات")
+        st.stop()
+
+    # ---------------------------------
+    # العمليات المسموح بها
+    # ---------------------------------
+
+    allowed_operations = """
+    يسمح فقط باستخدام العمليات التالية في pandas:
+
+    groupby
+    sum
+    mean
+    max
+    min
+    sort_values
+    head
+    tail
+    count
+    value_counts
+    """
+
+    # ---------------------------------
+    # تجهيز Prompt
+    # ---------------------------------
+
+    prompt = f"""
+    أنت محلل بيانات.
+
+    لديك dataframe اسمه df_f
+
+    الأعمدة هي:
+
+    {list(df_f.columns)}
+
+    {allowed_operations}
+
+    اكتب كود pandas فقط للإجابة عن السؤال.
+
+    الشروط:
+    - لا تستخدم import
+    - لا تستخدم ملفات
+    - لا تستخدم مكتبات أخرى
+    - لا تكتب شرح
+
+    السؤال:
+    {question}
+    """
+
+    with st.spinner("AI analyzing your question..."):
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a data analyst"},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=120
+        )
+
+    code = response.choices[0].message.content
+
+    st.markdown("### 🔎 Generated Analysis")
+
+    st.code(code)
+
+    try:
+
+        result = eval(code)
+
+        st.markdown("### 📊 Result")
+
+        st.write(result)
+
+    except Exception:
+
+        st.error("لم يتمكن النظام من تحليل السؤال.")
 
 
