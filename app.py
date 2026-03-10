@@ -927,12 +927,12 @@ if question:
             max_tokens=120
         )
 
-  code = response.choices[0].message.content
+   code = response.choices[0].message.content
 
 # تنظيف الكود
-code = code.replace("```python", "")
-code = code.replace("```", "")
-code = code.strip()
+        code = code.replace("```python", "")
+        code = code.replace("```", "")
+        code = code.strip()
 
 st.markdown("### 🔎 Generated Analysis")
 
