@@ -927,7 +927,7 @@ if question:
             max_tokens=120
         )
 
-   code = response.choices[0].message.content
+       code = response.choices[0].message.content
 
 # تنظيف الكود
         code = code.replace("```python", "")
