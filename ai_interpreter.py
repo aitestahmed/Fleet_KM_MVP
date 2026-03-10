@@ -98,6 +98,7 @@ Rules:
 - choose 1 to 3 charts only
 - do not include markdown
 - return JSON only
+-charts must use canonical schema field names (revenue, product, quantity, date...) NOT original column names
 """
 
     response = client.chat.completions.create(
