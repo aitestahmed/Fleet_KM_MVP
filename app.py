@@ -927,22 +927,26 @@ if question:
             max_tokens=120
         )
 
-    code = response.choices[0].message.content
+  code = response.choices[0].message.content
 
-    st.markdown("### 🔎 Generated Analysis")
+# تنظيف الكود
+code = code.replace("```python", "")
+code = code.replace("```", "")
+code = code.strip()
 
-    st.code(code)
+st.markdown("### 🔎 Generated Analysis")
 
-    try:
+st.code(code)
 
-        result = eval(code)
+try:
 
-        st.markdown("### 📊 Result")
+    result = eval(code)
 
-        st.write(result)
+    st.markdown("### 📊 Result")
 
-    except Exception:
+    st.write(result)
 
-        st.error("لم يتمكن النظام من تحليل السؤال.")
+except Exception as e:
 
+    st.error("لم يتمكن النظام من تحليل السؤال.")
 
