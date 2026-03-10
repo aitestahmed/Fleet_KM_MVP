@@ -6,10 +6,6 @@ import streamlit as st
 from supabase import create_client
 from openai import OpenAI
 
-from ai_interpreter import detect_schema_kpis_charts_with_ai
-from schema_mapper import apply_ai_schema
-from generic_ai_dashboard import render_kpis, render_charts
-
 
 # --- Supabase init ---
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -230,28 +226,7 @@ if not uploaded:
     st.stop()
 
 # تحميل البيانات مرة واحدة فقط
-
-raw_df = pd.read_excel(uploaded, header=0)
-raw_df.columns = raw_df.columns.str.strip()
-
-ai_plan = detect_schema_kpis_charts_with_ai(raw_df)
-
-st.markdown("## 🧠 AI Dataset Understanding")
-st.write("**Dataset Type:**", ai_plan.get("dataset_type"))
-st.write("**AI Notes:**", ai_plan.get("notes", ""))
-
-with st.expander("View AI Schema"):
-    st.json(ai_plan)
-
-df = apply_ai_schema(raw_df, ai_plan.get("schema", {}))
-
-dataset_type = ai_plan.get("dataset_type", "other")
-
-if dataset_type != "fleet":
-    render_kpis(df, dataset_type, ai_plan.get("kpis", []))
-    render_charts(df, ai_plan.get("charts", []))
-    st.stop()
-
+df = load_and_standardize(uploaded)
 
 # تجهيز قائمة العربيات
 # تجهيز قائمة العربيات
