@@ -19,6 +19,25 @@ supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
+
+# =========================================
+# HELPERS
+# =========================================
+
+def calculate_tokens(response):
+    try:
+        tokens = response.usage.total_tokens
+    except:
+        tokens = 0
+    return tokens
+
+
+def tokens_to_credit(tokens):
+    credit = tokens / 1000
+    return round(credit, 2)
+
+
+
 # =========================================
 # 3️⃣ SESSION STATE
 # =========================================
@@ -385,15 +404,23 @@ with col4:
 # 14 AI ENGINE
 # =========================================
 
+
+# تهيئة متغير التقرير
 if "report_html" not in st.session_state:
     st.session_state.report_html = None
 
+
+# زر تشغيل التحليل
 if st.button("Generate AI Insight"):
 
+    # التحقق من الرصيد
     if st.session_state.credits <= 0:
         st.error("رصيدك انتهى. يرجى شحن الحساب.")
         st.stop()
 
+    # ---------------------------------
+    # تجهيز ملخص البيانات
+    # ---------------------------------
     summary = f"""
     Fleet Summary
 
@@ -406,6 +433,9 @@ if st.button("Generate AI Insight"):
     Profit Margin: {fleet['profit_margin_pct']}
     """
 
+    # ---------------------------------
+    # بناء الـ Prompt
+    # ---------------------------------
     prompt = f"""
     قم بتحليل بيانات أسطول النقل التالية وقدم تقرير تنفيذي واضح.
 
@@ -418,21 +448,37 @@ if st.button("Generate AI Insight"):
     - توصيات الإدارة
     """
 
+    # ---------------------------------
+    # استدعاء AI
+    # ---------------------------------
     with st.spinner("AI is analyzing fleet data..."):
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
             ],
             max_tokens=500
         )
 
+    # ---------------------------------
+    # حساب التوكين
+    # ---------------------------------
     tokens_used = calculate_tokens(response)
 
-    credit_used = 2
+    # تحويل التوكين إلى Credits
+    credit_used = tokens_to_credit(tokens_used)
 
+    # ---------------------------------
+    # خصم الرصيد
+    # ---------------------------------
     new_credit = float(st.session_state.credits) - float(credit_used)
 
     supabase.table("Companies").update({
@@ -441,10 +487,18 @@ if st.button("Generate AI Insight"):
 
     st.session_state.credits = new_credit
 
+    # ---------------------------------
+    # حفظ التقرير
+    # ---------------------------------
     st.session_state.report_html = response.choices[0].message.content
 
+    # إعادة تشغيل الصفحة
     st.rerun()
 
+
+# =========================================
+# عرض تقرير AI
+# =========================================
 
 if st.session_state.report_html:
 
