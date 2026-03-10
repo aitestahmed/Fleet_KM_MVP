@@ -68,8 +68,8 @@ You must return JSON with this exact structure:
   "charts": [
     {{
       "type": "bar or line or pie",
-      "x": "canonical field name",
-      "y": "canonical field name",
+      "x": "canonical field name from schema"
+      "y": "canonical field name from schema"
       "aggregation": "sum or mean or count",
       "title": "short title"
     }}
