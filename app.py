@@ -1258,7 +1258,7 @@ nunique
 # إنشاء عينة من البيانات لتقليل التوكن
 # ---------------------------------
 
-df_sample = df_f.head(3000)
+df_sample = df_filtered.sample(min(3000, len(df_filtered)))
 allowed_operations = """
 يسمح فقط باستخدام العمليات التالية في pandas:
 
@@ -1335,7 +1335,7 @@ with st.spinner("🤖 AI يحلل سؤالك..."):
         st.code(code)
 
         # تنفيذ الكود على العينة
-        result = eval(code, {"df_sample": df_sample})
+        result = eval(code, {"df_sample": df_sample, "pd": pd})
 
         st.markdown("### 📊 النتيجة")
 
