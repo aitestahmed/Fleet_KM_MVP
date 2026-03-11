@@ -168,147 +168,159 @@ st.markdown(
     unsafe_allow_html=True
 )
 # =========================================
+# =========================================
 # 7️⃣ DATA LOADING
 # =========================================
 
 def load_and_standardize(file):
+
     df = pd.read_excel(file, header=0)
     df.columns = df.columns.str.strip()
 
-    rename_map = column_mapping = {
+    rename_map = {
 
-    "اسم الفرع": "branch_name",
-    "رقم الفرع": "branch_id",
+        "اسم الفرع": "branch_name",
+        "رقم الفرع": "branch_id",
 
-    "كود المخزن": "warehouse_id",
-    "اسم المخزن": "warehouse_name",
+        "كود المخزن": "warehouse_id",
+        "اسم المخزن": "warehouse_name",
 
-    "رقم المشرف": "supervisor_id",
-    "اسم المشرف": "supervisor_name",
+        "رقم المشرف": "supervisor_id",
+        "اسم المشرف": "supervisor_name",
 
-    "رقم المندوب": "sales_rep_id",
-    "اسم المندوب": "sales_rep_name",
+        "رقم المندوب": "sales_rep_id",
+        "اسم المندوب": "sales_rep_name",
 
-    "رقم الاوردر": "order_id",
-    "نوع الاوردر": "order_type",
+        "رقم الاوردر": "order_id",
+        "نوع الاوردر": "order_type",
 
-    "كود العميل": "customer_id",
-    "اسم العميل": "customer_name",
+        "كود العميل": "customer_id",
+        "اسم العميل": "customer_name",
 
-    "التاريخ": "date",
+        "التاريخ": "date",
 
-    "رقم الصنف": "product_id",
-    "اسم الصنف": "product_name",
+        "رقم الصنف": "product_id",
+        "اسم الصنف": "product_name",
 
-    "كود البراند": "brand_id",
-    "اسم البراند": "brand_name",
+        "كود البراند": "brand_id",
+        "اسم البراند": "brand_name",
 
-    "الكمية": "quantity",
-    "وحدة القياس": "unit",
+        "الكمية": "quantity",
+        "وحدة القياس": "unit",
 
-    "السعر": "price",
+        "السعر": "price",
 
-    "اجمالي الخصومات": "total_discount",
-    "اجمالي الضرائب": "total_tax",
+        "اجمالي الخصومات": "total_discount",
+        "اجمالي الضرائب": "total_tax",
 
-    "اصناف مجانية": "free_items",
+        "اصناف مجانية": "free_items",
 
-    "الاجمالي": "total_amount",
+        "الاجمالي": "total_amount",
 
-    "كود المحافظة": "governorate_id",
-    "اسم المحافظة": "governorate",
+        "كود المحافظة": "governorate_id",
+        "اسم المحافظة": "governorate",
 
-    "كود المدينة": "city_id",
-    "اسم المدينة": "city",
+        "كود المدينة": "city_id",
+        "اسم المدينة": "city",
 
-    "كود المنطقة": "area_id",
-    "اسم المنطقة": "area",
+        "كود المنطقة": "area_id",
+        "اسم المنطقة": "area",
 
-    "كود المسار": "route_id",
-    "اسم المسار": "route_name",
+        "كود المسار": "route_id",
+        "اسم المسار": "route_name",
 
-    "اسم المستخدم": "created_by",
+        "اسم المستخدم": "created_by",
+        "CreatedOn": "created_on",
+        "المصدر": "source"
+    }
 
-    "CreatedOn": "created_on",
-
-    "المصدر": "source"
-}
     df = df.rename(columns=rename_map)
 
-required = [
-    "order_id",
-    "date",
-    "branch_name",
-    "sales_rep_id",
-    "customer_id",
-    "product_id",
-    "quantity",
-    "price",
-    "total_amount",
-    "total_discount",
-    "brand_name",
-    "governorate",
-    "city"
-]
+    # ------------------------------
+    # Required columns
+    # ------------------------------
 
-missing = [c for c in required if c not in df.columns]
+    required = [
+        "order_id",
+        "date",
+        "branch_name",
+        "sales_rep_id",
+        "customer_id",
+        "product_id",
+        "quantity",
+        "price",
+        "total_amount",
+        "total_discount",
+        "brand_name",
+        "governorate",
+        "city"
+    ]
 
-if missing:
-    st.error(f"Missing required columns: {missing}")
-    st.stop()
+    missing = [c for c in required if c not in df.columns]
 
+    if missing:
+        st.error(f"Missing required columns: {missing}")
+        st.stop()
 
-# تحويل التاريخ
-df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    # ------------------------------
+    # Date conversion
+    # ------------------------------
 
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-# تحويل الأعمدة الرقمية
-numeric_cols = [
-    "quantity",
-    "price",
-    "total_discount",
-    "total_tax",
-    "free_items",
-    "total_amount"
-]
+    # ------------------------------
+    # Numeric columns
+    # ------------------------------
 
-for c in numeric_cols:
-    if c in df.columns:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
+    numeric_cols = [
+        "quantity",
+        "price",
+        "total_discount",
+        "total_tax",
+        "free_items",
+        "total_amount"
+    ]
 
+    for c in numeric_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
 
-# حذف الصفوف غير الصحيحة
-df = df.dropna(subset=["order_id", "date"])
+    # ------------------------------
+    # Clean data
+    # ------------------------------
 
+    df = df.dropna(subset=["order_id", "date"])
 
-# الأعمدة المستخدمة في التحليل
-df = df[[
-    "branch_name",
-    "sales_rep_id",
-    "sales_rep_name",
-    "customer_id",
-    "customer_name",
-    "order_id",
-    "order_type",
-    "date",
-    "product_id",
-    "product_name",
-    "brand_name",
-    "quantity",
-    "unit",
-    "price",
-    "total_discount",
-    "total_tax",
-    "free_items",
-    "total_amount",
-    "governorate",
-    "city",
-    "area",
-    "route_name"
-]]
+    # ------------------------------
+    # Final columns
+    # ------------------------------
 
-return df
+    df = df[[
+        "branch_name",
+        "sales_rep_id",
+        "sales_rep_name",
+        "customer_id",
+        "customer_name",
+        "order_id",
+        "order_type",
+        "date",
+        "product_id",
+        "product_name",
+        "brand_name",
+        "quantity",
+        "unit",
+        "price",
+        "total_discount",
+        "total_tax",
+        "free_items",
+        "total_amount",
+        "governorate",
+        "city",
+        "area",
+        "route_name"
+    ]]
 
+    return df
 # =========================================
 # 8️⃣ KPI ENGINE (SALES)
 # =========================================
