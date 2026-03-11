@@ -1145,7 +1145,44 @@ st.download_button(
     mime="text/csv"
 )
 
+# =========================================
+# ⚡ QUICK AI QUESTIONS
+# =========================================
 
+st.divider()
+
+st.markdown(
+    "<h3 style='text-align:right;'>⚡ أسئلة سريعة بالذكاء الاصطناعي</h3>",
+    unsafe_allow_html=True
+)
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    q1 = st.button("أعلى محافظة مبيعات")
+
+with col2:
+    q2 = st.button("أكثر براند مبيعًا")
+
+with col3:
+    q3 = st.button("أفضل مندوب مبيعات")
+
+with col4:
+    q4 = st.button("إجمالي المبيعات")
+
+quick_question = None
+
+if q1:
+    quick_question = "أعلى محافظة مبيعات"
+
+if q2:
+    quick_question = "أكثر براند مبيعًا"
+
+if q3:
+    quick_question = "أفضل مندوب مبيعات"
+
+if q4:
+    quick_question = "إجمالي المبيعات"
 # =========================================
 # 💬 CHAT WITH YOUR DATA
 # =========================================
@@ -1174,6 +1211,10 @@ st.info(
 
 # كتابة السؤال
 question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 6 كلمات)")
+
+# إذا ضغط المستخدم سؤال سريع
+if quick_question:
+    question = quick_question
 
 # زر تنفيذ السؤال
 run_question = st.button("🔍 تحليل السؤال")
@@ -1213,21 +1254,30 @@ nunique
     # ---------------------------------
     # تجهيز Prompt
     # ---------------------------------
+# ---------------------------------
+# إنشاء عينة من البيانات لتقليل التوكن
+# ---------------------------------
 
-    prompt = f"""
+df_sample = df_f.head(3000)
+
+# ---------------------------------
+# تجهيز Prompt
+# ---------------------------------
+
+prompt = f"""
 أنت محلل بيانات مبيعات محترف.
 
-لديك dataframe اسمه df_f
+لديك dataframe اسمه df_sample
 
 الأعمدة المتاحة:
 
-{list(df_f.columns)}
+{list(df_sample.columns)}
 
 {allowed_operations}
 
 القواعد:
 
-- استخدم df_f فقط
+- استخدم df_sample فقط
 - لا تستخدم import
 - لا تستخدم ملفات
 - لا تستخدم مكتبات أخرى
@@ -1239,42 +1289,43 @@ nunique
 {question}
 """
 
-    with st.spinner("🤖 AI يحلل سؤالك..."):
+with st.spinner("🤖 AI يحلل سؤالك..."):
 
-        try:
+    try:
 
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a professional sales data analyst using pandas."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                max_tokens=120
-            )
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a professional sales data analyst using pandas."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_tokens=120
+        )
 
-            code = response.choices[0].message.content
+        code = response.choices[0].message.content
 
-            # تنظيف الكود
-            code = code.replace("```python", "")
-            code = code.replace("```", "")
-            code = code.strip()
+        # تنظيف الكود
+        code = code.replace("```python", "")
+        code = code.replace("```", "")
+        code = code.strip()
 
-            st.markdown("### 🔎 الكود الذي أنشأه AI")
+        st.markdown("### 🔎 الكود الذي أنشأه AI")
 
-            st.code(code)
+        st.code(code)
 
-            result = eval(code, {"df_f": df_f})
+        # تنفيذ الكود على العينة
+        result = eval(code, {"df_sample": df_sample})
 
-            st.markdown("### 📊 النتيجة")
+        st.markdown("### 📊 النتيجة")
 
-            st.write(result)
+        st.write(result)
 
-        except Exception:
+    except Exception:
 
-            st.error("لم يتمكن النظام من تحليل السؤال.")
+        st.error("لم يتمكن النظام من تحليل السؤال.")
