@@ -172,6 +172,7 @@ st.markdown(
 # 7️⃣ DATA LOADING
 # =========================================
 
+@st.cache_data
 def load_and_standardize(file):
 
     df = pd.read_excel(file, header=0)
@@ -731,7 +732,11 @@ if "report_html" not in st.session_state:
 
 
 # زر تشغيل التحليل
-if st.button("🤖 Generate Sales AI Insight"):
+if "ai_running" not in st.session_state:
+    st.session_state.ai_running = False
+if st.button("Generate Sales AI Insight") and not st.session_state.ai_running:
+
+    st.session_state.ai_running = True
 
     # التحقق من الرصيد
     if st.session_state.credits <= 0:
@@ -819,31 +824,30 @@ with st.spinner("🤖 جاري تحليل بيانات المبيعات..."):
     )
 
 
-# ---------------------------------
-# حساب التوكين
-# ---------------------------------
+try:
 
-tokens_used = calculate_tokens(response)
+    result = eval(code, {"df_f": df_f})
 
+    st.markdown("### 📊 Result")
+    st.write(result)
 
-# ---------------------------------
-# تحويل التوكين إلى Credits
-# ---------------------------------
+    # ---------------------------------
+    # خصم الكريديت فقط بعد النجاح
+    # ---------------------------------
 
-credit_used = tokens_to_credit(tokens_used)
+    tokens_used = calculate_tokens(response)
+    credit_used = tokens_to_credit(tokens_used)
 
+    new_credit = float(st.session_state.credits) - float(credit_used)
 
-# ---------------------------------
-# خصم الرصيد
-# ---------------------------------
+    supabase.table("Companies").update({
+        "credits": new_credit
+    }).eq("id", st.session_state.company_id).execute()
 
-new_credit = float(st.session_state.credits) - float(credit_used)
+    st.session_state.credits = new_credit
 
-supabase.table("Companies").update({
-    "credits": new_credit
-}).eq("id", st.session_state.company_id).execute()
-
-st.session_state.credits = new_credit
+except Exception:
+    st.error("لم يتمكن النظام من تحليل السؤال.")
 
 
 # ---------------------------------
