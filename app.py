@@ -159,7 +159,7 @@ st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 st.markdown(
     """
     <h1 style='text-align: right; font-weight: 800;'>
-        لوحة تحليل أسطول النقل
+        لوحة تحليل المبيعات 
     </h1>
     <p style='text-align: right; color: gray; margin-top: -10px;'>
         رفع ملف إكسل → توحيد البيانات → حساب المؤشرات → عرض الرسوم البيانية
@@ -175,115 +175,278 @@ def load_and_standardize(file):
     df = pd.read_excel(file, header=0)
     df.columns = df.columns.str.strip()
 
-    rename_map = {
-        "التاريخ": "date",
-        "كود السياره": "vehicle_id",
-        "الجهه": "location",
-        "نوع السياره": "vehicle_type",
-        "نوع الحساب": "account_type",
-        "قيمة المصروف": "expense_amount",
-        "قيمة النقلات": "revenue",
-        "الكيلومتر": "kilometers"
-    }
+    rename_map = column_mapping = {
+
+    "اسم الفرع": "branch_name",
+    "رقم الفرع": "branch_id",
+
+    "كود المخزن": "warehouse_id",
+    "اسم المخزن": "warehouse_name",
+
+    "رقم المشرف": "supervisor_id",
+    "اسم المشرف": "supervisor_name",
+
+    "رقم المندوب": "sales_rep_id",
+    "اسم المندوب": "sales_rep_name",
+
+    "رقم الاوردر": "order_id",
+    "نوع الاوردر": "order_type",
+
+    "كود العميل": "customer_id",
+    "اسم العميل": "customer_name",
+
+    "التاريخ": "date",
+
+    "رقم الصنف": "product_id",
+    "اسم الصنف": "product_name",
+
+    "كود البراند": "brand_id",
+    "اسم البراند": "brand_name",
+
+    "الكمية": "quantity",
+    "وحدة القياس": "unit",
+
+    "السعر": "price",
+
+    "اجمالي الخصومات": "total_discount",
+    "اجمالي الضرائب": "total_tax",
+
+    "اصناف مجانية": "free_items",
+
+    "الاجمالي": "total_amount",
+
+    "كود المحافظة": "governorate_id",
+    "اسم المحافظة": "governorate",
+
+    "كود المدينة": "city_id",
+    "اسم المدينة": "city",
+
+    "كود المنطقة": "area_id",
+    "اسم المنطقة": "area",
+
+    "كود المسار": "route_id",
+    "اسم المسار": "route_name",
+
+    "اسم المستخدم": "created_by",
+
+    "CreatedOn": "created_on",
+
+    "المصدر": "source"
+}
     df = df.rename(columns=rename_map)
 
-    required = ["vehicle_id","date","kilometers","account_type","expense_amount","revenue"]
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        st.error(f"Missing required columns: {missing}")
-        st.stop()
+required = [
+    "order_id",
+    "date",
+    "branch_name",
+    "sales_rep_id",
+    "customer_id",
+    "product_id",
+    "quantity",
+    "price",
+    "total_amount",
+    "total_discount",
+    "brand_name",
+    "governorate",
+    "city"
+]
 
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    for c in ["kilometers","expense_amount","revenue"]:
+missing = [c for c in required if c not in df.columns]
+
+if missing:
+    st.error(f"Missing required columns: {missing}")
+    st.stop()
+
+
+# تحويل التاريخ
+df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+
+# تحويل الأعمدة الرقمية
+numeric_cols = [
+    "quantity",
+    "price",
+    "total_discount",
+    "total_tax",
+    "free_items",
+    "total_amount"
+]
+
+for c in numeric_cols:
+    if c in df.columns:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    df = df.dropna(subset=["vehicle_id","date"])
-    df = df[["vehicle_id","date","location","vehicle_type","account_type","expense_amount","revenue","kilometers"]]
-    return df
+
+# حذف الصفوف غير الصحيحة
+df = df.dropna(subset=["order_id", "date"])
+
+
+# الأعمدة المستخدمة في التحليل
+df = df[[
+    "branch_name",
+    "sales_rep_id",
+    "sales_rep_name",
+    "customer_id",
+    "customer_name",
+    "order_id",
+    "order_type",
+    "date",
+    "product_id",
+    "product_name",
+    "brand_name",
+    "quantity",
+    "unit",
+    "price",
+    "total_discount",
+    "total_tax",
+    "free_items",
+    "total_amount",
+    "governorate",
+    "city",
+    "area",
+    "route_name"
+]]
+
+return df
 
 # =========================================
-# 8️⃣ KPI ENGINE
+# 8️⃣ KPI ENGINE (SALES)
 # =========================================
 
 def compute_kpis(df):
+
+    # ================================
+    # Daily Sales
+    # ================================
     daily = (
-        df.groupby(["vehicle_id","date"], as_index=False)
-          .agg(total_cost=("expense_amount","sum"),
-               total_revenue=("revenue","sum"),
-               total_km=("kilometers","sum"))
+        df.groupby(["date"], as_index=False)
+          .agg(
+              total_sales=("total_amount","sum"),
+              total_quantity=("quantity","sum"),
+              total_discount=("total_discount","sum"),
+              total_orders=("order_id","nunique")
+          )
     )
-    # avoid div by zero
-    daily["cost_per_km"] = np.where(daily["total_km"]>0, daily["total_cost"]/daily["total_km"], 0)
-    daily["profit"] = daily["total_revenue"] - daily["total_cost"]
 
-    vehicle = (
-        daily.groupby("vehicle_id", as_index=False)
-             .agg(total_cost=("total_cost","sum"),
-                  total_revenue=("total_revenue","sum"),
-                  total_km=("total_km","sum"),
-                  total_profit=("profit","sum"))
+    daily["avg_order_value"] = np.where(
+        daily["total_orders"] > 0,
+        daily["total_sales"] / daily["total_orders"],
+        0
     )
-    vehicle["cost_per_km"] = np.where(vehicle["total_km"]>0, vehicle["total_cost"]/vehicle["total_km"], 0)
 
-    fleet = {
-        "total_cost": float(vehicle["total_cost"].sum()),
-        "total_revenue": float(vehicle["total_revenue"].sum()),
-        "total_km": float(vehicle["total_km"].sum()),
-        "total_profit": float(vehicle["total_profit"].sum())
+
+    # ================================
+    # Branch Performance
+    # ================================
+    branch = (
+        df.groupby("branch_name", as_index=False)
+          .agg(
+              total_sales=("total_amount","sum"),
+              total_quantity=("quantity","sum"),
+              total_discount=("total_discount","sum"),
+              total_orders=("order_id","nunique")
+          )
+    )
+
+    branch["avg_order_value"] = np.where(
+        branch["total_orders"] > 0,
+        branch["total_sales"] / branch["total_orders"],
+        0
+    )
+
+
+    # ================================
+    # Brand Performance
+    # ================================
+    brand = (
+        df.groupby("brand_name", as_index=False)
+          .agg(
+              total_sales=("total_amount","sum"),
+              total_quantity=("quantity","sum"),
+              total_orders=("order_id","nunique")
+          )
+    )
+
+
+    # ================================
+    # Governorate Performance
+    # ================================
+    governorate = (
+        df.groupby("governorate", as_index=False)
+          .agg(
+              total_sales=("total_amount","sum"),
+              total_quantity=("quantity","sum"),
+              total_orders=("order_id","nunique")
+          )
+    )
+
+
+    # ================================
+    # Overall Sales KPIs
+    # ================================
+    sales = {
+        "total_sales": float(df["total_amount"].sum()),
+        "total_quantity": float(df["quantity"].sum()),
+        "total_discount": float(df["total_discount"].sum()),
+        "total_orders": int(df["order_id"].nunique())
     }
-    fleet["fleet_cost_per_km"] = fleet["total_cost"]/fleet["total_km"] if fleet["total_km"]>0 else 0
-    fleet["profit_margin_pct"] = (fleet["total_profit"]/fleet["total_revenue"]*100) if fleet["total_revenue"]>0 else 0
 
-    return daily, vehicle, fleet
-def compute_kpis(df):
-    daily = (
-        df.groupby(["vehicle_id","date"], as_index=False)
-          .agg(total_cost=("expense_amount","sum"),
-               total_revenue=("revenue","sum"),
-               total_km=("kilometers","sum"))
+    sales["avg_order_value"] = (
+        sales["total_sales"] / sales["total_orders"]
+        if sales["total_orders"] > 0 else 0
     )
-    # avoid div by zero
-    daily["cost_per_km"] = np.where(daily["total_km"]>0, daily["total_cost"]/daily["total_km"], 0)
-    daily["profit"] = daily["total_revenue"] - daily["total_cost"]
 
-    vehicle = (
-        daily.groupby("vehicle_id", as_index=False)
-             .agg(total_cost=("total_cost","sum"),
-                  total_revenue=("total_revenue","sum"),
-                  total_km=("total_km","sum"),
-                  total_profit=("profit","sum"))
+    sales["discount_ratio_pct"] = (
+        sales["total_discount"] / sales["total_sales"] * 100
+        if sales["total_sales"] > 0 else 0
     )
-    vehicle["cost_per_km"] = np.where(vehicle["total_km"]>0, vehicle["total_cost"]/vehicle["total_km"], 0)
 
-    fleet = {
-        "total_cost": float(vehicle["total_cost"].sum()),
-        "total_revenue": float(vehicle["total_revenue"].sum()),
-        "total_km": float(vehicle["total_km"].sum()),
-        "total_profit": float(vehicle["total_profit"].sum())
-    }
-    fleet["fleet_cost_per_km"] = fleet["total_cost"]/fleet["total_km"] if fleet["total_km"]>0 else 0
-    fleet["profit_margin_pct"] = (fleet["total_profit"]/fleet["total_revenue"]*100) if fleet["total_revenue"]>0 else 0
-
-    return daily, vehicle, fleet
+    return daily, branch, brand, governorate, sales
 # =========================================
 # 9️⃣ FILE UPLOAD
 # =========================================
 
 uploaded = st.file_uploader("📂 قم برفع ملف الإكسل (.xlsx)", type=["xlsx"])
+
 if not uploaded:
-    st.info("Upload an Excel file to start.")
+    st.info("قم برفع ملف إكسل لبدء التحليل")
     st.stop()
+
 
 # تحميل البيانات مرة واحدة فقط
 df = load_and_standardize(uploaded)
 
-# تجهيز قائمة العربيات
-# تجهيز قائمة العربيات
-vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
 
-# تهيئة القيم الافتراضية في session
-if "selected_vehicle" not in st.session_state:
-    st.session_state.selected_vehicle = vehicles
+# ===============================
+# تجهيز القوائم للتحليل
+# ===============================
+
+branches = sorted(df["branch_name"].astype(str).unique().tolist())
+brands = sorted(df["brand_name"].astype(str).unique().tolist())
+sales_reps = sorted(df["sales_rep_name"].astype(str).unique().tolist())
+governorates = sorted(df["governorate"].astype(str).unique().tolist())
+
+
+# ===============================
+# Session State
+# ===============================
+
+if "selected_branch" not in st.session_state:
+    st.session_state.selected_branch = branches
+
+if "selected_brand" not in st.session_state:
+    st.session_state.selected_brand = brands
+
+if "selected_sales_rep" not in st.session_state:
+    st.session_state.selected_sales_rep = sales_reps
+
+if "selected_governorate" not in st.session_state:
+    st.session_state.selected_governorate = governorates
+
+
+# ===============================
+# Date Range
+# ===============================
 
 if "date_range" not in st.session_state:
     st.session_state.date_range = (
@@ -298,12 +461,24 @@ if "date_range" not in st.session_state:
 with st.sidebar:
     st.header("🔎 الفلاتر")
 
-    # تجهيز قائمة السيارات
-    vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
+    # تجهيز القوائم
+    branches = sorted(df["branch_name"].astype(str).unique().tolist())
+    brands = sorted(df["brand_name"].astype(str).unique().tolist())
+    sales_reps = sorted(df["sales_rep_name"].astype(str).unique().tolist())
+    governorates = sorted(df["governorate"].astype(str).unique().tolist())
 
     # تهيئة Session State
-    if "selected_vehicle_multi" not in st.session_state:
-        st.session_state.selected_vehicle_multi = vehicles
+    if "selected_branch_multi" not in st.session_state:
+        st.session_state.selected_branch_multi = branches
+
+    if "selected_brand_multi" not in st.session_state:
+        st.session_state.selected_brand_multi = brands
+
+    if "selected_sales_rep_multi" not in st.session_state:
+        st.session_state.selected_sales_rep_multi = sales_reps
+
+    if "selected_governorate_multi" not in st.session_state:
+        st.session_state.selected_governorate_multi = governorates
 
     if "date_range" not in st.session_state:
         st.session_state.date_range = (
@@ -311,24 +486,67 @@ with st.sidebar:
             df["date"].max().date()
         )
 
-    # زر إعادة الضبط
+
+    # زر إعادة ضبط الفلاتر
     if st.button("🔄 إعادة ضبط الفلاتر"):
-        st.session_state.selected_vehicle_multi = vehicles
+        st.session_state.selected_branch_multi = branches
+        st.session_state.selected_brand_multi = brands
+        st.session_state.selected_sales_rep_multi = sales_reps
+        st.session_state.selected_governorate_multi = governorates
         st.session_state.date_range = (
             df["date"].min().date(),
             df["date"].max().date()
         )
         st.rerun()
 
-    # فلتر السيارات (MultiSelect احترافي)
-    selected_vehicle = st.multiselect(
-        "🚚 اختيار السيارة",
-        options=vehicles,
-        default=st.session_state.selected_vehicle_multi,
-        key="selected_vehicle_multi"
+
+    # ===============================
+    # Branch Filter
+    # ===============================
+    selected_branch = st.multiselect(
+        "🏢 اختيار الفرع",
+        options=branches,
+        default=st.session_state.selected_branch_multi,
+        key="selected_branch_multi"
     )
 
-    # فلتر التاريخ (Range + يوم واحد مدعوم)
+
+    # ===============================
+    # Brand Filter
+    # ===============================
+    selected_brand = st.multiselect(
+        "🏷 اختيار البراند",
+        options=brands,
+        default=st.session_state.selected_brand_multi,
+        key="selected_brand_multi"
+    )
+
+
+    # ===============================
+    # Sales Rep Filter
+    # ===============================
+    selected_sales_rep = st.multiselect(
+        "👤 اختيار المندوب",
+        options=sales_reps,
+        default=st.session_state.selected_sales_rep_multi,
+        key="selected_sales_rep_multi"
+    )
+
+
+    # ===============================
+    # Governorate Filter
+    # ===============================
+    selected_governorate = st.multiselect(
+        "📍 اختيار المحافظة",
+        options=governorates,
+        default=st.session_state.selected_governorate_multi,
+        key="selected_governorate_multi"
+    )
+
+
+    # ===============================
+    # Date Range
+    # ===============================
     date_range = st.date_input(
         "📅 نطاق التاريخ",
         value=st.session_state.date_range,
@@ -338,13 +556,28 @@ with st.sidebar:
     )
 
 
-# ---------------- Apply Filters ----------------
-df_f = df.copy()
-df_f["vehicle_id"] = df_f["vehicle_id"].astype(str)
+# =========================================
+# Apply Filters
+# =========================================
 
-# فلترة السيارات
-if selected_vehicle:
-    df_f = df_f[df_f["vehicle_id"].isin(selected_vehicle)]
+df_f = df.copy()
+
+# فلترة الفروع
+if selected_branch:
+    df_f = df_f[df_f["branch_name"].isin(selected_branch)]
+
+# فلترة البراند
+if selected_brand:
+    df_f = df_f[df_f["brand_name"].isin(selected_brand)]
+
+# فلترة المندوب
+if selected_sales_rep:
+    df_f = df_f[df_f["sales_rep_name"].isin(selected_sales_rep)]
+
+# فلترة المحافظة
+if selected_governorate:
+    df_f = df_f[df_f["governorate"].isin(selected_governorate)]
+
 
 # فلترة التاريخ بشكل آمن
 if isinstance(date_range, tuple):
@@ -359,52 +592,126 @@ df_f = df_f[
     (df_f["date"].dt.date >= start_date) &
     (df_f["date"].dt.date <= end_date)
 ]
-
 # =========================================
 # 11️⃣ DASHBOARD
 # =========================================
 
 # =========================================
-# 12 KPI ENGINE
+# 12️⃣ KPI ENGINE
 # =========================================
 
-daily, vehicle, fleet = compute_kpis(df_f)
-vehicle["vehicle_id"] = vehicle["vehicle_id"].astype(str)
+daily, branch, brand, governorate, sales = compute_kpis(df_f)
 
-cost_breakdown = (
-    df_f.groupby("account_type", as_index=False)
-        .agg(total_expense=("expense_amount", "sum"))
-        .sort_values("total_expense", ascending=False)
+
+# =========================================
+# Brand Sales
+# =========================================
+
+brand_sales = (
+    df_f.groupby("brand_name", as_index=False)
+        .agg(total_sales=("total_amount", "sum"))
+        .sort_values("total_sales", ascending=False)
+)
+
+
+# =========================================
+# Branch Sales
+# =========================================
+
+branch_sales = (
+    df_f.groupby("branch_name", as_index=False)
+        .agg(total_sales=("total_amount", "sum"))
+        .sort_values("total_sales", ascending=False)
+)
+
+
+# =========================================
+# Governorate Sales
+# =========================================
+
+geo_sales = (
+    df_f.groupby("governorate", as_index=False)
+        .agg(total_sales=("total_amount", "sum"))
+        .sort_values("total_sales", ascending=False)
+)
+
+
+# =========================================
+# Discount Breakdown
+# =========================================
+
+discount_breakdown = (
+    df_f.groupby("brand_name", as_index=False)
+        .agg(total_discount=("total_discount", "sum"))
+        .sort_values("total_discount", ascending=False)
 )
 # =========================================
-# 13 QUICK INSIGHTS
+# 13️⃣ QUICK INSIGHTS
 # =========================================
 
 st.divider()
-st.markdown("## 🤖 Fleet Quick Insights")
+st.markdown("## 🤖 Sales Quick Insights")
 
 col1, col2, col3, col4 = st.columns(4)
 
+
+# ===============================
+# Top Branches
+# ===============================
 with col1:
-    if st.button("🔴 Highest Cost per KM"):
-        st.dataframe(vehicle.sort_values("cost_per_km", ascending=False).head(5))
+    if st.button("🏢 أعلى الفروع مبيعات"):
+        top_branch = (
+            df_f.groupby("branch_name", as_index=False)
+                .agg(total_sales=("total_amount","sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+        )
+        st.dataframe(top_branch)
 
+
+# ===============================
+# Top Brands
+# ===============================
 with col2:
-    if st.button("🟢 Most Profitable Vehicles"):
-        st.dataframe(vehicle.sort_values("total_profit", ascending=False).head(5))
+    if st.button("🏷 أكثر البراندات مبيعًا"):
+        top_brand = (
+            df_f.groupby("brand_name", as_index=False)
+                .agg(total_sales=("total_amount","sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+        )
+        st.dataframe(top_brand)
 
+
+# ===============================
+# Top Sales Reps
+# ===============================
 with col3:
-    if st.button("🟣 Expense Categories"):
-        st.dataframe(cost_breakdown)
+    if st.button("👤 أفضل المندوبين مبيعات"):
+        top_sales_rep = (
+            df_f.groupby("sales_rep_name", as_index=False)
+                .agg(total_sales=("total_amount","sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+        )
+        st.dataframe(top_sales_rep)
 
+
+# ===============================
+# Top Governorates
+# ===============================
 with col4:
-    if st.button("⚠ Lowest Profit Vehicles"):
-        st.dataframe(vehicle.sort_values("total_profit").head(5))
-
+    if st.button("📍 أعلى المحافظات مبيعات"):
+        top_geo = (
+            df_f.groupby("governorate", as_index=False)
+                .agg(total_sales=("total_amount","sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+        )
+        st.dataframe(top_geo)
 # =========================================
-# 14 AI ENGINE
+# 14️⃣ AI ENGINE
 # =========================================
-
 
 # تهيئة متغير التقرير
 if "report_html" not in st.session_state:
@@ -412,98 +719,140 @@ if "report_html" not in st.session_state:
 
 
 # زر تشغيل التحليل
-if st.button("Generate AI Insight"):
+if st.button("🤖 Generate Sales AI Insight"):
 
     # التحقق من الرصيد
     if st.session_state.credits <= 0:
         st.error("رصيدك انتهى. يرجى شحن الحساب.")
         st.stop()
 
+    with st.spinner("جاري تحليل بيانات المبيعات بواسطة الذكاء الاصطناعي..."):
+
+        # ملخص البيانات لإرساله للـ AI
+        summary = {
+            "total_sales": float(df_f["total_amount"].sum()),
+            "total_orders": int(df_f["order_id"].nunique()),
+            "total_quantity": float(df_f["quantity"].sum()),
+            "total_discount": float(df_f["total_discount"].sum()),
+            "branches": int(df_f["branch_name"].nunique()),
+            "brands": int(df_f["brand_name"].nunique()),
+            "sales_reps": int(df_f["sales_rep_name"].nunique()),
+            "governorates": int(df_f["governorate"].nunique())
+        }
     # ---------------------------------
-    # تجهيز ملخص البيانات
+   # ---------------------------------
+# تجهيز ملخص البيانات
+# ---------------------------------
+
+summary = f"""
+Sales Summary
+
+Total Sales: {sales['total_sales']}
+Total Orders: {sales['total_orders']}
+Total Quantity Sold: {sales['total_quantity']}
+Total Discount: {sales['total_discount']}
+
+Average Order Value: {sales['avg_order_value']}
+Discount Ratio (%): {sales['discount_ratio_pct']}
+"""
+
+
+# ---------------------------------
+# بناء الـ Prompt
+# ---------------------------------
+
+prompt = f"""
+قم بتحليل بيانات المبيعات التالية وقدم تقريرًا تنفيذيًا واضحًا.
+
+{summary}
+
+اشرح:
+
+- أداء المبيعات بشكل عام
+- الفروع أو المناطق ذات الأداء الأعلى
+- تأثير الخصومات على الإيرادات
+- الفرص الممكنة لزيادة المبيعات
+- توصيات استراتيجية للإدارة لتحسين الأداء
+"""
     # ---------------------------------
-    summary = f"""
-    Fleet Summary
+# ---------------------------------
+# استدعاء AI
+# ---------------------------------
 
-    Total KM: {fleet['total_km']}
-    Total Revenue: {fleet['total_revenue']}
-    Total Cost: {fleet['total_cost']}
-    Total Profit: {fleet['total_profit']}
+with st.spinner("🤖 جاري تحليل بيانات المبيعات..."):
 
-    Fleet Cost per KM: {fleet['fleet_cost_per_km']}
-    Profit Margin: {fleet['profit_margin_pct']}
-    """
-
-    # ---------------------------------
-    # بناء الـ Prompt
-    # ---------------------------------
-    prompt = f"""
-    قم بتحليل بيانات أسطول النقل التالية وقدم تقرير تنفيذي واضح.
-
-    {summary}
-
-    اشرح:
-    - المشكلات التشغيلية
-    - السيارات الأعلى تكلفة
-    - فرص تقليل التكلفة
-    - توصيات الإدارة
-    """
-
-    # ---------------------------------
-    # استدعاء AI
-    # ---------------------------------
-    with st.spinner("AI is analyzing fleet data..."):
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            max_tokens=500
-        )
-
-    # ---------------------------------
-    # حساب التوكين
-    # ---------------------------------
-    tokens_used = calculate_tokens(response)
-
-    # تحويل التوكين إلى Credits
-    credit_used = tokens_to_credit(tokens_used)
-
-    # ---------------------------------
-    # خصم الرصيد
-    # ---------------------------------
-    new_credit = float(st.session_state.credits) - float(credit_used)
-
-    supabase.table("Companies").update({
-        "credits": new_credit
-    }).eq("id", st.session_state.company_id).execute()
-
-    st.session_state.credits = new_credit
-
-    # ---------------------------------
-    # حفظ التقرير
-    # ---------------------------------
-    st.session_state.report_html = response.choices[0].message.content
-
-    # إعادة تشغيل الصفحة
-    st.rerun()
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": """
+                أنت خبير في تحليل بيانات المبيعات وذكاء الأعمال.
+                مهمتك تحليل بيانات المبيعات وتقديم تقرير تنفيذي واضح يساعد الإدارة
+                على فهم الأداء واتخاذ قرارات استراتيجية.
+                ركز على:
+                - أداء المبيعات
+                - الفروع الأعلى مبيعات
+                - تأثير الخصومات
+                - فرص زيادة الإيرادات
+                - التوصيات الإدارية
+                """
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        max_tokens=500
+    )
 
 
+# ---------------------------------
+# حساب التوكين
+# ---------------------------------
+
+tokens_used = calculate_tokens(response)
+
+
+# ---------------------------------
+# تحويل التوكين إلى Credits
+# ---------------------------------
+
+credit_used = tokens_to_credit(tokens_used)
+
+
+# ---------------------------------
+# خصم الرصيد
+# ---------------------------------
+
+new_credit = float(st.session_state.credits) - float(credit_used)
+
+supabase.table("Companies").update({
+    "credits": new_credit
+}).eq("id", st.session_state.company_id).execute()
+
+st.session_state.credits = new_credit
+
+
+# ---------------------------------
+# حفظ التقرير
+# ---------------------------------
+
+st.session_state.report_html = response.choices[0].message.content
+
+
+# ---------------------------------
+# إعادة تشغيل الصفحة
+# ---------------------------------
+
+st.rerun()
 # =========================================
 # عرض تقرير AI
 # =========================================
 
 if st.session_state.report_html:
 
-    st.markdown("## 📑 AI Fleet Executive Report")
+    st.markdown("## 📑 AI Sales Executive Report")
 
     st.markdown(
         f"""
@@ -522,320 +871,263 @@ if st.session_state.report_html:
     )
 
 # =========================================
-# 15 KPI DASHBOARD
+# 15️⃣ KPI DASHBOARD
 # =========================================
 
 st.markdown(
-    "<h2 style='text-align: right; font-weight: 700;'>🚛 الملخص التنفيذي للأسطول</h2>",
+    "<h2 style='text-align: right; font-weight: 700;'>📊 الملخص التنفيذي للمبيعات</h2>",
     unsafe_allow_html=True
 )
 
 col1, col2, col3, col4 = st.columns(4)
 
+
 with col1:
     st.metric(
-        "💸 تكلفة الكيلومتر",
-        f"{fleet['fleet_cost_per_km']:,.2f}"
+        "💰 إجمالي المبيعات",
+        f"{sales['total_sales']:,.0f}"
     )
+
 
 with col2:
     st.metric(
-        "💰 الإيراد لكل كيلومتر",
-        f"{(fleet['total_revenue']/fleet['total_km'] if fleet['total_km']>0 else 0):,.2f}"
+        "🧾 عدد الأوردرات",
+        f"{sales['total_orders']:,.0f}"
     )
+
 
 with col3:
     st.metric(
-        "📈 نسبة الربحية %",
-        f"{fleet['profit_margin_pct']:,.2f}%"
+        "📦 إجمالي الكمية",
+        f"{sales['total_quantity']:,.0f}"
     )
+
 
 with col4:
     st.metric(
-        "🚛 إجمالي الكيلومترات",
-        f"{fleet['total_km']:,.0f}"
+        "📊 متوسط قيمة الأوردر",
+        f"{sales['avg_order_value']:,.2f}"
     )
-
 # =========================================
-# 16 VISUALIZATION ENGINE
+# =========================================
+# 16️⃣ VISUALIZATION ENGINE
 # =========================================
 
-# Charts Row 1
 # ===== Performance Snapshot =====
 st.markdown(
-    "<h2 style='text-align: right;'>📊 نظرة عامة على الأداء</h2>",
+    "<h2 style='text-align: right;'>📊 نظرة عامة على أداء المبيعات</h2>",
     unsafe_allow_html=True
 )
 
 colA, colB = st.columns(2)
 
-# 🔴 Top 5 Worst Vehicles by Cost/KM
-worst_vehicles = vehicle.sort_values("cost_per_km", ascending=False).head(5).copy()
-worst_vehicles["vehicle_id"] = worst_vehicles["vehicle_id"].astype(str)
+# =========================================
+# 🏢 Top Branches Sales
+# =========================================
+
+top_branches = (
+    df_f.groupby("branch_name", as_index=False)
+        .agg(total_sales=("total_amount","sum"))
+        .sort_values("total_sales", ascending=False)
+        .head(5)
+)
 
 fig1 = px.bar(
-    worst_vehicles,
-    x="cost_per_km",
-    y="vehicle_id",
+    top_branches,
+    x="total_sales",
+    y="branch_name",
     orientation="h",
-    title="🔴 أعلى 5 سيارات من حيث تكلفة الكيلومتر"
+    title="🏢 أعلى 5 فروع مبيعات"
 )
 
 fig1.update_traces(
-    marker_color="#D32F2F",   # أحمر احترافي
-    marker_line_width=0,
-    texttemplate='%{x:,.2f}',
+    marker_color="#1565C0",
+    texttemplate='%{x:,.0f}',
     textposition='outside'
 )
 
 fig1.update_layout(
-    title=dict(
-        text="🔴 أعلى 5 سيارات من حيث تكلفة الكيلومتر",
-        x=1,
-        xanchor="right",
-        font=dict(size=18)
-    ),
-
-    xaxis=dict(
-        title=dict(
-            text="<b>تكلفة الكيلومتر</b>",
-            font=dict(size=14)
-        )
-    ),
-
-    yaxis=dict(
-        type="category",
-        categoryorder="total ascending",
-        title=None
-    ),
-
-    annotations=[
-        dict(
-            text="<b>رقم السيارة</b>",
-            xref="paper",
-            yref="paper",
-            x=0,
-            y=1.08,
-            showarrow=False,
-            font=dict(size=14)
-        )
-    ],
-
-    font=dict(size=12)
+    yaxis=dict(type="category", categoryorder="total ascending"),
+    xaxis_title="إجمالي المبيعات",
+    yaxis_title="الفرع"
 )
 
-fig1.update_yaxes(title=None)
-fig1.update_traces(marker_line_width=0)
-fig1.update_layout(
-    yaxis=dict(type="category"),
-    yaxis_categoryorder="total ascending"
-)
 colA.plotly_chart(fig1, use_container_width=True)
 
-# 🟢 Top 5 Most Profitable Vehicles
-best_vehicles = vehicle.sort_values("total_profit", ascending=False).head(5).copy()
-best_vehicles["vehicle_id"] = best_vehicles["vehicle_id"].astype(str)
+
+# =========================================
+# 🏷 Top Brands Sales
+# =========================================
+
+top_brands = (
+    df_f.groupby("brand_name", as_index=False)
+        .agg(total_sales=("total_amount","sum"))
+        .sort_values("total_sales", ascending=False)
+        .head(5)
+)
+
 fig2 = px.bar(
-    best_vehicles,
-    x="total_profit",
-    y="vehicle_id",
+    top_brands,
+    x="total_sales",
+    y="brand_name",
     orientation="h",
-    title="🟢 أفضل 5 سيارات من حيث صافي الربح"
+    title="🏷 أكثر 5 براندات مبيعًا"
 )
 
 fig2.update_traces(
-    marker_color="#2E7D32",   # أخضر احترافي
-    marker_line_width=0,
+    marker_color="#2E7D32",
     texttemplate='%{x:,.0f}',
     textposition='outside'
 )
 
 fig2.update_layout(
-    title=dict(
-        text="🟢 أفضل 5 سيارات من حيث صافي الربح",
-        x=1,
-        xanchor="right",
-        font=dict(size=18)
-    ),
-
-    xaxis=dict(
-        title=dict(
-            text="<b>صافي الربح</b>",
-            font=dict(size=14)
-        )
-    ),
-
-    yaxis=dict(
-        type="category",
-        categoryorder="total ascending",
-        title=None
-    ),
-
-    annotations=[
-        dict(
-            text="<b>رقم السيارة</b>",
-            xref="paper",
-            yref="paper",
-            x=0,
-            y=1.08,
-            showarrow=False,
-            font=dict(size=14)
-        )
-    ],
-
-    font=dict(size=12)
+    yaxis=dict(type="category", categoryorder="total ascending"),
+    xaxis_title="إجمالي المبيعات",
+    yaxis_title="البراند"
 )
-
-fig2.update_yaxes(title=None)
-fig2.update_traces(marker_line_width=0)
 
 colB.plotly_chart(fig2, use_container_width=True)
 
+
+# =========================================
 # Charts Row 2
+# =========================================
+
 colC, colD = st.columns(2)
 
-# ==============================
-# 🔵 إجمالي الربح لكل سيارة (fig3)
-# ==============================
 
-sorted_vehicle = (
-    vehicle.sort_values("total_profit", ascending=False)
-           .copy()
+# =========================================
+# 📈 Daily Sales Trend
+# =========================================
+
+daily_sales = (
+    df_f.groupby("date", as_index=False)
+        .agg(total_sales=("total_amount","sum"))
 )
 
-sorted_vehicle["vehicle_id"] = sorted_vehicle["vehicle_id"].astype(str)
-
-fig3 = px.bar(
-    sorted_vehicle,
-    x="vehicle_id",
-    y="total_profit",
-    title="🔵 إجمالي الربح لكل سيارة"
+fig3 = px.line(
+    daily_sales,
+    x="date",
+    y="total_sales",
+    title="📈 اتجاه المبيعات اليومية"
 )
 
-fig3.update_traces(
-    marker_color="#1565C0",
-    marker_line_width=0,
-    texttemplate='<b>%{y:,.0f}</b>',
-    textposition='outside'
-)
+fig3.update_traces(line_color="#D32F2F")
 
 fig3.update_layout(
-    title=dict(
-        text="🔵 إجمالي الربح لكل سيارة",
-        x=1,
-        xanchor="right",
-        font=dict(size=18)
-    ),
-
-    xaxis=dict(
-        title=dict(
-            text="<b>رقم السيارة</b>",
-            font=dict(size=14)
-        ),
-        type="category",
-        tickangle=-45
-    ),
-
-    yaxis=dict(
-        title=dict(
-            text="<b>إجمالي الربح</b>",
-            font=dict(size=14)
-        )
-    ),
-
-    font=dict(size=12)
+    xaxis_title="التاريخ",
+    yaxis_title="إجمالي المبيعات"
 )
 
 colC.plotly_chart(fig3, use_container_width=True)
 
 
-# ==============================
-# 🟣 إنشاء cost_breakdown أولاً (مهم جداً)
-# ==============================
+# =========================================
+# 📍 Sales by Governorate
+# =========================================
 
-cost_breakdown = (
-    df_f.groupby("account_type", as_index=False)
-        .agg(total_expense=("expense_amount", "sum"))
-        .sort_values("total_expense", ascending=False)
+geo_sales = (
+    df_f.groupby("governorate", as_index=False)
+        .agg(total_sales=("total_amount","sum"))
+        .sort_values("total_sales", ascending=False)
+        .head(10)
 )
 
-
-# ==============================
-# 🟣 توزيع المصروفات حسب نوع الحساب (fig4)
-# ==============================
-
 fig4 = px.bar(
-    cost_breakdown,
-    x="account_type",
-    y="total_expense",
-    title="🟣 توزيع المصروفات حسب نوع الحساب"
+    geo_sales,
+    x="governorate",
+    y="total_sales",
+    title="📍 المبيعات حسب المحافظة"
 )
 
 fig4.update_traces(
-    marker_color="#1565C0",
-    marker_line_width=0,
-    texttemplate='<b>%{y:,.0f}</b>',
+    marker_color="#6A1B9A",
+    texttemplate='%{y:,.0f}',
     textposition='outside'
 )
 
 fig4.update_layout(
-    title=dict(
-        text="🟣 توزيع المصروفات حسب نوع الحساب",
-        x=1,
-        xanchor="right",
-        font=dict(size=18)
-    ),
-
-    xaxis=dict(
-        title=dict(
-            text="<b>نوع الحساب</b>",
-            font=dict(size=14)
-        ),
-        tickangle=-30
-    ),
-
-    yaxis=dict(
-        title=dict(
-            text="<b>إجمالي المصروف</b>",
-            font=dict(size=14)
-        )
-    ),
-
-    font=dict(size=12)
+    xaxis_title="المحافظة",
+    yaxis_title="إجمالي المبيعات",
+    xaxis_tickangle=-30
 )
 
 colD.plotly_chart(fig4, use_container_width=True)
-
-
 # =========================================
-# 17 DATA PREVIEW
+# =========================================
+# 17️⃣ DATA PREVIEW
 # =========================================
 
 st.divider()
 
 st.markdown(
-    "<h3 style='text-align: right;'>📋 معاينة البيانات</h3>",
+    "<h3 style='text-align: right;'>📋 معاينة بيانات المبيعات بعد الفلترة</h3>",
     unsafe_allow_html=True
 )
 
+
+# ---------------------------------
+# إعادة تسمية الأعمدة
+# ---------------------------------
+
 df_preview = df_f.rename(columns={
-    "vehicle_id": "رقم السيارة",
-    "date": "التاريخ",
-    "location": "الموقع",
-    "vehicle_type": "نوع المركبة",
-    "account_type": "نوع الحساب",
-    "expense_amount": "قيمة المصروف",
-    "revenue": "الإيراد",
-    "kilometers": "الكيلومترات"
+    "branch_name": "اسم الفرع",
+    "sales_rep_name": "اسم المندوب",
+    "customer_name": "اسم العميل",
+    "product_name": "اسم الصنف",
+    "brand_name": "البراند",
+    "quantity": "الكمية",
+    "unit": "الوحدة",
+    "price": "السعر",
+    "total_discount": "إجمالي الخصومات",
+    "total_tax": "إجمالي الضرائب",
+    "total_amount": "الإجمالي",
+    "governorate": "المحافظة",
+    "city": "المدينة",
+    "area": "المنطقة",
+    "route_name": "المسار",
+    "date": "التاريخ"
 })
 
-df_preview = df_preview[df_preview.columns[::-1]]
 
-st.data_editor(df_preview.head(50), use_container_width=True)
+# ---------------------------------
+# فلتر بحث سريع داخل الجدول
+# ---------------------------------
 
-# =========================================
-# 💬 CHAT WITH YOUR DATA
-# =========================================
+search = st.text_input("🔎 بحث سريع داخل البيانات")
+
+if search:
+    df_preview = df_preview[
+        df_preview.astype(str).apply(
+            lambda row: row.str.contains(search, case=False).any(),
+            axis=1
+        )
+    ]
+
+
+# ---------------------------------
+# عرض البيانات
+# ---------------------------------
+
+st.data_editor(
+    df_preview.head(200),
+    use_container_width=True
+)
+
+
+# ---------------------------------
+# تحميل البيانات بعد الفلترة
+# ---------------------------------
+
+csv = df_preview.to_csv(index=False).encode("utf-8-sig")
+
+st.download_button(
+    "⬇ تحميل البيانات بعد الفلترة (CSV)",
+    data=csv,
+    file_name="filtered_sales_data.csv",
+    mime="text/csv"
+)
+
 
 # =========================================
 # 💬 CHAT WITH YOUR DATA
@@ -844,34 +1136,36 @@ st.data_editor(df_preview.head(50), use_container_width=True)
 st.divider()
 
 st.markdown(
-    "<h2 style='text-align:right;'>💬 اسأل عن بياناتك</h2>",
+    "<h2 style='text-align:right;'>💬 اسأل عن بيانات المبيعات</h2>",
     unsafe_allow_html=True
 )
 
 st.info(
 """
-يمكنك سؤال النظام عن بيانات التشغيل مثل:
+يمكنك سؤال النظام عن بيانات المبيعات مثل:
 
-• أعلى سيارة ربح  
-• أقل سيارة ربح  
-• أعلى تكلفة كيلومتر  
-• إجمالي الكيلومترات  
-• أكثر نوع مصروف  
+• أعلى فرع مبيعات  
+• أكثر براند مبيعًا  
+• أفضل مندوب مبيعات  
+• إجمالي المبيعات  
+• عدد الأوردرات  
+• المبيعات في القاهرة  
 
-⚠️ يفضل أن يكون السؤال قصيرًا (حتى 5 كلمات).
+⚠️ يفضل أن يكون السؤال قصيرًا (حتى 6 كلمات).
 """
 )
 
-question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 5 كلمات)")
+question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 6 كلمات)")
 
 if question:
 
     # منع الأسئلة الطويلة
     words = question.split()
 
-    if len(words) > 5:
-        st.error("السؤال يجب ألا يزيد عن 5 كلمات")
+    if len(words) > 6:
+        st.error("السؤال يجب ألا يزيد عن 6 كلمات")
         st.stop()
+
 
     # ---------------------------------
     # العمليات المسموح بها
@@ -890,18 +1184,20 @@ if question:
     tail
     count
     value_counts
+    nunique
     """
+
 
     # ---------------------------------
     # تجهيز Prompt
     # ---------------------------------
 
     prompt = f"""
-    أنت محلل بيانات.
+    أنت محلل بيانات مبيعات.
 
     لديك dataframe اسمه df_f
 
-    الأعمدة هي:
+    الأعمدة المتاحة هي:
 
     {list(df_f.columns)}
 
@@ -909,26 +1205,38 @@ if question:
 
     اكتب كود pandas فقط للإجابة عن السؤال.
 
-    الشروط:
+    القواعد:
+
+    - استخدم df_f فقط
     - لا تستخدم import
     - لا تستخدم ملفات
     - لا تستخدم مكتبات أخرى
     - لا تكتب شرح
+    - أعد كود pandas فقط
 
     السؤال:
+
     {question}
     """
 
-    with st.spinner("AI analyzing your question..."):
+
+    with st.spinner("🤖 AI يحلل سؤالك..."):
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a data analyst"},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "You are a professional sales data analyst using pandas."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
             ],
             max_tokens=120
         )
+
 
         code = response.choices[0].message.content
 
@@ -937,15 +1245,17 @@ if question:
         code = code.replace("```", "")
         code = code.strip()
 
-        st.markdown("### 🔎 Generated Analysis")
+
+        st.markdown("### 🔎 الكود الذي أنشأه AI")
 
         st.code(code)
 
+
         try:
 
-            result = eval(code, {"df_f": df_f, "vehicle": vehicle, "fleet": fleet})
+            result = eval(code, {"df_f": df_f})
 
-            st.markdown("### 📊 Result")
+            st.markdown("### 📊 النتيجة")
 
             st.write(result)
 
