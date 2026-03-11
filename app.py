@@ -19,6 +19,9 @@ supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
+# must be called before any Streamlit UI elements
+st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
+
 
 # =========================================
 # HELPERS
@@ -155,7 +158,6 @@ if not st.session_state.user:
 # 6️⃣ PAGE CONFIG
 # =========================================
 
-st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 st.markdown(
     """
     <h1 style='text-align: right; font-weight: 800;'>
@@ -205,36 +207,6 @@ def load_and_standardize(file):
 # 8️⃣ KPI ENGINE
 # =========================================
 
-def compute_kpis(df):
-    daily = (
-        df.groupby(["vehicle_id","date"], as_index=False)
-          .agg(total_cost=("expense_amount","sum"),
-               total_revenue=("revenue","sum"),
-               total_km=("kilometers","sum"))
-    )
-    # avoid div by zero
-    daily["cost_per_km"] = np.where(daily["total_km"]>0, daily["total_cost"]/daily["total_km"], 0)
-    daily["profit"] = daily["total_revenue"] - daily["total_cost"]
-
-    vehicle = (
-        daily.groupby("vehicle_id", as_index=False)
-             .agg(total_cost=("total_cost","sum"),
-                  total_revenue=("total_revenue","sum"),
-                  total_km=("total_km","sum"),
-                  total_profit=("profit","sum"))
-    )
-    vehicle["cost_per_km"] = np.where(vehicle["total_km"]>0, vehicle["total_cost"]/vehicle["total_km"], 0)
-
-    fleet = {
-        "total_cost": float(vehicle["total_cost"].sum()),
-        "total_revenue": float(vehicle["total_revenue"].sum()),
-        "total_km": float(vehicle["total_km"].sum()),
-        "total_profit": float(vehicle["total_profit"].sum())
-    }
-    fleet["fleet_cost_per_km"] = fleet["total_cost"]/fleet["total_km"] if fleet["total_km"]>0 else 0
-    fleet["profit_margin_pct"] = (fleet["total_profit"]/fleet["total_revenue"]*100) if fleet["total_revenue"]>0 else 0
-
-    return daily, vehicle, fleet
 def compute_kpis(df):
     daily = (
         df.groupby(["vehicle_id","date"], as_index=False)
@@ -832,10 +804,6 @@ df_preview = df_f.rename(columns={
 df_preview = df_preview[df_preview.columns[::-1]]
 
 st.data_editor(df_preview.head(50), use_container_width=True)
-
-# =========================================
-# 💬 CHAT WITH YOUR DATA
-# =========================================
 
 # =========================================
 # 💬 CHAT WITH YOUR DATA
