@@ -1208,25 +1208,16 @@ st.info(
 """
 )
 
-# ---------------------------------
-# إدخال السؤال
-# ---------------------------------
-
 question = st.text_input(
     "اكتب سؤال عن البيانات (حد أقصى 6 كلمات)",
     value=quick_question if quick_question else ""
 )
 
-# زر التحليل اليدوي
 manual_run = st.button("🔍 تحليل السؤال")
 
-# دمج الأزرار
 if manual_run:
     run_question = True
 
-# ---------------------------------
-# تشغيل التحليل
-# ---------------------------------
 
 if run_question:
 
@@ -1240,20 +1231,12 @@ if run_question:
         st.error("السؤال يجب ألا يزيد عن 6 كلمات")
         st.stop()
 
-    # التأكد من وجود بيانات بعد الفلاتر
     if len(df_f) == 0:
         st.warning("لا توجد بيانات بعد تطبيق الفلاتر")
         st.stop()
 
-    # ---------------------------------
-    # إنشاء عينة من البيانات
-    # ---------------------------------
-
-    df_sample = df_f.sample(min(3000, len(df_f)))
-
-    # ---------------------------------
-    # العمليات المسموح بها
-    # ---------------------------------
+    # عينة من البيانات بعد الفلاتر
+    df_sample = df_f.sample(min(3000, len(df_f))) if len(df_f) > 0 else df_f
 
     allowed_operations = """
 يسمح فقط باستخدام العمليات التالية في pandas:
@@ -1269,11 +1252,8 @@ tail
 count
 value_counts
 nunique
+reset_index
 """
-
-    # ---------------------------------
-    # Context الفلاتر
-    # ---------------------------------
 
     filter_context = f"""
 البيانات الحالية بعد الفلاتر:
@@ -1282,10 +1262,6 @@ nunique
 عدد الفروع: {df_f['branch_name'].nunique()}
 عدد المحافظات: {df_f['governorate'].nunique()}
 """
-
-    # ---------------------------------
-    # تجهيز الـ Prompt
-    # ---------------------------------
 
     prompt = f"""
 أنت محلل بيانات مبيعات محترف.
@@ -1300,33 +1276,30 @@ nunique
 
 {filter_context}
 
-القواعد:
+اكتب Expression واحد فقط بصيغة pandas يعيد النتيجة مباشرة.
 
+شروط مهمة جدًا:
 - استخدم df_sample فقط
 - لا تستخدم import
 - لا تستخدم مكتبات أخرى
 - لا تكتب شرح
-- أعد كود pandas فقط
+- لا تكتب أي متغيرات مثل x =
+- لا تكتب أكثر من سطر
+- يجب أن يكون الناتج النهائي expression واحد يمكن تشغيله بـ eval مباشرة
 
 السؤال:
-
 {question}
 """
-
-    # ---------------------------------
-    # تشغيل AI
-    # ---------------------------------
 
     with st.spinner("🤖 AI يحلل سؤالك..."):
 
         try:
-
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a professional sales data analyst using pandas."
+                        "content": "You are a professional sales data analyst using pandas. Return only one valid pandas expression and never use assignment."
                     },
                     {
                         "role": "user",
@@ -1337,10 +1310,7 @@ nunique
             )
 
             code = response.choices[0].message.content
-
-            code = code.replace("```python", "")
-            code = code.replace("```", "")
-            code = code.strip()
+            code = code.replace("```python", "").replace("```", "").strip()
 
             st.markdown("### 🔎 الكود الذي أنشأه AI")
             st.code(code)
@@ -1351,5 +1321,4 @@ nunique
             st.write(result)
 
         except Exception as e:
-
             st.error("لم يتمكن النظام من تحليل السؤال.")
