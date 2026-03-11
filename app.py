@@ -826,19 +826,19 @@ st.info(
 • إجمالي الكيلومترات  
 • أكثر نوع مصروف  
 
-⚠️ يفضل أن يكون السؤال قصيرًا (حتى 5 كلمات).
+⚠️ يفضل أن يكون السؤال قصيرًا (حتى 7 كلمات).
 """
 )
 
-question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 5 كلمات)")
+question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 7 كلمات)")
 
 if question:
 
     # منع الأسئلة الطويلة
     words = question.split()
 
-    if len(words) > 5:
-        st.error("السؤال يجب ألا يزيد عن 5 كلمات")
+    if len(words) > 7:
+        st.error("السؤال يجب ألا يزيد عن 7 كلمات")
         st.stop()
 
     # ---------------------------------
@@ -865,23 +865,31 @@ if question:
     # ---------------------------------
 
     prompt = f"""
-    أنت محلل بيانات.
+    أنت محلل بيانات تشغيل أسطول بخبرة تنفيذية.
 
     لديك dataframe اسمه df_f
+    ولديك أيضًا:
+    - vehicle: summary by vehicle
+    - fleet: fleet totals
 
-    الأعمدة هي:
-
+    الأعمدة في df_f:
     {list(df_f.columns)}
 
     {allowed_operations}
 
-    اكتب كود pandas فقط للإجابة عن السؤال.
+    المطلوب (صيغة نصية منظمة فقط):
+    - اكتب النتيجة بهذا الشكل الحرفي:
+      CODE:
+      <pandas code>
+      ANSWER_AR:
+      <إجابة عربية احترافية قصيرة>
+      INSIGHT_AR:
+      <ملاحظة تنفيذية قصيرة أو اكتب: لا يوجد>
 
     الشروط:
-    - لا تستخدم import
-    - لا تستخدم ملفات
-    - لا تستخدم مكتبات أخرى
-    - لا تكتب شرح
+    - code يجب أن يستخدم df_f أو vehicle أو fleet فقط
+    - لا تستخدم import أو ملفات أو مكتبات خارجية
+    - لا تكتب markdown
 
     السؤال:
     {question}
@@ -898,15 +906,34 @@ if question:
             max_tokens=120
         )
 
-        code = response.choices[0].message.content
+        raw_response = response.choices[0].message.content.strip()
 
-        # تنظيف الكود
-        code = code.replace("```python", "")
-        code = code.replace("```", "")
-        code = code.strip()
+        clean_response = raw_response.replace("```python", "").replace("```", "").strip()
+
+        def extract_section(text, start_label, end_label=None):
+            start_idx = text.find(start_label)
+            if start_idx == -1:
+                return ""
+            start_idx += len(start_label)
+            if end_label:
+                end_idx = text.find(end_label, start_idx)
+                if end_idx == -1:
+                    end_idx = len(text)
+            else:
+                end_idx = len(text)
+            return text[start_idx:end_idx].strip()
+
+        code = extract_section(clean_response, "CODE:", "ANSWER_AR:")
+        answer_ar = extract_section(clean_response, "ANSWER_AR:", "INSIGHT_AR:")
+        insight_ar = extract_section(clean_response, "INSIGHT_AR:")
+
+        if not code:
+            code = clean_response
+
+        if insight_ar.lower() in ["لا يوجد", "none", "n/a"]:
+            insight_ar = ""
 
         st.markdown("### 🔎 Generated Analysis")
-
         st.code(code)
 
         try:
@@ -914,8 +941,16 @@ if question:
             result = eval(code, {"df_f": df_f, "vehicle": vehicle, "fleet": fleet})
 
             st.markdown("### 📊 Result")
-
             st.write(result)
+
+            st.markdown("### 🧠 Executive Answer")
+            if answer_ar:
+                st.success(answer_ar)
+            else:
+                st.info("تم تحليل السؤال بنجاح، راجع النتيجة بالأعلى.")
+
+            if insight_ar:
+                st.caption(f"Insight: {insight_ar}")
 
         except Exception:
 
