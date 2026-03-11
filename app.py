@@ -766,7 +766,46 @@ if st.button("Generate Sales AI Insight") and not st.session_state.ai_running:
             brands = int(df_f["brand_name"].nunique())
             sales_reps = int(df_f["sales_rep_name"].nunique())
             governorates = int(df_f["governorate"].nunique())
-
+            branch_top = (
+            df_f.groupby("branch_name", as_index=False)
+                .agg(total_sales=("total_amount", "sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+            )
+            
+            branch_bottom = (
+                df_f.groupby("branch_name", as_index=False)
+                .agg(total_sales=("total_amount", "sum"))
+                .sort_values("total_sales", ascending=True)
+                .head(5)
+            )
+            
+            brand_top = (
+                df_f.groupby("brand_name", as_index=False)
+                .agg(total_sales=("total_amount", "sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+            )
+            
+            sales_rep_top = (
+                df_f.groupby("sales_rep_name", as_index=False)
+                .agg(total_sales=("total_amount", "sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+            )
+            
+            product_top = (
+                df_f.groupby("product_name", as_index=False)
+                .agg(total_qty=("quantity", "sum"))
+                .sort_values("total_qty", ascending=False)
+                .head(5)
+            )
+            
+            branch_top_text = branch_top.to_string(index=False)
+            branch_bottom_text = branch_bottom.to_string(index=False)
+            brand_top_text = brand_top.to_string(index=False)
+            sales_rep_top_text = sales_rep_top.to_string(index=False)
+            product_top_text = product_top.to_string(index=False)
 
             summary = f"""
 Sales Summary
@@ -791,17 +830,37 @@ Governorates: {governorates}
             # ---------------------------------
 
             prompt = f"""
-قم بتحليل بيانات المبيعات التالية وقدم تقريرًا تنفيذيًا واضحًا.
+قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي واضح.
 
+ملخص عام:
 {summary}
 
-اشرح:
+أعلى الفروع مبيعات:
+{branch_top_text}
 
-- أداء المبيعات بشكل عام
-- الفروع أو المناطق ذات الأداء الأعلى
-- تأثير الخصومات على الإيرادات
-- الفرص الممكنة لزيادة المبيعات
-- توصيات استراتيجية للإدارة لتحسين الأداء
+أقل الفروع مبيعات:
+{branch_bottom_text}
+
+أعلى البراندات:
+{brand_top_text}
+
+أفضل المندوبين:
+{sales_rep_top_text}
+
+أكثر المنتجات مبيعًا:
+{product_top_text}
+
+المطلوب في التقرير:
+
+1 تحليل أداء المبيعات بشكل عام
+2 مقارنة الفروع مع ذكر أسماء الفروع الأعلى والأضعف
+3 تحليل أداء البراندات
+4 تحليل أداء المندوبين
+5 تحليل تأثير الخصومات على الإيرادات
+6 تحديد فرص تحسين المبيعات
+7 تقديم توصيات عملية للإدارة
+
+اكتب التحليل باللغة العربية مع ذكر أسماء الفروع والبراندات والأرقام المهمة.
 """
 
 
