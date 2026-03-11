@@ -1259,6 +1259,21 @@ nunique
 # ---------------------------------
 
 df_sample = df_f.head(3000)
+allowed_operations = """
+يسمح فقط باستخدام العمليات التالية في pandas:
+
+groupby
+sum
+mean
+max
+min
+sort_values
+head
+tail
+count
+value_counts
+nunique
+"""
 
 # ---------------------------------
 # تجهيز Prompt
