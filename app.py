@@ -659,6 +659,70 @@ discount_breakdown = (
         .sort_values("total_discount", ascending=False)
 )
 # =========================================
+# 13️⃣ QUICK INSIGHTS
+# =========================================
+
+st.divider()
+st.markdown("## 🤖 Sales Quick Insights")
+
+col1, col2, col3, col4 = st.columns(4)
+
+
+# ===============================
+# Top Branches
+# ===============================
+with col1:
+    if st.button("🏢 أعلى الفروع مبيعات"):
+        top_branch = (
+            df_f.groupby("branch_name", as_index=False)
+                .agg(total_sales=("total_amount","sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+        )
+        st.dataframe(top_branch)
+
+
+# ===============================
+# Top Brands
+# ===============================
+with col2:
+    if st.button("🏷 أكثر البراندات مبيعًا"):
+        top_brand = (
+            df_f.groupby("brand_name", as_index=False)
+                .agg(total_sales=("total_amount","sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+        )
+        st.dataframe(top_brand)
+
+
+# ===============================
+# Top Sales Reps
+# ===============================
+with col3:
+    if st.button("👤 أفضل المندوبين مبيعات"):
+        top_sales_rep = (
+            df_f.groupby("sales_rep_name", as_index=False)
+                .agg(total_sales=("total_amount","sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+        )
+        st.dataframe(top_sales_rep)
+
+
+# ===============================
+# Top Governorates
+# ===============================
+with col4:
+    if st.button("📍 أعلى المحافظات مبيعات"):
+        top_geo = (
+            df_f.groupby("governorate", as_index=False)
+                .agg(total_sales=("total_amount","sum"))
+                .sort_values("total_sales", ascending=False)
+                .head(5)
+        )
+        st.dataframe(top_geo)
+# =========================================
 # 14️⃣ AI ENGINE
 # =========================================
 
@@ -671,10 +735,7 @@ if "ai_running" not in st.session_state:
     st.session_state.ai_running = False
 
 
-# =========================================
 # زر تشغيل التحليل
-# =========================================
-
 if st.button("Generate Sales AI Insight") and not st.session_state.ai_running:
 
     st.session_state.ai_running = True
@@ -687,59 +748,27 @@ if st.button("Generate Sales AI Insight") and not st.session_state.ai_running:
 
     with st.spinner("🤖 جاري تحليل بيانات المبيعات بواسطة الذكاء الاصطناعي..."):
 
-try:
+        try:
 
-    # ================================
-    # إعداد ملخصات البيانات
-    # ================================
+            # ---------------------------------
+            # تجهيز ملخص البيانات
+            # ---------------------------------
 
-    branch_summary = (
-        df_f.groupby("branch_name")["total_amount"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(10)
-    )
+            total_sales = float(df_f["total_amount"].sum())
+            total_orders = int(df_f["order_id"].nunique())
+            total_quantity = float(df_f["quantity"].sum())
+            total_discount = float(df_f["total_discount"].sum())
 
-    brand_summary = (
-        df_f.groupby("brand_name")["total_amount"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(10)
-    )
+            avg_order_value = total_sales / total_orders if total_orders else 0
+            discount_ratio_pct = (total_discount / total_sales * 100) if total_sales else 0
 
-    sales_rep_summary = (
-        df_f.groupby("sales_rep_name")["total_amount"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(10)
-    )
-
-    product_summary = (
-        df_f.groupby("product_name")["quantity"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(10)
-    )
-
-    # ================================
-    # تجهيز ملخص البيانات العام
-    # ================================
-
-    total_sales = float(df_f["total_amount"].sum())
-    total_orders = int(df_f["order_id"].nunique())
-    total_quantity = float(df_f["quantity"].sum())
-    total_discount = float(df_f["total_discount"].sum())
-
-    avg_order_value = total_sales / total_orders if total_orders else 0
-    discount_ratio_pct = (total_discount / total_sales * 100) if total_sales else 0
-
-    branches = int(df_f["branch_name"].nunique())
-    brands = int(df_f["brand_name"].nunique())
-    sales_reps = int(df_f["sales_rep_name"].nunique())
-    governorates = int(df_f["governorate"].nunique())
+            branches = int(df_f["branch_name"].nunique())
+            brands = int(df_f["brand_name"].nunique())
+            sales_reps = int(df_f["sales_rep_name"].nunique())
+            governorates = int(df_f["governorate"].nunique())
 
 
-    summary = f"""
+            summary = f"""
 Sales Summary
 
 Total Sales: {total_sales}
@@ -757,117 +786,60 @@ Governorates: {governorates}
 """
 
 
-    # ======================================
-    # تجهيز Prompt
-    # ======================================
+            # ---------------------------------
+            # بناء الـ Prompt
+            # ---------------------------------
 
-    prompt = f"""
-أنت خبير ذكاء أعمال وتحليل بيانات المبيعات.
+            prompt = f"""
+قم بتحليل بيانات المبيعات التالية وقدم تقريرًا تنفيذيًا واضحًا.
 
-قم بإعداد تقرير تنفيذي احترافي يعتمد على البيانات الفعلية التالية.
-
-تحليل الفروع:
-{branch_summary}
-
-تحليل البراندات:
-{brand_summary}
-
-أفضل المندوبين:
-{sales_rep_summary}
-
-أفضل المنتجات:
-{product_summary}
-
-البيانات العامة:
 {summary}
 
-المطلوب في التقرير:
+اشرح:
 
-1- تحليل أداء المبيعات بشكل عام
-2- مقارنة أداء الفروع مع ذكر أسماء الفروع الأعلى مبيعات
-3- مقارنة أداء البراندات
-4- تحديد أفضل المندوبين
-5- تحليل تأثير الخصومات
-6- تحديد فرص زيادة المبيعات
-7- تقديم توصيات للإدارة
-
-اكتب التقرير باللغة العربية.
+- أداء المبيعات بشكل عام
+- الفروع أو المناطق ذات الأداء الأعلى
+- تأثير الخصومات على الإيرادات
+- الفرص الممكنة لزيادة المبيعات
+- توصيات استراتيجية للإدارة لتحسين الأداء
 """
 
 
-    # ---------------------------------
-    # استدعاء AI
-    # ---------------------------------
+            # ---------------------------------
+            # استدعاء AI
+            # ---------------------------------
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": """
-أنت خبير ذكاء أعمال (Business Intelligence) وتحليل بيانات المبيعات.
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """
+أنت خبير في تحليل بيانات المبيعات وذكاء الأعمال.
 
 مهمتك:
-تحليل البيانات الرقمية وتقديم تقرير تنفيذي عملي يساعد الإدارة في اتخاذ القرار.
+تحليل البيانات وتقديم تقرير تنفيذي يساعد الإدارة على اتخاذ القرار.
 
-يجب أن:
-- تذكر أسماء الفروع
-- تذكر أسماء البراندات
-- تقارن بين الأداء
-- تذكر الأرقام المهمة
-- تقدم توصيات عملية
+ركز على:
+- أداء المبيعات
+- الفروع الأعلى مبيعات
+- تأثير الخصومات
+- فرص زيادة الإيرادات
+- توصيات الإدارة
 """
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        max_tokens=700
-    )
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=500
+            )
 
-    report = response.choices[0].message.content
-
-
-    # ---------------------------------
-    # خصم الكريديت
-    # ---------------------------------
-
-    tokens_used = calculate_tokens(response)
-    credit_used = tokens_to_credit(tokens_used)
-
-    new_credit = float(st.session_state.credits) - float(credit_used)
-
-    supabase.table("Companies").update({
-        "credits": new_credit
-    }).eq("id", st.session_state.company_id).execute()
-
-    st.session_state.credits = new_credit
+            report = response.choices[0].message.content
 
 
-    # حفظ التقرير
-    st.session_state.report_html = report
-
-
-except Exception as e:
-
-    st.error(f"لم يتمكن النظام من تحليل البيانات: {e}")
-
-
-finally:
-
-    st.session_state.ai_running = False
-
-
-# =========================================
-# عرض التقرير
-# =========================================
-
-if st.session_state.report_html:
-
-    st.markdown("## 📊 AI Sales Executive Report")
-    st.markdown(st.session_state.report_html)
-    # ---------------------------------
+            # ---------------------------------
             # خصم الكريديت بعد النجاح فقط
             # ---------------------------------
 
