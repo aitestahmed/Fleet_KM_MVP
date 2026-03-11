@@ -738,44 +738,44 @@ if "ai_running" not in st.session_state:
 # زر تشغيل التحليل
 if st.button("Generate Sales AI Insight") and not st.session_state.ai_running:
     # ================================
-# إعداد ملخصات البيانات
-# ================================
-
-branch_summary = (
-    df_f.groupby("branch_name")["total_amount"]
-    .sum()
-    .sort_values(ascending=False)
-    .head(10)
-)
-
-brand_summary = (
-    df_f.groupby("brand_name")["total_amount"]
-    .sum()
-    .sort_values(ascending=False)
-    .head(10)
-)
-
-sales_rep_summary = (
-    df_f.groupby("sales_rep_name")["total_amount"]
-    .sum()
-    .sort_values(ascending=False)
-    .head(10)
-)
-
-product_summary = (
-    df_f.groupby("product_name")["quantity"]
-    .sum()
-    .sort_values(ascending=False)
-    .head(10)
-)
-
-    st.session_state.ai_running = True
-
-    # التحقق من الرصيد
-    if st.session_state.credits <= 0:
-        st.error("رصيدك انتهى. يرجى شحن الحساب.")
-        st.session_state.ai_running = False
-        st.stop()
+    # إعداد ملخصات البيانات
+    # ================================
+    
+    branch_summary = (
+        df_f.groupby("branch_name")["total_amount"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
+    
+    brand_summary = (
+        df_f.groupby("brand_name")["total_amount"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
+    
+    sales_rep_summary = (
+        df_f.groupby("sales_rep_name")["total_amount"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
+    
+    product_summary = (
+        df_f.groupby("product_name")["quantity"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
+    
+        st.session_state.ai_running = True
+    
+        # التحقق من الرصيد
+        if st.session_state.credits <= 0:
+            st.error("رصيدك انتهى. يرجى شحن الحساب.")
+            st.session_state.ai_running = False
+            st.stop()
 
     with st.spinner("🤖 جاري تحليل بيانات المبيعات بواسطة الذكاء الاصطناعي..."):
 
