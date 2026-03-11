@@ -1158,32 +1158,30 @@ st.markdown(
 
 col1, col2, col3, col4 = st.columns(4)
 
+quick_question = None
+run_question = False
+
 with col1:
-    q1 = st.button("أعلى محافظة مبيعات")
+    if st.button("أعلى محافظة مبيعات"):
+        quick_question = "أعلى محافظة مبيعات"
+        run_question = True
 
 with col2:
-    q2 = st.button("أكثر براند مبيعًا")
+    if st.button("أكثر براند مبيعًا"):
+        quick_question = "أكثر براند مبيعًا"
+        run_question = True
 
 with col3:
-    q3 = st.button("أفضل مندوب مبيعات")
+    if st.button("أفضل مندوب مبيعات"):
+        quick_question = "أفضل مندوب مبيعات"
+        run_question = True
 
 with col4:
-    q4 = st.button("إجمالي المبيعات")
+    if st.button("إجمالي المبيعات"):
+        quick_question = "إجمالي المبيعات"
+        run_question = True
 
-quick_question = None
 
-if q1:
-    quick_question = "أعلى محافظة مبيعات"
-
-if q2:
-    quick_question = "أكثر براند مبيعًا"
-
-if q3:
-    quick_question = "أفضل مندوب مبيعات"
-
-if q4:
-    quick_question = "إجمالي المبيعات"
-# =========================================
 # =========================================
 # 💬 CHAT WITH YOUR DATA
 # =========================================
@@ -1214,14 +1212,17 @@ st.info(
 # إدخال السؤال
 # ---------------------------------
 
-question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 6 كلمات)")
+question = st.text_input(
+    "اكتب سؤال عن البيانات (حد أقصى 6 كلمات)",
+    value=quick_question if quick_question else ""
+)
 
-# دعم الأسئلة السريعة
-if quick_question:
-    question = quick_question
+# زر التحليل اليدوي
+manual_run = st.button("🔍 تحليل السؤال")
 
-# زر التنفيذ
-run_question = st.button("🔍 تحليل السؤال")
+# دمج الأزرار
+if manual_run:
+    run_question = True
 
 # ---------------------------------
 # تشغيل التحليل
@@ -1337,7 +1338,6 @@ nunique
 
             code = response.choices[0].message.content
 
-            # تنظيف الكود
             code = code.replace("```python", "")
             code = code.replace("```", "")
             code = code.strip()
@@ -1345,7 +1345,6 @@ nunique
             st.markdown("### 🔎 الكود الذي أنشأه AI")
             st.code(code)
 
-            # تنفيذ الكود
             result = eval(code, {"df_sample": df_sample, "pd": pd})
 
             st.markdown("### 📊 النتيجة")
