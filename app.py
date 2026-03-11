@@ -1155,10 +1155,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# كاش للأسئلة داخل الجلسة
-if "question_cache" not in st.session_state:
-    st.session_state.question_cache = {}
-
 col1, col2, col3, col4 = st.columns(4)
 
 quick_question = None
@@ -1224,11 +1220,10 @@ if manual_run:
 
 if run_question:
 
-    if not question or not question.strip():
+    if not question:
         st.warning("يرجى كتابة سؤال أولاً")
         st.stop()
 
-    question = question.strip()
     words = question.split()
 
     if len(words) > 6:
@@ -1239,14 +1234,9 @@ if run_question:
         st.warning("لا توجد بيانات بعد تطبيق الفلاتر")
         st.stop()
 
-    # ---------------------------------
     # عينة من البيانات بعد الفلاتر
-    # ---------------------------------
     df_sample = df_f.sample(min(3000, len(df_f))) if len(df_f) > 0 else df_f
 
-    # ---------------------------------
-    # العمليات المسموح بها
-    # ---------------------------------
     allowed_operations = """
 يسمح فقط باستخدام العمليات التالية في pandas:
 
@@ -1264,34 +1254,14 @@ nunique
 reset_index
 """
 
-    # ---------------------------------
-    # Context الفلاتر الحالية
-    # ---------------------------------
     filter_context = f"""
 البيانات الحالية بعد الفلاتر:
 
 عدد الصفوف: {len(df_f)}
 عدد الفروع: {df_f['branch_name'].nunique()}
 عدد المحافظات: {df_f['governorate'].nunique()}
-عدد البراندات: {df_f['brand_name'].nunique()}
-عدد المندوبين: {df_f['sales_rep_name'].nunique()}
 """
 
-    # ---------------------------------
-    # مفتاح الكاش بناءً على السؤال + الفلاتر
-    # ---------------------------------
-    cache_key = str({
-        "question": question,
-        "branches": sorted(st.session_state.get("selected_branch_multi", [])),
-        "brands": sorted(st.session_state.get("selected_brand_multi", [])),
-        "sales_reps": sorted(st.session_state.get("selected_sales_rep_multi", [])),
-        "governorates": sorted(st.session_state.get("selected_governorate_multi", [])),
-        "date_range": str(st.session_state.get("date_range", "")),
-    })
-
-    # ---------------------------------
-    # الـ Prompt
-    # ---------------------------------
     prompt = f"""
 أنت محلل بيانات مبيعات محترف.
 
@@ -1314,76 +1284,40 @@ reset_index
 - لا تكتب شرح
 - لا تكتب أي متغيرات مثل x =
 - لا تكتب أكثر من سطر
-- لا تستخدم print
 - يجب أن يكون الناتج النهائي expression واحد يمكن تشغيله بـ eval مباشرة
-- إذا كان السؤال عن "أفضل" أو "أعلى" أو "أكثر" فاستخدم sort_values(...).head(1)
-- إذا كان السؤال عن إجمالي فاستخدم sum
-- إذا كان السؤال عن عدد فاستخدم nunique أو count حسب المعنى
 
 السؤال:
 {question}
 """
 
-    # ---------------------------------
-    # تشغيل AI / استخدام الكاش
-    # ---------------------------------
     with st.spinner("🤖 AI يحلل سؤالك..."):
 
         try:
-            used_cache = False
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a professional sales data analyst using pandas. Return only one valid pandas expression and never use assignment."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=120
+            )
 
-            if cache_key in st.session_state.question_cache:
-                code = st.session_state.question_cache[cache_key]
-                used_cache = True
-            else:
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are a professional sales data analyst using pandas. "
-                                "Return only one valid pandas expression. "
-                                "Never use assignment. Never return multiple lines."
-                            )
-                        },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
-                    max_tokens=120
-                )
-
-                code = response.choices[0].message.content
-                code = code.replace("```python", "").replace("```", "").strip()
+            code = response.choices[0].message.content
+            code = code.replace("```python", "").replace("```", "").strip()
 
             st.markdown("### 🔎 الكود الذي أنشأه AI")
             st.code(code)
 
-            # حماية إضافية ضد الأكواد غير المناسبة لـ eval
-            invalid_patterns = ["=", "import ", "print(", "__", "exec(", "eval("]
-            if any(p in code for p in invalid_patterns):
-                st.error("AI رجّع كود غير صالح للتنفيذ المباشر.")
-                st.stop()
-
             result = eval(code, {"df_sample": df_sample, "pd": pd})
 
-            # حفظ الكود في الكاش فقط إذا نجح التنفيذ
-            if not used_cache:
-                st.session_state.question_cache[cache_key] = code
-
-            if used_cache:
-                st.info("تم استخدام نتيجة محفوظة لنفس السؤال والفلاتر")
-
             st.markdown("### 📊 النتيجة")
+            st.write(result)
 
-            if isinstance(result, pd.DataFrame):
-                st.dataframe(result, use_container_width=True)
-            elif isinstance(result, pd.Series):
-                st.dataframe(result.to_frame(), use_container_width=True)
-            else:
-                st.write(result)
-
-        except Exception:
+        except Exception as e:
             st.error("لم يتمكن النظام من تحليل السؤال.")
