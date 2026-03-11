@@ -687,59 +687,59 @@ if st.button("Generate Sales AI Insight") and not st.session_state.ai_running:
 
     with st.spinner("🤖 جاري تحليل بيانات المبيعات بواسطة الذكاء الاصطناعي..."):
 
-        try:
+try:
 
-            # ================================
-            # إعداد ملخصات البيانات
-            # ================================
+    # ================================
+    # إعداد ملخصات البيانات
+    # ================================
 
-            branch_summary = (
-                df_f.groupby("branch_name")["total_amount"]
-                .sum()
-                .sort_values(ascending=False)
-                .head(10)
-            )
+    branch_summary = (
+        df_f.groupby("branch_name")["total_amount"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
 
-            brand_summary = (
-                df_f.groupby("brand_name")["total_amount"]
-                .sum()
-                .sort_values(ascending=False)
-                .head(10)
-            )
+    brand_summary = (
+        df_f.groupby("brand_name")["total_amount"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
 
-            sales_rep_summary = (
-                df_f.groupby("sales_rep_name")["total_amount"]
-                .sum()
-                .sort_values(ascending=False)
-                .head(10)
-            )
+    sales_rep_summary = (
+        df_f.groupby("sales_rep_name")["total_amount"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
 
-            product_summary = (
-                df_f.groupby("product_name")["quantity"]
-                .sum()
-                .sort_values(ascending=False)
-                .head(10)
-            )
+    product_summary = (
+        df_f.groupby("product_name")["quantity"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(10)
+    )
 
-            # ================================
-            # تجهيز ملخص البيانات العام
-            # ================================
+    # ================================
+    # تجهيز ملخص البيانات العام
+    # ================================
 
-            total_sales = float(df_f["total_amount"].sum())
-            total_orders = int(df_f["order_id"].nunique())
-            total_quantity = float(df_f["quantity"].sum())
-            total_discount = float(df_f["total_discount"].sum())
+    total_sales = float(df_f["total_amount"].sum())
+    total_orders = int(df_f["order_id"].nunique())
+    total_quantity = float(df_f["quantity"].sum())
+    total_discount = float(df_f["total_discount"].sum())
 
-            avg_order_value = total_sales / total_orders if total_orders else 0
-            discount_ratio_pct = (total_discount / total_sales * 100) if total_sales else 0
+    avg_order_value = total_sales / total_orders if total_orders else 0
+    discount_ratio_pct = (total_discount / total_sales * 100) if total_sales else 0
 
-            branches = int(df_f["branch_name"].nunique())
-            brands = int(df_f["brand_name"].nunique())
-            sales_reps = int(df_f["sales_rep_name"].nunique())
-            governorates = int(df_f["governorate"].nunique())
+    branches = int(df_f["branch_name"].nunique())
+    brands = int(df_f["brand_name"].nunique())
+    sales_reps = int(df_f["sales_rep_name"].nunique())
+    governorates = int(df_f["governorate"].nunique())
 
 
-            summary = f"""
+    summary = f"""
 Sales Summary
 
 Total Sales: {total_sales}
@@ -757,11 +757,11 @@ Governorates: {governorates}
 """
 
 
-            # ======================================
-            # تجهيز Prompt
-            # ======================================
+    # ======================================
+    # تجهيز Prompt
+    # ======================================
 
-            prompt = f"""
+    prompt = f"""
 أنت خبير ذكاء أعمال وتحليل بيانات المبيعات.
 
 قم بإعداد تقرير تنفيذي احترافي يعتمد على البيانات الفعلية التالية.
@@ -795,16 +795,16 @@ Governorates: {governorates}
 """
 
 
-            # ---------------------------------
-# استدعاء AI
-# ---------------------------------
+    # ---------------------------------
+    # استدعاء AI
+    # ---------------------------------
 
-response = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[
-        {
-            "role": "system",
-            "content": """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": """
 أنت خبير ذكاء أعمال (Business Intelligence) وتحليل بيانات المبيعات.
 
 مهمتك:
@@ -817,59 +817,46 @@ response = client.chat.completions.create(
 - تذكر الأرقام المهمة
 - تقدم توصيات عملية
 """
-        },
-        {
-            "role": "user",
-            "content": prompt
-        }
-    ],
-    max_tokens=700
-)
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        max_tokens=700
+    )
 
-report = response.choices[0].message.content
-
-
-# ---------------------------------
-# خصم الكريديت بعد النجاح فقط
-# ---------------------------------
-
-tokens_used = calculate_tokens(response)
-credit_used = tokens_to_credit(tokens_used)
-
-new_credit = float(st.session_state.credits) - float(credit_used)
-
-supabase.table("Companies").update({
-    "credits": new_credit
-}).eq("id", st.session_state.company_id).execute()
-
-st.session_state.credits = new_credit
+    report = response.choices[0].message.content
 
 
-# ---------------------------------
-# حفظ التقرير
-# ---------------------------------
+    # ---------------------------------
+    # خصم الكريديت
+    # ---------------------------------
 
-st.session_state.report_html = report
+    tokens_used = calculate_tokens(response)
+    credit_used = tokens_to_credit(tokens_used)
+
+    new_credit = float(st.session_state.credits) - float(credit_used)
+
+    supabase.table("Companies").update({
+        "credits": new_credit
+    }).eq("id", st.session_state.company_id).execute()
+
+    st.session_state.credits = new_credit
 
 
-# ---------------------------------
-# معالجة الأخطاء
-# ---------------------------------
+    # حفظ التقرير
+    st.session_state.report_html = report
+
 
 except Exception as e:
 
-    st.error("لم يتمكن النظام من تحليل البيانات.")
-    st.session_state.ai_running = False
+    st.error(f"لم يتمكن النظام من تحليل البيانات: {e}")
 
-
-# ---------------------------------
-# إنهاء تشغيل AI
-# ---------------------------------
 
 finally:
 
     st.session_state.ai_running = False
-
 
 
 # =========================================
