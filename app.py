@@ -1184,6 +1184,7 @@ if q3:
 if q4:
     quick_question = "إجمالي المبيعات"
 # =========================================
+# =========================================
 # 💬 CHAT WITH YOUR DATA
 # =========================================
 
@@ -1209,15 +1210,22 @@ st.info(
 """
 )
 
-# كتابة السؤال
+# ---------------------------------
+# إدخال السؤال
+# ---------------------------------
+
 question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 6 كلمات)")
 
-# إذا ضغط المستخدم سؤال سريع
+# دعم الأسئلة السريعة
 if quick_question:
     question = quick_question
 
-# زر تنفيذ السؤال
+# زر التنفيذ
 run_question = st.button("🔍 تحليل السؤال")
+
+# ---------------------------------
+# تشغيل التحليل
+# ---------------------------------
 
 if run_question:
 
@@ -1230,6 +1238,17 @@ if run_question:
     if len(words) > 6:
         st.error("السؤال يجب ألا يزيد عن 6 كلمات")
         st.stop()
+
+    # التأكد من وجود بيانات بعد الفلاتر
+    if len(df_f) == 0:
+        st.warning("لا توجد بيانات بعد تطبيق الفلاتر")
+        st.stop()
+
+    # ---------------------------------
+    # إنشاء عينة من البيانات
+    # ---------------------------------
+
+    df_sample = df_f.sample(min(3000, len(df_f)))
 
     # ---------------------------------
     # العمليات المسموح بها
@@ -1252,34 +1271,22 @@ nunique
 """
 
     # ---------------------------------
-    # تجهيز Prompt
+    # Context الفلاتر
     # ---------------------------------
-# ---------------------------------
-# إنشاء عينة من البيانات لتقليل التوكن
-# ---------------------------------
 
-df_sample = df_filtered.sample(min(3000, len(df_filtered)))
-allowed_operations = """
-يسمح فقط باستخدام العمليات التالية في pandas:
+    filter_context = f"""
+البيانات الحالية بعد الفلاتر:
 
-groupby
-sum
-mean
-max
-min
-sort_values
-head
-tail
-count
-value_counts
-nunique
+عدد الصفوف: {len(df_f)}
+عدد الفروع: {df_f['branch_name'].nunique()}
+عدد المحافظات: {df_f['governorate'].nunique()}
 """
 
-# ---------------------------------
-# تجهيز Prompt
-# ---------------------------------
+    # ---------------------------------
+    # تجهيز الـ Prompt
+    # ---------------------------------
 
-prompt = f"""
+    prompt = f"""
 أنت محلل بيانات مبيعات محترف.
 
 لديك dataframe اسمه df_sample
@@ -1290,11 +1297,12 @@ prompt = f"""
 
 {allowed_operations}
 
+{filter_context}
+
 القواعد:
 
 - استخدم df_sample فقط
 - لا تستخدم import
-- لا تستخدم ملفات
 - لا تستخدم مكتبات أخرى
 - لا تكتب شرح
 - أعد كود pandas فقط
@@ -1304,43 +1312,45 @@ prompt = f"""
 {question}
 """
 
-with st.spinner("🤖 AI يحلل سؤالك..."):
+    # ---------------------------------
+    # تشغيل AI
+    # ---------------------------------
 
-    try:
+    with st.spinner("🤖 AI يحلل سؤالك..."):
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a professional sales data analyst using pandas."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            max_tokens=120
-        )
+        try:
 
-        code = response.choices[0].message.content
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a professional sales data analyst using pandas."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=120
+            )
 
-        # تنظيف الكود
-        code = code.replace("```python", "")
-        code = code.replace("```", "")
-        code = code.strip()
+            code = response.choices[0].message.content
 
-        st.markdown("### 🔎 الكود الذي أنشأه AI")
+            # تنظيف الكود
+            code = code.replace("```python", "")
+            code = code.replace("```", "")
+            code = code.strip()
 
-        st.code(code)
+            st.markdown("### 🔎 الكود الذي أنشأه AI")
+            st.code(code)
 
-        # تنفيذ الكود على العينة
-        result = eval(code, {"df_sample": df_sample, "pd": pd})
+            # تنفيذ الكود
+            result = eval(code, {"df_sample": df_sample, "pd": pd})
 
-        st.markdown("### 📊 النتيجة")
+            st.markdown("### 📊 النتيجة")
+            st.write(result)
 
-        st.write(result)
+        except Exception as e:
 
-    except Exception:
-
-        st.error("لم يتمكن النظام من تحليل السؤال.")
+            st.error("لم يتمكن النظام من تحليل السؤال.")
