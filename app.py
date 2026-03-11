@@ -92,8 +92,8 @@ def auth_ui():
 
     if st.session_state.user:
         st.sidebar.success(f"✅ Logged in: {st.session_state.user.email}")
-        st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name','-')}")
-        st.sidebar.markdown(f"👤 Role: {st.session_state.get('role','-')}")
+        st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name', '-')}")
+        st.sidebar.markdown(f"👤 Role: {st.session_state.get('role', '-')}")
         st.sidebar.metric("الرصيد المتبقي", f"{st.session_state.credits:.2f} جنيه")
 
         if st.sidebar.button("Logout"):
@@ -103,64 +103,79 @@ def auth_ui():
 
 
 # =========================================
-# 3) SALES LOADING + STANDARDIZATION
+# 3) DATA LOADING + STANDARDIZATION
 # =========================================
-def load_sales_file(file):
+def normalize_col(col_name: str) -> str:
+    col = str(col_name).strip().lower()
+    for ch in [" ", "-", "/", "\\", "(", ")", "[", "]"]:
+        col = col.replace(ch, "_")
+    while "__" in col:
+        col = col.replace("__", "_")
+    return col.strip("_")
+
+
+def load_fleet_file(file):
     name = file.name.lower()
     if name.endswith(".xlsx"):
         df = pd.read_excel(file, header=0)
     else:
         df = pd.read_csv(file, sep=None, engine="python", encoding="utf-8-sig")
 
-    df.columns = df.columns.str.strip()
-
-    rename_map = {
-        "اسم الفرع": "branch_name",
-        "رقم الفرع": "branch_no",
-        "كود المخزن": "store_code",
-        "اسم المخزن": "store_name",
-        "رقم المشرف": "supervisor_no",
-        "اسم المشرف": "supervisor_name",
-        "رقم المندوب": "rep_no",
-        "اسم المندوب": "rep_name",
-        "رقم الاوردر": "order_no",
-        "كود العميل": "customer_code",
-        "اسم العميل": "customer_name",
-        "نوع الاوردر": "order_type",
-        "التاريخ": "date",
-        "رقم الصنف": "item_no",
-        "اسم الصنف": "item_name",
-        "كود البراند": "brand_code",
-        "اسم البراند": "brand_name",
-        "الكمية": "qty",
-        "وحدة القياس": "uom",
-        "السعر": "unit_price",
-        "الاجمالي": "line_total",
-        "كود المحافظة": "gov_code",
-        "اسم المحافظة": "gov_name",
-        "كود المدينة": "city_code",
-        "اسم المدينة": "city_name",
-        "كود المنطقة": "area_code",
-        "اسم المنطقة": "area_name",
+    # Flexible schema mapping to avoid strict-name upload failures
+    alias_map = {
+        "vehicle_id": "vehicle_id",
+        "vehicle": "vehicle_id",
+        "truck_id": "vehicle_id",
+        "car_id": "vehicle_id",
+        "رقم_السيارة": "vehicle_id",
+        "كود_السيارة": "vehicle_id",
+        "السيارة": "vehicle_id",
+        "kilometers": "kilometers",
+        "km": "kilometers",
+        "distance": "kilometers",
+        "المسافة": "kilometers",
+        "الكيلومترات": "kilometers",
+        "كيلومترات": "kilometers",
+        "account_type": "account_type",
+        "type": "account_type",
+        "category": "account_type",
+        "نوع_الحساب": "account_type",
+        "نوع_البند": "account_type",
+        "expense_amount": "expense_amount",
+        "expense": "expense_amount",
+        "cost": "expense_amount",
+        "amount": "expense_amount",
+        "قيمة_المصروف": "expense_amount",
+        "المصروف": "expense_amount",
+        "التكلفة": "expense_amount",
+        "revenue": "revenue",
+        "income": "revenue",
+        "sales": "revenue",
+        "الايراد": "revenue",
+        "الإيراد": "revenue",
     }
+
+    normalized_to_original = {normalize_col(c): c for c in df.columns}
+    rename_map = {}
+    for normalized_name, original in normalized_to_original.items():
+        if normalized_name in alias_map:
+            rename_map[original] = alias_map[normalized_name]
 
     df = df.rename(columns=rename_map)
 
-    required = [
-        "branch_name", "store_code", "store_name", "rep_no", "rep_name",
-        "order_no", "customer_code", "order_type", "date", "item_no",
-        "item_name", "brand_name", "qty", "uom", "unit_price", "line_total",
-        "gov_name", "city_name", "area_name", "branch_no"
-    ]
-
+    required = ["vehicle_id", "kilometers", "account_type", "expense_amount", "revenue"]
     missing = [c for c in required if c not in df.columns]
     if missing:
         st.error(f"Missing required columns: {missing}")
+        st.info(
+            "الأعمدة المطلوبة (بأي تسمية مرادفة): vehicle_id, kilometers, account_type, expense_amount, revenue"
+        )
         st.stop()
 
-    df["date"] = pd.to_datetime(df["date"], errors="coerce", dayfirst=True)
+    df["vehicle_id"] = df["vehicle_id"].astype(str).str.strip()
+    df["account_type"] = df["account_type"].astype(str).str.strip()
 
-    for c in ["qty", "unit_price", "line_total"]:
+    for c in ["kilometers", "expense_amount", "revenue"]:
         df[c] = (
             df[c]
             .astype(str)
@@ -169,73 +184,65 @@ def load_sales_file(file):
         )
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    df = df.dropna(subset=["date", "order_no", "line_total"])
+    df = df.dropna(subset=["vehicle_id", "kilometers", "expense_amount", "revenue"])  # account_type can be unknown
+    df = df[df["kilometers"] > 0]
+    df["account_type"] = df["account_type"].replace("", "Unknown").fillna("Unknown")
     return df
 
 
-# =========================================
-# 4) KPI ENGINE (SALES)
-# =========================================
-def compute_sales_kpis(df):
-    total_sales = float(df["line_total"].sum())
-    total_qty = float(df["qty"].sum())
-    total_orders = int(df["order_no"].nunique())
-    total_customers = int(df["customer_code"].nunique())
+def compute_fleet_kpis(df):
+    total_km = float(df["kilometers"].sum())
+    total_expense = float(df["expense_amount"].sum())
+    total_revenue = float(df["revenue"].sum())
+    net_profit = total_revenue - total_expense
+    cost_per_km = total_expense / total_km if total_km else 0
+    revenue_per_km = total_revenue / total_km if total_km else 0
 
-    avg_order_value = total_sales / total_orders if total_orders else 0
-    avg_unit_price = total_sales / total_qty if total_qty else 0
-
-    by_rep = (
-        df.groupby(["rep_no", "rep_name"], as_index=False)
+    by_vehicle = (
+        df.groupby("vehicle_id", as_index=False)
         .agg(
-            total_sales=("line_total", "sum"),
-            total_qty=("qty", "sum"),
-            orders=("order_no", "nunique"),
-            customers=("customer_code", "nunique"),
+            kilometers=("kilometers", "sum"),
+            expense_amount=("expense_amount", "sum"),
+            revenue=("revenue", "sum"),
         )
-        .sort_values("total_sales", ascending=False)
     )
+    by_vehicle["profit"] = by_vehicle["revenue"] - by_vehicle["expense_amount"]
+    by_vehicle["cost_per_km"] = by_vehicle["expense_amount"] / by_vehicle["kilometers"]
+    by_vehicle = by_vehicle.sort_values("cost_per_km", ascending=False)
 
-    by_branch = (
-        df.groupby(["branch_no", "branch_name"], as_index=False)
-        .agg(total_sales=("line_total", "sum"), orders=("order_no", "nunique"))
-        .sort_values("total_sales", ascending=False)
-    )
-
-    by_brand = (
-        df.groupby("brand_name", as_index=False)
-        .agg(total_sales=("line_total", "sum"), total_qty=("qty", "sum"))
-        .sort_values("total_sales", ascending=False)
+    by_account = (
+        df.groupby("account_type", as_index=False)
+        .agg(expense_amount=("expense_amount", "sum"))
+        .sort_values("expense_amount", ascending=False)
     )
 
     return {
-        "total_sales": total_sales,
-        "total_qty": total_qty,
-        "total_orders": total_orders,
-        "total_customers": total_customers,
-        "avg_order_value": avg_order_value,
-        "avg_unit_price": avg_unit_price,
-        "by_rep": by_rep,
-        "by_branch": by_branch,
-        "by_brand": by_brand,
+        "total_km": total_km,
+        "total_expense": total_expense,
+        "total_revenue": total_revenue,
+        "net_profit": net_profit,
+        "cost_per_km": cost_per_km,
+        "revenue_per_km": revenue_per_km,
+        "by_vehicle": by_vehicle,
+        "by_account": by_account,
     }
 
 
 # =========================================
-# 5) APP GATE + HEADER
+# 4) APP GATE + HEADER
 # =========================================
 auth_ui()
 if not st.session_state.user:
     st.stop()
 
-st.set_page_config(page_title="Sales Intelligence", layout="wide")
+st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 st.markdown(
     """
     <h1 style='text-align: right; font-weight: 800;'>
-        لوحة تحليل المبيعات
+        لوحة تحليل أسطول النقل
     </h1>
     <p style='text-align: right; color: gray; margin-top: -10px;'>
-        رفع ملف مبيعات → توحيد البيانات → حساب المؤشرات → عرض الرسوم البيانية
+        رفع ملف إكسل → توحيد البيانات → حساب المؤشرات → عرض الرسوم البيانية
     </p>
     """,
     unsafe_allow_html=True,
@@ -243,119 +250,53 @@ st.markdown(
 
 
 # =========================================
-# 6) FILE UPLOAD
+# 5) FILE UPLOAD
 # =========================================
-uploaded = st.file_uploader("📂 قم برفع ملف المبيعات (.xlsx / .csv / .txt)", type=["xlsx", "csv", "txt"])
+uploaded = st.file_uploader("📂 قم برفع ملف إكسل (.xlsx / .csv / .txt)", type=["xlsx", "csv", "txt"])
 if not uploaded:
-    st.info("قم برفع ملف المبيعات للبدء.")
+    st.info("قم برفع الملف للبدء.")
     st.stop()
 
-df = load_sales_file(uploaded)
+df = load_fleet_file(uploaded)
+kpis = compute_fleet_kpis(df)
 
 
 # =========================================
-# 7) FILTERS
+# 6) KPIs + CHARTS
 # =========================================
-with st.sidebar:
-    st.header("🔎 الفلاتر")
-
-    branches = sorted(df["branch_name"].astype(str).unique().tolist())
-    reps = sorted(df["rep_name"].astype(str).unique().tolist())
-    brands = sorted(df["brand_name"].astype(str).unique().tolist())
-
-    selected_branches = st.multiselect("🏢 الفروع", options=branches, default=branches)
-    selected_reps = st.multiselect("👤 المندوبين", options=reps, default=reps)
-    selected_brands = st.multiselect("🏷️ البراند", options=brands, default=brands)
-
-    date_range = st.date_input(
-        "📅 نطاق التاريخ",
-        value=(df["date"].min().date(), df["date"].max().date()),
-        min_value=df["date"].min().date(),
-        max_value=df["date"].max().date(),
-    )
-
-
-df_f = df.copy()
-df_f = df_f[df_f["branch_name"].astype(str).isin(selected_branches)]
-df_f = df_f[df_f["rep_name"].astype(str).isin(selected_reps)]
-df_f = df_f[df_f["brand_name"].astype(str).isin(selected_brands)]
-
-if isinstance(date_range, tuple) and len(date_range) == 2:
-    start_date, end_date = date_range
-else:
-    start_date = end_date = date_range[0] if isinstance(date_range, tuple) else date_range
-
-df_f = df_f[(df_f["date"].dt.date >= start_date) & (df_f["date"].dt.date <= end_date)]
-
-if df_f.empty:
-    st.warning("لا توجد بيانات بعد تطبيق الفلاتر.")
-    st.stop()
-
-kpis = compute_sales_kpis(df_f)
-
-
-# =========================================
-# 8) SALES KPIs
-# =========================================
-st.markdown("<h2 style='text-align: right;'>📌 الملخص التنفيذي للمبيعات</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: right;'>📌 الملخص التنفيذي</h2>", unsafe_allow_html=True)
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("💰 إجمالي المبيعات", f"{kpis['total_sales']:,.2f}")
-col2.metric("🧾 عدد الأوردرات", f"{kpis['total_orders']:,}")
-col3.metric("👥 عدد العملاء", f"{kpis['total_customers']:,}")
-col4.metric("📦 إجمالي الكمية", f"{kpis['total_qty']:,.2f}")
+col1.metric("🚚 إجمالي الكيلومترات", f"{kpis['total_km']:,.2f}")
+col2.metric("💸 إجمالي المصروفات", f"{kpis['total_expense']:,.2f}")
+col3.metric("💰 إجمالي الإيرادات", f"{kpis['total_revenue']:,.2f}")
+col4.metric("📈 صافي الربح", f"{kpis['net_profit']:,.2f}")
 
 col5, col6 = st.columns(2)
-col5.metric("💵 متوسط قيمة الأوردر", f"{kpis['avg_order_value']:,.2f}")
-col6.metric("🏷️ متوسط سعر الوحدة", f"{kpis['avg_unit_price']:,.2f}")
+col5.metric("⚙️ Cost/KM", f"{kpis['cost_per_km']:,.2f}")
+col6.metric("🏁 Revenue/KM", f"{kpis['revenue_per_km']:,.2f}")
 
-
-# =========================================
-# 9) CHARTS
-# =========================================
-st.markdown("<h2 style='text-align: right;'>📊 تحليلات المبيعات</h2>", unsafe_allow_html=True)
-
+st.markdown("<h2 style='text-align: right;'>📊 التحليلات</h2>", unsafe_allow_html=True)
 c1, c2 = st.columns(2)
-fig_rep = px.bar(kpis["by_rep"].head(10), x="total_sales", y="rep_name", orientation="h", title="أفضل 10 مندوبين بالمبيعات")
-fig_rep.update_layout(yaxis_categoryorder="total ascending")
-c1.plotly_chart(fig_rep, use_container_width=True)
 
-fig_branch = px.bar(kpis["by_branch"].head(10), x="branch_name", y="total_sales", title="أفضل 10 فروع بالمبيعات")
-fig_branch.update_xaxes(tickangle=-30)
-c2.plotly_chart(fig_branch, use_container_width=True)
+fig_vehicle = px.bar(
+    kpis["by_vehicle"].head(10),
+    x="vehicle_id",
+    y="cost_per_km",
+    title="أعلى 10 سيارات في تكلفة الكيلومتر",
+)
+c1.plotly_chart(fig_vehicle, use_container_width=True)
 
-c3, c4 = st.columns(2)
-fig_brand = px.bar(kpis["by_brand"].head(10), x="brand_name", y="total_sales", title="أفضل 10 براند بالمبيعات")
-fig_brand.update_xaxes(tickangle=-30)
-c3.plotly_chart(fig_brand, use_container_width=True)
-
-sales_daily = df_f.groupby(df_f["date"].dt.date, as_index=False).agg(total_sales=("line_total", "sum"))
-fig_daily = px.line(sales_daily, x="date", y="total_sales", title="اتجاه المبيعات اليومي")
-c4.plotly_chart(fig_daily, use_container_width=True)
-
-
-# =========================================
-# 10) QUICK INSIGHTS
-# =========================================
-st.divider()
-st.markdown("## 🤖 Sales Quick Insights")
-
-q1, q2, q3, q4 = st.columns(4)
-with q1:
-    if st.button("🏆 أعلى مندوب مبيعات"):
-        st.dataframe(kpis["by_rep"].head(5), use_container_width=True)
-with q2:
-    if st.button("🏢 أعلى الفروع"):
-        st.dataframe(kpis["by_branch"].head(5), use_container_width=True)
-with q3:
-    if st.button("🏷️ أعلى البراندات"):
-        st.dataframe(kpis["by_brand"].head(5), use_container_width=True)
-with q4:
-    if st.button("📉 أقل المندوبين"):
-        st.dataframe(kpis["by_rep"].tail(5), use_container_width=True)
+fig_account = px.pie(
+    kpis["by_account"],
+    values="expense_amount",
+    names="account_type",
+    title="توزيع المصروفات حسب نوع الحساب",
+)
+c2.plotly_chart(fig_account, use_container_width=True)
 
 
 # =========================================
-# 11) AI REPORT
+# 7) AI REPORT
 # =========================================
 if st.button("Generate AI Insight"):
     if st.session_state.credits <= 0:
@@ -363,31 +304,32 @@ if st.button("Generate AI Insight"):
         st.stop()
 
     summary = f"""
-    Sales Summary
-    Total Sales: {kpis['total_sales']}
-    Total Orders: {kpis['total_orders']}
-    Total Customers: {kpis['total_customers']}
-    Total Quantity: {kpis['total_qty']}
-    Average Order Value: {kpis['avg_order_value']}
+    Fleet Summary
+    Total Kilometers: {kpis['total_km']}
+    Total Expenses: {kpis['total_expense']}
+    Total Revenue: {kpis['total_revenue']}
+    Net Profit: {kpis['net_profit']}
+    Cost per KM: {kpis['cost_per_km']}
+    Revenue per KM: {kpis['revenue_per_km']}
     """
 
     prompt = f"""
-    قم بتحليل بيانات المبيعات التالية وقدم تقريرًا تنفيذيًا مختصرًا وواضحًا.
+    قم بتحليل بيانات أسطول النقل التالية وقدم تقريرًا تنفيذيًا مختصرًا وواضحًا.
 
     {summary}
 
     المطلوب:
-    - أهم نقاط القوة والضعف
-    - أداء الفروع والمندوبين
-    - فرص زيادة المبيعات
-    - توصيات عملية للإدارة
+    - أهم مصادر التكلفة
+    - المركبات الأعلى تكلفة لكل كيلومتر
+    - تقييم الربحية
+    - توصيات عملية لخفض التكلفة وتحسين العائد
     """
 
-    with st.spinner("AI is analyzing sales data..."):
+    with st.spinner("AI is analyzing fleet data..."):
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات."},
+                {"role": "system", "content": "أنت خبير تحليل بيانات النقل واللوجستيات."},
                 {"role": "user", "content": prompt},
             ],
             max_tokens=500,
@@ -403,7 +345,7 @@ if st.button("Generate AI Insight"):
     st.rerun()
 
 if st.session_state.report_html:
-    st.markdown("## 📑 AI Sales Executive Report")
+    st.markdown("## 📑 AI Fleet Executive Report")
     st.markdown(
         f"""
         <div style="
@@ -422,15 +364,8 @@ if st.session_state.report_html:
 
 
 # =========================================
-# 12) DATA PREVIEW
+# 8) DATA PREVIEW
 # =========================================
 st.divider()
 st.markdown("<h3 style='text-align: right;'>📋 معاينة البيانات</h3>", unsafe_allow_html=True)
-
-preview_cols = [
-    "branch_name", "store_code", "store_name", "supervisor_name", "rep_name", "order_no",
-    "customer_name", "order_type", "date", "item_name", "brand_name", "qty", "uom",
-    "unit_price", "line_total", "gov_name", "city_name", "area_name", "branch_no"
-]
-
-st.data_editor(df_f[preview_cols].head(100), use_container_width=True)
+st.data_editor(df[["vehicle_id", "kilometers", "account_type", "expense_amount", "revenue"]].head(100), use_container_width=True)
