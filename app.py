@@ -726,14 +726,16 @@ with col4:
 # 14️⃣ AI ENGINE
 # =========================================
 
-# تهيئة متغير التقرير
+# تخزين التقرير
 if "report_html" not in st.session_state:
     st.session_state.report_html = None
 
-
-# زر تشغيل التحليل
+# منع تشغيل AI أكثر من مرة
 if "ai_running" not in st.session_state:
     st.session_state.ai_running = False
+
+
+# زر تشغيل التحليل
 if st.button("Generate Sales AI Insight") and not st.session_state.ai_running:
 
     st.session_state.ai_running = True
@@ -741,44 +743,54 @@ if st.button("Generate Sales AI Insight") and not st.session_state.ai_running:
     # التحقق من الرصيد
     if st.session_state.credits <= 0:
         st.error("رصيدك انتهى. يرجى شحن الحساب.")
+        st.session_state.ai_running = False
         st.stop()
 
-    with st.spinner("جاري تحليل بيانات المبيعات بواسطة الذكاء الاصطناعي..."):
+    with st.spinner("🤖 جاري تحليل بيانات المبيعات بواسطة الذكاء الاصطناعي..."):
 
-        # ملخص البيانات لإرساله للـ AI
-        summary = {
-            "total_sales": float(df_f["total_amount"].sum()),
-            "total_orders": int(df_f["order_id"].nunique()),
-            "total_quantity": float(df_f["quantity"].sum()),
-            "total_discount": float(df_f["total_discount"].sum()),
-            "branches": int(df_f["branch_name"].nunique()),
-            "brands": int(df_f["brand_name"].nunique()),
-            "sales_reps": int(df_f["sales_rep_name"].nunique()),
-            "governorates": int(df_f["governorate"].nunique())
-        }
-    # ---------------------------------
-   # ---------------------------------
-# تجهيز ملخص البيانات
-# ---------------------------------
+        try:
 
-summary = f"""
+            # ---------------------------------
+            # تجهيز ملخص البيانات
+            # ---------------------------------
+
+            total_sales = float(df_f["total_amount"].sum())
+            total_orders = int(df_f["order_id"].nunique())
+            total_quantity = float(df_f["quantity"].sum())
+            total_discount = float(df_f["total_discount"].sum())
+
+            avg_order_value = total_sales / total_orders if total_orders else 0
+            discount_ratio_pct = (total_discount / total_sales * 100) if total_sales else 0
+
+            branches = int(df_f["branch_name"].nunique())
+            brands = int(df_f["brand_name"].nunique())
+            sales_reps = int(df_f["sales_rep_name"].nunique())
+            governorates = int(df_f["governorate"].nunique())
+
+
+            summary = f"""
 Sales Summary
 
-Total Sales: {sales['total_sales']}
-Total Orders: {sales['total_orders']}
-Total Quantity Sold: {sales['total_quantity']}
-Total Discount: {sales['total_discount']}
+Total Sales: {total_sales}
+Total Orders: {total_orders}
+Total Quantity Sold: {total_quantity}
+Total Discount: {total_discount}
 
-Average Order Value: {sales['avg_order_value']}
-Discount Ratio (%): {sales['discount_ratio_pct']}
+Average Order Value: {avg_order_value}
+Discount Ratio (%): {discount_ratio_pct}
+
+Branches: {branches}
+Brands: {brands}
+Sales Reps: {sales_reps}
+Governorates: {governorates}
 """
 
 
-# ---------------------------------
-# بناء الـ Prompt
-# ---------------------------------
+            # ---------------------------------
+            # بناء الـ Prompt
+            # ---------------------------------
 
-prompt = f"""
+            prompt = f"""
 قم بتحليل بيانات المبيعات التالية وقدم تقريرًا تنفيذيًا واضحًا.
 
 {summary}
@@ -791,77 +803,67 @@ prompt = f"""
 - الفرص الممكنة لزيادة المبيعات
 - توصيات استراتيجية للإدارة لتحسين الأداء
 """
-    # ---------------------------------
-# ---------------------------------
-# استدعاء AI
-# ---------------------------------
-
-with st.spinner("🤖 جاري تحليل بيانات المبيعات..."):
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": """
-                أنت خبير في تحليل بيانات المبيعات وذكاء الأعمال.
-                مهمتك تحليل بيانات المبيعات وتقديم تقرير تنفيذي واضح يساعد الإدارة
-                على فهم الأداء واتخاذ قرارات استراتيجية.
-                ركز على:
-                - أداء المبيعات
-                - الفروع الأعلى مبيعات
-                - تأثير الخصومات
-                - فرص زيادة الإيرادات
-                - التوصيات الإدارية
-                """
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        max_tokens=500
-    )
 
 
-try:
+            # ---------------------------------
+            # استدعاء AI
+            # ---------------------------------
 
-    result = eval(code, {"df_f": df_f})
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """
+أنت خبير في تحليل بيانات المبيعات وذكاء الأعمال.
 
-    st.markdown("### 📊 Result")
-    st.write(result)
+مهمتك:
+تحليل البيانات وتقديم تقرير تنفيذي يساعد الإدارة على اتخاذ القرار.
 
-    # ---------------------------------
-    # خصم الكريديت فقط بعد النجاح
-    # ---------------------------------
+ركز على:
+- أداء المبيعات
+- الفروع الأعلى مبيعات
+- تأثير الخصومات
+- فرص زيادة الإيرادات
+- توصيات الإدارة
+"""
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=500
+            )
 
-    tokens_used = calculate_tokens(response)
-    credit_used = tokens_to_credit(tokens_used)
-
-    new_credit = float(st.session_state.credits) - float(credit_used)
-
-    supabase.table("Companies").update({
-        "credits": new_credit
-    }).eq("id", st.session_state.company_id).execute()
-
-    st.session_state.credits = new_credit
-
-except Exception:
-    st.error("لم يتمكن النظام من تحليل السؤال.")
-
-
-# ---------------------------------
-# حفظ التقرير
-# ---------------------------------
-
-st.session_state.report_html = response.choices[0].message.content
+            report = response.choices[0].message.content
 
 
-# ---------------------------------
-# إعادة تشغيل الصفحة
-# ---------------------------------
+            # ---------------------------------
+            # خصم الكريديت بعد النجاح فقط
+            # ---------------------------------
 
-st.rerun()
+            tokens_used = calculate_tokens(response)
+            credit_used = tokens_to_credit(tokens_used)
+
+            new_credit = float(st.session_state.credits) - float(credit_used)
+
+            supabase.table("Companies").update({
+                "credits": new_credit
+            }).eq("id", st.session_state.company_id).execute()
+
+            st.session_state.credits = new_credit
+
+
+            # حفظ التقرير
+            st.session_state.report_html = report
+
+        except Exception as e:
+
+            st.error("لم يتمكن النظام من تحليل البيانات.")
+            st.session_state.ai_running = False
+
+
 # =========================================
 # عرض تقرير AI
 # =========================================
@@ -885,7 +887,6 @@ if st.session_state.report_html:
         """,
         unsafe_allow_html=True
     )
-
 # =========================================
 # 15️⃣ KPI DASHBOARD
 # =========================================
@@ -1171,103 +1172,102 @@ st.info(
 """
 )
 
+# كتابة السؤال
 question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 6 كلمات)")
 
-if question:
+# زر تنفيذ السؤال
+run_question = st.button("🔍 تحليل السؤال")
 
-    # منع الأسئلة الطويلة
+if run_question:
+
+    if not question:
+        st.warning("يرجى كتابة سؤال أولاً")
+        st.stop()
+
     words = question.split()
 
     if len(words) > 6:
         st.error("السؤال يجب ألا يزيد عن 6 كلمات")
         st.stop()
 
-
     # ---------------------------------
     # العمليات المسموح بها
     # ---------------------------------
 
     allowed_operations = """
-    يسمح فقط باستخدام العمليات التالية في pandas:
+يسمح فقط باستخدام العمليات التالية في pandas:
 
-    groupby
-    sum
-    mean
-    max
-    min
-    sort_values
-    head
-    tail
-    count
-    value_counts
-    nunique
-    """
-
+groupby
+sum
+mean
+max
+min
+sort_values
+head
+tail
+count
+value_counts
+nunique
+"""
 
     # ---------------------------------
     # تجهيز Prompt
     # ---------------------------------
 
     prompt = f"""
-    أنت محلل بيانات مبيعات.
+أنت محلل بيانات مبيعات محترف.
 
-    لديك dataframe اسمه df_f
+لديك dataframe اسمه df_f
 
-    الأعمدة المتاحة هي:
+الأعمدة المتاحة:
 
-    {list(df_f.columns)}
+{list(df_f.columns)}
 
-    {allowed_operations}
+{allowed_operations}
 
-    اكتب كود pandas فقط للإجابة عن السؤال.
+القواعد:
 
-    القواعد:
+- استخدم df_f فقط
+- لا تستخدم import
+- لا تستخدم ملفات
+- لا تستخدم مكتبات أخرى
+- لا تكتب شرح
+- أعد كود pandas فقط
 
-    - استخدم df_f فقط
-    - لا تستخدم import
-    - لا تستخدم ملفات
-    - لا تستخدم مكتبات أخرى
-    - لا تكتب شرح
-    - أعد كود pandas فقط
+السؤال:
 
-    السؤال:
-
-    {question}
-    """
-
+{question}
+"""
 
     with st.spinner("🤖 AI يحلل سؤالك..."):
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a professional sales data analyst using pandas."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            max_tokens=120
-        )
-
-
-        code = response.choices[0].message.content
-
-        # تنظيف الكود
-        code = code.replace("```python", "")
-        code = code.replace("```", "")
-        code = code.strip()
-
-
-        st.markdown("### 🔎 الكود الذي أنشأه AI")
-
-        st.code(code)
-
-
         try:
+
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a professional sales data analyst using pandas."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=120
+            )
+
+            code = response.choices[0].message.content
+
+            # تنظيف الكود
+            code = code.replace("```python", "")
+            code = code.replace("```", "")
+            code = code.strip()
+
+            st.markdown("### 🔎 الكود الذي أنشأه AI")
+
+            st.code(code)
 
             result = eval(code, {"df_f": df_f})
 
