@@ -19,9 +19,6 @@ supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# must be called before any Streamlit UI elements
-st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
-
 
 # =========================================
 # HELPERS
@@ -158,6 +155,7 @@ if not st.session_state.user:
 # 6️⃣ PAGE CONFIG
 # =========================================
 
+st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
 st.markdown(
     """
     <h1 style='text-align: right; font-weight: 800;'>
@@ -207,6 +205,36 @@ def load_and_standardize(file):
 # 8️⃣ KPI ENGINE
 # =========================================
 
+def compute_kpis(df):
+    daily = (
+        df.groupby(["vehicle_id","date"], as_index=False)
+          .agg(total_cost=("expense_amount","sum"),
+               total_revenue=("revenue","sum"),
+               total_km=("kilometers","sum"))
+    )
+    # avoid div by zero
+    daily["cost_per_km"] = np.where(daily["total_km"]>0, daily["total_cost"]/daily["total_km"], 0)
+    daily["profit"] = daily["total_revenue"] - daily["total_cost"]
+
+    vehicle = (
+        daily.groupby("vehicle_id", as_index=False)
+             .agg(total_cost=("total_cost","sum"),
+                  total_revenue=("total_revenue","sum"),
+                  total_km=("total_km","sum"),
+                  total_profit=("profit","sum"))
+    )
+    vehicle["cost_per_km"] = np.where(vehicle["total_km"]>0, vehicle["total_cost"]/vehicle["total_km"], 0)
+
+    fleet = {
+        "total_cost": float(vehicle["total_cost"].sum()),
+        "total_revenue": float(vehicle["total_revenue"].sum()),
+        "total_km": float(vehicle["total_km"].sum()),
+        "total_profit": float(vehicle["total_profit"].sum())
+    }
+    fleet["fleet_cost_per_km"] = fleet["total_cost"]/fleet["total_km"] if fleet["total_km"]>0 else 0
+    fleet["profit_margin_pct"] = (fleet["total_profit"]/fleet["total_revenue"]*100) if fleet["total_revenue"]>0 else 0
+
+    return daily, vehicle, fleet
 def compute_kpis(df):
     daily = (
         df.groupby(["vehicle_id","date"], as_index=False)
@@ -809,6 +837,10 @@ st.data_editor(df_preview.head(50), use_container_width=True)
 # 💬 CHAT WITH YOUR DATA
 # =========================================
 
+# =========================================
+# 💬 CHAT WITH YOUR DATA
+# =========================================
+
 st.divider()
 
 st.markdown(
@@ -826,19 +858,19 @@ st.info(
 • إجمالي الكيلومترات  
 • أكثر نوع مصروف  
 
-⚠️ يفضل أن يكون السؤال قصيرًا (حتى 7 كلمات).
+⚠️ يفضل أن يكون السؤال قصيرًا (حتى 5 كلمات).
 """
 )
 
-question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 7 كلمات)")
+question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 5 كلمات)")
 
 if question:
 
     # منع الأسئلة الطويلة
     words = question.split()
 
-    if len(words) > 7:
-        st.error("السؤال يجب ألا يزيد عن 7 كلمات")
+    if len(words) > 5:
+        st.error("السؤال يجب ألا يزيد عن 5 كلمات")
         st.stop()
 
     # ---------------------------------
@@ -865,31 +897,23 @@ if question:
     # ---------------------------------
 
     prompt = f"""
-    أنت محلل بيانات تشغيل أسطول بخبرة تنفيذية.
+    أنت محلل بيانات.
 
     لديك dataframe اسمه df_f
-    ولديك أيضًا:
-    - vehicle: summary by vehicle
-    - fleet: fleet totals
 
-    الأعمدة في df_f:
+    الأعمدة هي:
+
     {list(df_f.columns)}
 
     {allowed_operations}
 
-    المطلوب (صيغة نصية منظمة فقط):
-    - اكتب النتيجة بهذا الشكل الحرفي:
-      CODE:
-      <pandas code>
-      ANSWER_AR:
-      <إجابة عربية احترافية قصيرة>
-      INSIGHT_AR:
-      <ملاحظة تنفيذية قصيرة أو اكتب: لا يوجد>
+    اكتب كود pandas فقط للإجابة عن السؤال.
 
     الشروط:
-    - code يجب أن يستخدم df_f أو vehicle أو fleet فقط
-    - لا تستخدم import أو ملفات أو مكتبات خارجية
-    - لا تكتب markdown
+    - لا تستخدم import
+    - لا تستخدم ملفات
+    - لا تستخدم مكتبات أخرى
+    - لا تكتب شرح
 
     السؤال:
     {question}
@@ -906,34 +930,15 @@ if question:
             max_tokens=120
         )
 
-        raw_response = response.choices[0].message.content.strip()
+        code = response.choices[0].message.content
 
-        clean_response = raw_response.replace("```python", "").replace("```", "").strip()
-
-        def extract_section(text, start_label, end_label=None):
-            start_idx = text.find(start_label)
-            if start_idx == -1:
-                return ""
-            start_idx += len(start_label)
-            if end_label:
-                end_idx = text.find(end_label, start_idx)
-                if end_idx == -1:
-                    end_idx = len(text)
-            else:
-                end_idx = len(text)
-            return text[start_idx:end_idx].strip()
-
-        code = extract_section(clean_response, "CODE:", "ANSWER_AR:")
-        answer_ar = extract_section(clean_response, "ANSWER_AR:", "INSIGHT_AR:")
-        insight_ar = extract_section(clean_response, "INSIGHT_AR:")
-
-        if not code:
-            code = clean_response
-
-        if insight_ar.lower() in ["لا يوجد", "none", "n/a"]:
-            insight_ar = ""
+        # تنظيف الكود
+        code = code.replace("```python", "")
+        code = code.replace("```", "")
+        code = code.strip()
 
         st.markdown("### 🔎 Generated Analysis")
+
         st.code(code)
 
         try:
@@ -941,16 +946,8 @@ if question:
             result = eval(code, {"df_f": df_f, "vehicle": vehicle, "fleet": fleet})
 
             st.markdown("### 📊 Result")
+
             st.write(result)
-
-            st.markdown("### 🧠 Executive Answer")
-            if answer_ar:
-                st.success(answer_ar)
-            else:
-                st.info("تم تحليل السؤال بنجاح، راجع النتيجة بالأعلى.")
-
-            if insight_ar:
-                st.caption(f"Insight: {insight_ar}")
 
         except Exception:
 
