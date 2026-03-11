@@ -795,38 +795,81 @@ Governorates: {governorates}
 """
 
 
-            # ======================================
-            # استدعاء AI
-            # ======================================
+            # ---------------------------------
+# استدعاء AI
+# ---------------------------------
 
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """
-أنت خبير ذكاء أعمال وتحليل بيانات المبيعات.
+response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[
+        {
+            "role": "system",
+            "content": """
+أنت خبير ذكاء أعمال (Business Intelligence) وتحليل بيانات المبيعات.
 
-قدم تحليلاً عملياً يعتمد على الأرقام وليس كلاماً عاماً.
+مهمتك:
+تحليل البيانات الرقمية وتقديم تقرير تنفيذي عملي يساعد الإدارة في اتخاذ القرار.
+
+يجب أن:
+- تذكر أسماء الفروع
+- تذكر أسماء البراندات
+- تقارن بين الأداء
+- تذكر الأرقام المهمة
+- تقدم توصيات عملية
 """
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                max_tokens=700
-            )
+        },
+        {
+            "role": "user",
+            "content": prompt
+        }
+    ],
+    max_tokens=700
+)
 
-            report = response.choices[0].message.content
+report = response.choices[0].message.content
 
-            st.session_state.report_html = report
 
-        except Exception as e:
-            st.error(f"حدث خطأ أثناء التحليل: {e}")
+# ---------------------------------
+# خصم الكريديت بعد النجاح فقط
+# ---------------------------------
 
-        finally:
-            st.session_state.ai_running = False
+tokens_used = calculate_tokens(response)
+credit_used = tokens_to_credit(tokens_used)
+
+new_credit = float(st.session_state.credits) - float(credit_used)
+
+supabase.table("Companies").update({
+    "credits": new_credit
+}).eq("id", st.session_state.company_id).execute()
+
+st.session_state.credits = new_credit
+
+
+# ---------------------------------
+# حفظ التقرير
+# ---------------------------------
+
+st.session_state.report_html = report
+
+
+# ---------------------------------
+# معالجة الأخطاء
+# ---------------------------------
+
+except Exception as e:
+
+    st.error("لم يتمكن النظام من تحليل البيانات.")
+    st.session_state.ai_running = False
+
+
+# ---------------------------------
+# إنهاء تشغيل AI
+# ---------------------------------
+
+finally:
+
+    st.session_state.ai_running = False
+
 
 
 # =========================================
@@ -834,8 +877,10 @@ Governorates: {governorates}
 # =========================================
 
 if st.session_state.report_html:
+
     st.markdown("## 📊 AI Sales Executive Report")
-    st.markdown(st.session_state.report_html)            # ---------------------------------
+    st.markdown(st.session_state.report_html)
+    # ---------------------------------
             # خصم الكريديت بعد النجاح فقط
             # ---------------------------------
 
