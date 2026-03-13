@@ -8,6 +8,7 @@ import streamlit as st
 from supabase import create_client
 from openai import OpenAI
 
+def run():
     # =========================================
     # 2️⃣ CONFIGURATION
     # =========================================
