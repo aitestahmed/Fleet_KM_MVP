@@ -1383,7 +1383,7 @@ def run():
                 st.write(result)
     
             except Exception as e:
-                st.error("لم يتمكن النظام من تحليل السؤال.")")
+                st.error("لم يتمكن النظام من تحليل السؤال.")
 
 
     
