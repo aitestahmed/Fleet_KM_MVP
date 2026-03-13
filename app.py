@@ -37,3 +37,12 @@ if not client or not analysis:
 ### أمثلة الروابط
 
 **Mansour Sales**
+
+?client=mansour&type=sales
+
+**Mansour Fleet**
+
+?client=mansour&type=fleet
+""")
+
+    st.stop()
