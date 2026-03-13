@@ -1,4 +1,13 @@
+# =========================================
+# 1️⃣ IMPORTS
+# =========================================
+import pandas as pd 
+import numpy as np
+import plotly.express as px
 import streamlit as st
+from supabase import create_client
+from openai import OpenAI
+
 
 
 def run():
