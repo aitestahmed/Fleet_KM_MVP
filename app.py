@@ -46,3 +46,29 @@ if not client or not analysis:
 """)
 
     st.stop()
+
+# ---------------------------------
+# تحميل الداشبورد
+# ---------------------------------
+
+module_name = f"clients.{client}.{analysis}_dashboard"
+
+try:
+
+    module = importlib.import_module(module_name)
+
+    module.run()
+
+except ModuleNotFoundError:
+
+    st.error("❌ Dashboard غير موجود")
+    st.write(f"Module: {module_name}")
+
+except AttributeError:
+
+    st.error("❌ الملف لا يحتوي على run()")
+
+except Exception as e:
+
+    st.error("❌ حدث خطأ أثناء تشغيل الداشبورد")
+    st.write(e)
