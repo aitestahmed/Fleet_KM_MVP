@@ -138,11 +138,7 @@ def run():
                 f"{st.session_state.credits:.2f} جنيه"
             )
         
-            if st.sidebar.button("Logout"):
-                supabase.auth.sign_out()
-                st.session_state.user = None
-                st.rerun()
-    
+           
     # =========================================
     # 5️⃣ APP GATE
     # =========================================
