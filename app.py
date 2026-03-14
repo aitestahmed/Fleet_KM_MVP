@@ -4,11 +4,12 @@
 
 import streamlit as st
 import importlib
+from supabase import create_client
 
 
-# ---------------------------------
-# إعداد الصفحة
-# ---------------------------------
+# =========================================
+# PAGE CONFIG
+# =========================================
 
 st.set_page_config(
     page_title="Quantory AI Analytics",
@@ -16,17 +17,17 @@ st.set_page_config(
 )
 
 
-# ---------------------------------
-# قراءة الرابط
-# ---------------------------------
+# =========================================
+# READ URL PARAMS
+# =========================================
 
 params = st.query_params
 client = params.get("client")
 
 
-# ---------------------------------
+# =========================================
 # SESSION STATE
-# ---------------------------------
+# =========================================
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -34,41 +35,72 @@ if "logged_in" not in st.session_state:
 if "user_email" not in st.session_state:
     st.session_state.user_email = None
 
+if "credits" not in st.session_state:
+    st.session_state.credits = 0
 
-# ---------------------------------
+if "company_id" not in st.session_state:
+    st.session_state.company_id = None
+
+if "company_name" not in st.session_state:
+    st.session_state.company_name = None
+
+
+# =========================================
 # LOGIN PAGE
-# ---------------------------------
+# =========================================
 
 if not st.session_state.logged_in:
 
     st.title("Quantory AI Analytics")
 
-    with st.container():
+    st.subheader("Login")
 
-        st.subheader("Login")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
 
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
+    if st.button("Login"):
 
-        if st.button("Login"):
+        if email and password:
 
-            if email and password:
+            try:
+
+                SUPABASE_URL = st.secrets["SUPABASE_URL"]
+                SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+                supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+                # مثال بسيط لجلب الشركة
+                company = supabase.table("Companies") \
+                    .select("id,name,credits") \
+                    .limit(1) \
+                    .execute()
+
+                if company.data:
+
+                    st.session_state.company_id = company.data[0]["id"]
+                    st.session_state.company_name = company.data[0]["name"]
+                    st.session_state.credits = float(company.data[0]["credits"])
 
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
 
                 st.rerun()
 
-            else:
+            except Exception as e:
 
-                st.error("ادخل البريد وكلمة المرور")
+                st.error("خطأ في الاتصال بقاعدة البيانات")
+                st.exception(e)
+
+        else:
+
+            st.error("ادخل البريد وكلمة المرور")
 
     st.stop()
 
 
-# ---------------------------------
+# =========================================
 # CLIENT CHECK
-# ---------------------------------
+# =========================================
 
 if not client:
 
@@ -95,17 +127,20 @@ with st.sidebar:
 
     st.divider()
 
-    st.write("Company: منصور للصناعات الغذائية")
+    if st.session_state.company_name:
+        st.write(f"Company: {st.session_state.company_name}")
+    else:
+        st.write("Company: -")
+
     st.write("Role: admin")
 
     st.divider()
 
     st.write("Credits")
 
-    if "credits" in st.session_state:
-        st.write(f"{st.session_state.credits:.2f} جنيه")
-    else:
-        st.write("0 جنيه")
+    st.write(f"{st.session_state.credits:.2f} جنيه")
+
+    st.divider()
 
     page = st.radio(
         "Navigation",
@@ -121,6 +156,10 @@ with st.sidebar:
 
         st.session_state.logged_in = False
         st.session_state.user_email = None
+        st.session_state.company_id = None
+        st.session_state.company_name = None
+        st.session_state.credits = 0
+
         st.rerun()
 
 
@@ -133,7 +172,7 @@ st.markdown(
 <div style="text-align:center;padding-top:10px">
 
 <div style="
-font-size:32px;
+font-size:34px;
 font-weight:700;
 color:#1f77b4;
 letter-spacing:1px;
@@ -142,7 +181,7 @@ Quantory
 </div>
 
 <div style="
-font-size:20px;
+font-size:22px;
 color:#00c2ff;
 margin-top:6px;
 font-weight:600;
@@ -151,19 +190,20 @@ Data That Speaks
 </div>
 
 <div style="
-font-size:16px;
+font-size:18px;
 color:gray;
-margin-top:3px;
+margin-top:4px;
 ">
 حيث تتحدث البيانات
 </div>
 
-<hr style="margin-top:18px;margin-bottom:28px">
+<hr style="margin-top:20px;margin-bottom:30px">
 
 </div>
 """,
 unsafe_allow_html=True
 )
+
 
 # =========================================
 # MAIN PAGE
@@ -174,9 +214,9 @@ st.title("AI Analytics Platform")
 st.subheader(f"Client: {client}")
 
 
-# ---------------------------------
+# =========================================
 # LOAD DASHBOARD
-# ---------------------------------
+# =========================================
 
 try:
 
