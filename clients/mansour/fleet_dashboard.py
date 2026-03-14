@@ -286,8 +286,8 @@ def run():
     if "selected_vehicle" not in st.session_state:
         st.session_state.selected_vehicle = vehicles
     
-    if "date_range" not in st.session_state:
-        st.session_state.date_range = (
+    if "fleet_date_range" not in st.session_state:
+        st.session_state.fleet_date_range = (
             df["date"].min().date(),
             df["date"].max().date()
         )
@@ -306,8 +306,8 @@ def run():
         if "selected_vehicle_multi" not in st.session_state:
             st.session_state.selected_vehicle_multi = vehicles
     
-        if "date_range" not in st.session_state:
-            st.session_state.date_range = (
+        if "fleet_date_range" not in st.session_state:
+            st.session_state.fleet_date_range = (
                 df["date"].min().date(),
                 df["date"].max().date()
             )
@@ -315,7 +315,7 @@ def run():
         # زر إعادة الضبط
         if st.button("🔄 إعادة ضبط الفلاتر"):
             st.session_state.selected_vehicle_multi = vehicles
-            st.session_state.date_range = (
+            st.session_state.fleet_date_range = (
                 df["date"].min().date(),
                 df["date"].max().date()
             )
@@ -330,12 +330,12 @@ def run():
         )
     
         # فلتر التاريخ (Range + يوم واحد مدعوم)
-        date_range = st.date_input(
+        fleet_date_range = st.date_input(
             "📅 نطاق التاريخ",
-            value=st.session_state.date_range,
+            value=st.session_state.fleet_date_range,
             min_value=df["date"].min().date(),
             max_value=df["date"].max().date(),
-            key="date_range"
+            key="fleet_date_range"
         )
     
     
@@ -348,13 +348,13 @@ def run():
         df_f = df_f[df_f["vehicle_id"].isin(selected_vehicle)]
     
     # فلترة التاريخ بشكل آمن
-    if isinstance(date_range, tuple):
-        if len(date_range) == 2:
-            start_date, end_date = date_range
+    if isinstance(fleet_date_range, tuple):
+        if len(fleet_date_range) == 2:
+            start_date, end_date = fleet_date_range
         else:
-            start_date = end_date = date_range[0]
+            start_date = end_date = fleet_date_range[0]
     else:
-        start_date = end_date = date_range
+        start_date = end_date = fleet_date_range
     
     df_f = df_f[
         (df_f["date"].dt.date >= start_date) &
