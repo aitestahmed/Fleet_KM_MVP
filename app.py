@@ -11,7 +11,7 @@ import importlib
 # ---------------------------------
 
 st.set_page_config(
-    page_title="AI Analytics Platform",
+    page_title="Quantory AI Analytics",
     layout="wide"
 )
 
@@ -41,7 +41,7 @@ if "user_email" not in st.session_state:
 
 if not st.session_state.logged_in:
 
-    st.title("AI Analytics Platform")
+    st.title("Quantory AI Analytics")
 
     with st.container():
 
@@ -88,6 +88,7 @@ if not client:
 with st.sidebar:
 
     st.image("LOGO.png", use_container_width=True)
+
     st.markdown("---")
 
     st.success(f"Logged in: {st.session_state.user_email}")
@@ -101,10 +102,6 @@ with st.sidebar:
 
     st.write("Credits")
     st.write("64.25 جنيه")
-
-    # -------------------------
-    # NAVIGATION
-    # -------------------------
 
     page = st.radio(
         "Navigation",
@@ -124,31 +121,50 @@ with st.sidebar:
 
 
 # =========================================
-# MAIN PAGE
+# HEADER (Brand + Slogan)
 # =========================================
 
-# -------- SLOGAN --------
-
 st.markdown(
-    """
-    <div style="text-align:center;margin-bottom:25px">
+"""
+<div style="text-align:center;padding-top:10px">
 
-    <div style="font-size:26px;font-weight:700;color:#1f77b4">
-    Quantory
-    </div>
+<div style="
+font-size:30px;
+font-weight:700;
+color:#1f77b4;
+letter-spacing:1px;
+">
+Quantory
+</div>
 
-    <div style="font-size:16px;color:#00c2ff">
-    Where Data Tells the Story
-    </div>
+<div style="
+font-size:16px;
+color:#00c2ff;
+margin-top:4px;
+font-weight:500;
+">
+Data That Speaks
+</div>
 
-    <div style="font-size:14px;color:gray">
-    حيث تحكي البيانات القصة
-    </div>
+<div style="
+font-size:13px;
+color:gray;
+margin-top:2px;
+">
+حيث تتحدث البيانات
+</div>
 
-    </div>
-    """,
-    unsafe_allow_html=True
+<hr style="margin-top:15px;margin-bottom:25px">
+
+</div>
+""",
+unsafe_allow_html=True
 )
+
+
+# =========================================
+# MAIN PAGE
+# =========================================
 
 st.title("AI Analytics Platform")
 
