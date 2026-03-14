@@ -465,8 +465,8 @@ def run():
     # Date Range
     # ===============================
     
-    if "sales_sales_date_range" not in st.session_state:
-        st.session_state.sales_sales_date_range = (
+    if "sales_date_range" not in st.session_state:
+        st.session_state.sales_date_range = (
             df["date"].min().date(),
             df["date"].max().date()
         )
