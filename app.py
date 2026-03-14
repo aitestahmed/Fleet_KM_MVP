@@ -5,6 +5,7 @@
 import streamlit as st
 import importlib
 
+
 # ---------------------------------
 # إعداد الصفحة
 # ---------------------------------
@@ -14,61 +15,103 @@ st.set_page_config(
     layout="wide"
 )
 
+
+# ---------------------------------
+# LOGIN SYSTEM
+# ---------------------------------
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+
+if not st.session_state.logged_in:
+
+    with st.sidebar:
+
+        st.title("Account")
+
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+
+        if st.button("Login"):
+
+            # هنا ضع التحقق من Supabase
+            if email and password:
+
+                st.session_state.logged_in = True
+                st.session_state.user_email = email
+                st.rerun()
+
+    st.stop()
+
+
 # ---------------------------------
 # قراءة الرابط
 # ---------------------------------
 
 params = st.query_params
-
 client = params.get("client")
-analysis = params.get("type")
 
-# ---------------------------------
-# الصفحة الرئيسية
-# ---------------------------------
 
-if not client or not analysis:
+if not client:
 
     st.title("AI Analytics Platform")
+    st.warning("يجب تحديد العميل في الرابط")
 
-    st.write("اختر التحليل من خلال الرابط")
-
-    st.markdown("""
-### أمثلة الروابط
-
-**Mansour Sales**
-
-?client=mansour&type=sales
-
-**Mansour Fleet**
-
-?client=mansour&type=fleet
-""")
+    st.code(
+        "https://fleetkmmvp-5nekmubayo3xclgn7ceevk.streamlit.app/?client=mansour"
+    )
 
     st.stop()
 
+
 # ---------------------------------
-# تحميل الداشبورد
+# حفظ الصفحة المختارة
 # ---------------------------------
 
-module_name = f"clients.{client}.{analysis}_dashboard"
+if "page" not in st.session_state:
+    st.session_state.page = None
 
-try:
 
-    module = importlib.import_module(module_name)
+# ---------------------------------
+# واجهة التطبيق
+# ---------------------------------
+
+st.title("AI Analytics Platform")
+st.subheader(f"Client: {client}")
+
+st.write("اختر نوع التحليل")
+
+col1, col2 = st.columns(2)
+
+
+with col1:
+    if st.button("تحليل المبيعات"):
+        st.session_state.page = "sales"
+
+
+with col2:
+    if st.button("تحليل الأسطول"):
+        st.session_state.page = "fleet"
+
+
+# ---------------------------------
+# تشغيل الداشبورد
+# ---------------------------------
+
+if st.session_state.page == "sales":
+
+    module = importlib.import_module(
+        f"clients.{client}.sales_dashboard"
+    )
 
     module.run()
 
-except ModuleNotFoundError:
 
-    st.error("❌ Dashboard غير موجود")
-    st.write(f"Module: {module_name}")
+elif st.session_state.page == "fleet":
 
-except AttributeError:
+    module = importlib.import_module(
+        f"clients.{client}.fleet_dashboard"
+    )
 
-    st.error("❌ الملف لا يحتوي على run()")
-
-except Exception as e:
-
-    st.error("❌ حدث خطأ أثناء تشغيل الداشبورد")
-    st.write(e)
+    module.run()
