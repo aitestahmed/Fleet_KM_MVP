@@ -89,7 +89,7 @@ if not client:
 
 with st.sidebar:
 
-    st.image("logo.png", use_container_width=True)
+    st.image("LOGO.png", use_container_width=True)
     st.markdown("---")
 
     st.success(f"Logged in: {st.session_state.user_email}")
