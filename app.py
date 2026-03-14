@@ -89,6 +89,9 @@ if not client:
 
 with st.sidebar:
 
+    st.image("logo.png", use_container_width=True)
+    st.markdown("---")
+
     st.success(f"Logged in: {st.session_state.user_email}")
 
     st.divider()
@@ -100,8 +103,6 @@ with st.sidebar:
 
     st.write("Credits")
     st.write("64.25 جنيه")
-
-    st.divider()
 
     # -------------------------
     # NAVIGATION
