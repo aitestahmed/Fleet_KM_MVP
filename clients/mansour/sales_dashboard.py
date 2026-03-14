@@ -465,8 +465,8 @@ def run():
     # Date Range
     # ===============================
     
-    if "date_range" not in st.session_state:
-        st.session_state.date_range = (
+    if "sales_sales_date_range" not in st.session_state:
+        st.session_state.sales_sales_date_range = (
             df["date"].min().date(),
             df["date"].max().date()
         )
@@ -497,8 +497,8 @@ def run():
         if "selected_governorate_multi" not in st.session_state:
             st.session_state.selected_governorate_multi = governorates
     
-        if "date_range" not in st.session_state:
-            st.session_state.date_range = (
+        if "sales_date_range" not in st.session_state:
+            st.session_state.sales_date_range = (
                 df["date"].min().date(),
                 df["date"].max().date()
             )
@@ -510,7 +510,7 @@ def run():
             st.session_state.selected_brand_multi = brands
             st.session_state.selected_sales_rep_multi = sales_reps
             st.session_state.selected_governorate_multi = governorates
-            st.session_state.date_range = (
+            st.session_state.sales_date_range = (
                 df["date"].min().date(),
                 df["date"].max().date()
             )
@@ -564,12 +564,12 @@ def run():
         # ===============================
         # Date Range
         # ===============================
-        date_range = st.date_input(
+        sales_date_range = st.date_input(
             "📅 نطاق التاريخ",
-            value=st.session_state.date_range,
+            value=st.session_state.sales_date_range,
             min_value=df["date"].min().date(),
             max_value=df["date"].max().date(),
-            key="date_range"
+            key="sales_date_range"
         )
     
     
@@ -597,13 +597,13 @@ def run():
     
     
     # فلترة التاريخ بشكل آمن
-    if isinstance(date_range, tuple):
-        if len(date_range) == 2:
-            start_date, end_date = date_range
+    if isinstance(sales_date_range, tuple):
+        if len(sales_date_range) == 2:
+            start_date, end_date = sales_date_range
         else:
-            start_date = end_date = date_range[0]
+            start_date = end_date = sales_date_range[0]
     else:
-        start_date = end_date = date_range
+        start_date = end_date = sales_date_range
     
     df_f = df_f[
         (df_f["date"].dt.date >= start_date) &
