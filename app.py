@@ -71,6 +71,29 @@ if not st.session_state.logged_in:
 # ---------------------------------
 
 if not client:
+    st.markdown(
+    """
+    <div style="
+        text-align:center;
+        font-size:20px;
+        color:#00c2ff;
+        font-weight:600;
+        margin-bottom:10px;
+    ">
+    Quantory — Where Data Tells the Story
+    </div>
+
+    <div style="
+        text-align:center;
+        font-size:16px;
+        color:gray;
+        margin-bottom:30px;
+    ">
+    كوانتوري — حيث تحكي البيانات القصة
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
     st.title("AI Analytics Platform")
 
