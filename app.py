@@ -129,7 +129,7 @@ st.markdown(
 <div style="text-align:center;padding-top:10px">
 
 <div style="
-font-size:30px;
+font-size:32px;
 font-weight:700;
 color:#1f77b4;
 letter-spacing:1px;
@@ -138,29 +138,28 @@ Quantory
 </div>
 
 <div style="
-font-size:16px;
+font-size:20px;
 color:#00c2ff;
-margin-top:4px;
-font-weight:500;
+margin-top:6px;
+font-weight:600;
 ">
 Data That Speaks
 </div>
 
 <div style="
-font-size:13px;
+font-size:16px;
 color:gray;
-margin-top:2px;
+margin-top:3px;
 ">
 حيث تتحدث البيانات
 </div>
 
-<hr style="margin-top:15px;margin-bottom:25px">
+<hr style="margin-top:18px;margin-bottom:28px">
 
 </div>
 """,
 unsafe_allow_html=True
 )
-
 
 # =========================================
 # MAIN PAGE
