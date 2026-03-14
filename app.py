@@ -5,7 +5,6 @@
 import streamlit as st
 import importlib
 
-
 # ---------------------------------
 # إعداد الصفحة
 # ---------------------------------
@@ -15,120 +14,61 @@ st.set_page_config(
     layout="wide"
 )
 
-
 # ---------------------------------
 # قراءة الرابط
 # ---------------------------------
 
 params = st.query_params
+
 client = params.get("client")
-
+analysis = params.get("type")
 
 # ---------------------------------
-# التحقق من وجود العميل في الرابط
+# الصفحة الرئيسية
 # ---------------------------------
 
-if not client:
+if not client or not analysis:
 
     st.title("AI Analytics Platform")
-    st.warning("يجب تحديد العميل في الرابط")
 
-    st.write("مثال الرابط:")
+    st.write("اختر التحليل من خلال الرابط")
 
-    st.code(
-        "https://fleetkmmvp-5nekmubayo3xclgn7ceevk.streamlit.app/?client=mansour"
-    )
+    st.markdown("""
+### أمثلة الروابط
+
+**Mansour Sales**
+
+?client=mansour&type=sales
+
+**Mansour Fleet**
+
+?client=mansour&type=fleet
+""")
 
     st.stop()
 
-
 # ---------------------------------
-# حفظ الصفحة المختارة
-# ---------------------------------
-
-if "page" not in st.session_state:
-    st.session_state.page = None
-
-
-# ---------------------------------
-# واجهة اختيار التحليل
+# تحميل الداشبورد
 # ---------------------------------
 
-st.title("AI Analytics Platform")
-st.subheader(f"Client: {client}")
+module_name = f"clients.{client}.{analysis}_dashboard"
 
-st.write("اختر نوع التحليل")
+try:
 
-col1, col2 = st.columns(2)
+    module = importlib.import_module(module_name)
 
+    module.run()
 
-# ---------------------------------
-# زر تحليل المبيعات
-# ---------------------------------
+except ModuleNotFoundError:
 
-with col1:
+    st.error("❌ Dashboard غير موجود")
+    st.write(f"Module: {module_name}")
 
-    if st.button("تحليل المبيعات"):
-        st.session_state.page = "sales"
+except AttributeError:
 
+    st.error("❌ الملف لا يحتوي على run()")
 
-# ---------------------------------
-# زر تحليل الأسطول
-# ---------------------------------
+except Exception as e:
 
-with col2:
-
-    if st.button("تحليل الأسطول"):
-        st.session_state.page = "fleet"
-
-
-# ---------------------------------
-# تشغيل الداشبورد
-# ---------------------------------
-
-if st.session_state.page == "sales":
-
-    try:
-
-        module = importlib.import_module(
-            f"clients.{client}.sales_dashboard"
-        )
-
-        module.run()
-
-    except ModuleNotFoundError:
-
-        st.error("لوحة تحليل المبيعات غير موجودة لهذا العميل")
-
-    except AttributeError:
-
-        st.error("ملف المبيعات لا يحتوي على الدالة run()")
-
-    except Exception as e:
-
-        st.error("حدث خطأ أثناء تشغيل لوحة المبيعات")
-        st.write(e)
-
-
-elif st.session_state.page == "fleet":
-
-    try:
-
-        module = importlib.import_module(
-            f"clients.{client}.fleet_dashboard"
-        )
-
-        module.run()
-
-    except ModuleNotFoundError:
-
-        st.error("لوحة تحليل الأسطول غير موجودة لهذا العميل")
-
-    except AttributeError:
-
-        st.error("ملف الأسطول لا يحتوي على الدالة run()")
-
-    except Exception as e:
-
-        st.error("حدث خطأ أثناء تشغيل لوحة الأسطول")
-        st.write(e)
+    st.error("❌ حدث خطأ أثناء تشغيل الداشبورد")
+    st.write(e)
