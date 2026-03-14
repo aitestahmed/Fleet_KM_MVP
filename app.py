@@ -36,10 +36,18 @@ if not client:
     st.write("مثال الرابط:")
 
     st.code(
-        "https://yourapp.streamlit.app/?client=mansour"
+        "https://fleetkmmvp-5nekmubayo3xclgn7ceevk.streamlit.app/?client=mansour"
     )
 
     st.stop()
+
+
+# ---------------------------------
+# حفظ الصفحة المختارة
+# ---------------------------------
+
+if "page" not in st.session_state:
+    st.session_state.page = None
 
 
 # ---------------------------------
@@ -61,27 +69,7 @@ col1, col2 = st.columns(2)
 with col1:
 
     if st.button("تحليل المبيعات"):
-
-        try:
-
-            module = importlib.import_module(
-                f"clients.{client}.sales_dashboard"
-            )
-
-            module.run()
-
-        except ModuleNotFoundError:
-
-            st.error("لوحة تحليل المبيعات غير موجودة لهذا العميل")
-
-        except AttributeError:
-
-            st.error("ملف المبيعات لا يحتوي على الدالة run()")
-
-        except Exception as e:
-
-            st.error("حدث خطأ أثناء تشغيل لوحة المبيعات")
-            st.write(e)
+        st.session_state.page = "sales"
 
 
 # ---------------------------------
@@ -91,24 +79,56 @@ with col1:
 with col2:
 
     if st.button("تحليل الأسطول"):
+        st.session_state.page = "fleet"
 
-        try:
 
-            module = importlib.import_module(
-                f"clients.{client}.fleet_dashboard"
-            )
+# ---------------------------------
+# تشغيل الداشبورد
+# ---------------------------------
 
-            module.run()
+if st.session_state.page == "sales":
 
-        except ModuleNotFoundError:
+    try:
 
-            st.error("لوحة تحليل الأسطول غير موجودة لهذا العميل")
+        module = importlib.import_module(
+            f"clients.{client}.sales_dashboard"
+        )
 
-        except AttributeError:
+        module.run()
 
-            st.error("ملف الأسطول لا يحتوي على الدالة run()")
+    except ModuleNotFoundError:
 
-        except Exception as e:
+        st.error("لوحة تحليل المبيعات غير موجودة لهذا العميل")
 
-            st.error("حدث خطأ أثناء تشغيل لوحة الأسطول")
-            st.write(e)
+    except AttributeError:
+
+        st.error("ملف المبيعات لا يحتوي على الدالة run()")
+
+    except Exception as e:
+
+        st.error("حدث خطأ أثناء تشغيل لوحة المبيعات")
+        st.write(e)
+
+
+elif st.session_state.page == "fleet":
+
+    try:
+
+        module = importlib.import_module(
+            f"clients.{client}.fleet_dashboard"
+        )
+
+        module.run()
+
+    except ModuleNotFoundError:
+
+        st.error("لوحة تحليل الأسطول غير موجودة لهذا العميل")
+
+    except AttributeError:
+
+        st.error("ملف الأسطول لا يحتوي على الدالة run()")
+
+    except Exception as e:
+
+        st.error("حدث خطأ أثناء تشغيل لوحة الأسطول")
+        st.write(e)
