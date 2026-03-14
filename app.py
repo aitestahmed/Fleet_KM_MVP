@@ -101,7 +101,11 @@ with st.sidebar:
     st.divider()
 
     st.write("Credits")
-    st.write("64.25 جنيه")
+
+    if "credits" in st.session_state:
+        st.write(f"{st.session_state.credits:.2f} جنيه")
+    else:
+        st.write("0 جنيه")
 
     page = st.radio(
         "Navigation",
