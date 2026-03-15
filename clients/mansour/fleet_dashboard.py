@@ -92,7 +92,7 @@ def load_and_standardize(file):
         "كود المركبة": "vehicle_id",
         "رقم اللوحة": "plate_no",
 
-        "إجمالي الكيلو": "total_km",
+        "اجمالي الكيلو متر": "total_km",
         "عدد اللترات": "liters",
 
         "أجور": "wages",
