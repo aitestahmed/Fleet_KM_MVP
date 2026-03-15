@@ -93,7 +93,7 @@ def run(deduct_credit=None):
         "التاريخ": "date",
     
         # المركبة
-        "كود المركبة": "vehicle_id",
+        "الفرع": "Branch",
         "رقم اللوحة": "plate_no",
     
         # الكيلومترات (العمود الصحيح فقط)
@@ -120,7 +120,7 @@ def run(deduct_credit=None):
         df = df.rename(columns=rename_map)
     
         # التأكد من الأعمدة الأساسية
-        required = ["date", "vehicle_id"]
+        required = ["date", "plate_no"]
     
         missing = [c for c in required if c not in df.columns]
     
@@ -172,9 +172,9 @@ def run(deduct_credit=None):
                 df[col] = val
     
         # تنظيف البيانات
-        df = df.dropna(subset=["date","vehicle_id"]).copy()
+        df = df.dropna(subset=["date","plate_no"]).copy()
     
-        df["vehicle_id"] = df["vehicle_id"].astype(str).str.strip()
+        df["plate_no"] = df["plate_no"].astype(str).str.strip()
     
         if "plate_no" in df.columns:
             df["plate_no"] = df["plate_no"].astype(str).str.strip()
@@ -191,7 +191,7 @@ def run(deduct_credit=None):
         # ---------------------------------
     
         vehicle = (
-            df.groupby("vehicle_id", as_index=False)
+            df.groupby("plate_no", as_index=False)
             .agg(
                 total_expense=("total_expense", "sum"),
                 total_km=("total_km", "sum"),
@@ -355,7 +355,7 @@ def run(deduct_credit=None):
     # تجهيز قائمة المركبات
     # ---------------------------------
     
-    vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
+    vehicles = sorted(df["plate_no"].astype(str).unique().tolist())
     
     
     # ---------------------------------
@@ -405,7 +405,7 @@ def run(deduct_credit=None):
         # قائمة المركبات
         # ---------------------------------
     
-        vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
+        vehicles = sorted(df["plate_no"].astype(str).unique().tolist())
     
         # ---------------------------------
         # تهيئة Session State
@@ -469,7 +469,7 @@ def run(deduct_credit=None):
     # ---------------------------------
     
     if selected_vehicle:
-        df_f = df_f[df_f["vehicle_id"].isin(selected_vehicle)]
+        df_f = df_f[df_f["plate_no"].isin(selected_vehicle)]
     
     
     # ---------------------------------
@@ -512,7 +512,7 @@ def run(deduct_credit=None):
     
     daily, vehicle, fleet = compute_kpis(df_f)
     
-    vehicle["vehicle_id"] = vehicle["vehicle_id"].astype(str)
+    vehicle["plate_no"] = vehicle["plate_no"].astype(str)
     
     
     # =========================================
@@ -559,7 +559,7 @@ def run(deduct_credit=None):
     
             result = (
                 vehicle.sort_values("cost_per_km", ascending=False)
-                [["vehicle_id","total_expense","total_km","cost_per_km"]]
+                [["plate_no","total_expense","total_km","cost_per_km"]]
                 .head(5)
             )
     
@@ -573,7 +573,7 @@ def run(deduct_credit=None):
     
             result = (
                 vehicle.sort_values("km_per_liter", ascending=False)
-                [["vehicle_id","total_km","total_liters","km_per_liter"]]
+                [["plate_no","total_km","total_liters","km_per_liter"]]
                 .head(5)
             )
     
@@ -595,7 +595,7 @@ def run(deduct_credit=None):
     
             result = (
                 vehicle.sort_values("total_expense", ascending=False)
-                [["vehicle_id","total_expense","cost_per_km"]]
+                [["plate_no","total_expense","cost_per_km"]]
                 .head(5)
             )
     
@@ -809,12 +809,12 @@ def run(deduct_credit=None):
                .copy()
     )
     
-    worst_vehicles["vehicle_id"] = worst_vehicles["vehicle_id"].astype(str)
+    worst_vehicles["plate_no"] = worst_vehicles["plate_no"].astype(str)
     
     fig1 = px.bar(
         worst_vehicles,
         x="cost_per_km",
-        y="vehicle_id",
+        y="plate_no",
         orientation="h",
         title="🔴 أعلى 5 سيارات تكلفة لكل كيلومتر"
     )
@@ -843,12 +843,12 @@ def run(deduct_credit=None):
                .copy()
     )
     
-    best_efficiency["vehicle_id"] = best_efficiency["vehicle_id"].astype(str)
+    best_efficiency["plate_no"] = best_efficiency["plate_no"].astype(str)
     
     fig2 = px.bar(
         best_efficiency,
         x="km_per_liter",
-        y="vehicle_id",
+        y="plate_no",
         orientation="h",
         title="🟢 أفضل 5 سيارات كفاءة وقود"
     )
@@ -884,11 +884,11 @@ def run(deduct_credit=None):
                .copy()
     )
     
-    vehicle_sorted["vehicle_id"] = vehicle_sorted["vehicle_id"].astype(str)
+    vehicle_sorted["plate_no"] = vehicle_sorted["plate_no"].astype(str)
     
     fig3 = px.bar(
         vehicle_sorted,
-        x="vehicle_id",
+        x="plate_no",
         y="total_expense",
         title="🔵 إجمالي المصروف لكل سيارة"
     )
@@ -959,7 +959,7 @@ def run(deduct_credit=None):
     )
     
     df_preview = df_f.rename(columns={
-        "vehicle_id": "رقم السيارة",
+        "plate_no": "رقم السيارة",
         "date": "التاريخ",
         "location": "الموقع",
         "vehicle_type": "نوع المركبة",
