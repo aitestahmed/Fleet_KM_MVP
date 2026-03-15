@@ -50,58 +50,116 @@ def run(deduct_credit=None):
     # DATA LOADING
     # =========================================
 
-    def load_and_standardize(file):
+   def load_and_standardize(file):
 
-        if file.name.endswith(".csv"):
-            df = pd.read_csv(file)
-        else:
-            df = pd.read_excel(file)
+    # قراءة الملف
+    if file.name.endswith(".csv"):
+        df = pd.read_csv(file)
+    else:
+        df = pd.read_excel(file)
 
-        df.columns = df.columns.astype(str).str.strip()
+    # تنظيف أسماء الأعمدة
+    df.columns = df.columns.astype(str).str.strip()
 
-        rename_map = {
+    # تحويل الأسماء العربية إلى أسماء قياسية
+    rename_map = {
 
-            "التاريخ": "date",
-            "رقم اللوحة": "plate_no",
-            "كود المركبة": "vehicle_id",
+        "التاريخ": "date",
+        "رقم اللوحة": "plate_no",
+        "كود المركبة": "vehicle_id",
 
-            "عدد الكيلومترات": "trip_km",
-            "إجمالي الكيلو متر": "total_km",
+        "عدد الكيلومترات": "trip_km",
+        "إجمالي الكيلو متر": "total_km",
 
-            "عدد اللترات": "liters",
-            "سعر اللتر": "liter_price",
+        "عدد اللترات": "liters",
+        "سعر اللتر": "liter_price",
 
-            "أجور": "wages",
-            "حافز يومي": "daily_bonus",
-            "زيت": "oil_cost",
-            "مرور": "traffic_cost",
-            "عام": "general_cost",
-            "قطع غيار وصيانة": "maintenance_cost",
+        "أجور": "wages",
+        "حافز يومي": "daily_bonus",
+        "زيت": "oil_cost",
+        "مرور": "traffic_cost",
+        "عام": "general_cost",
+        "قطع غيار وصيانة": "maintenance_cost",
 
-            "إجمالي المصروف": "total_expense",
-            "عدد أيام العمل": "working_days"
-        }
+        "إجمالي المصروف": "total_expense",
+        "عدد أيام العمل": "working_days"
+    }
 
-        df = df.rename(columns=rename_map)
+    df = df.rename(columns=rename_map)
 
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    # =========================================
+    # التأكد من الأعمدة الأساسية
+    # =========================================
 
-        numeric_cols = [
-            "trip_km","total_km","liters","liter_price",
-            "wages","daily_bonus","oil_cost",
-            "traffic_cost","general_cost","maintenance_cost",
-            "total_expense","working_days"
-        ]
+    required = ["date", "vehicle_id"]
 
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
+    missing = [c for c in required if c not in df.columns]
 
-        df = df.dropna(subset=["date","vehicle_id"])
+    if missing:
+        st.error(f"الأعمدة الأساسية غير موجودة: {missing}")
+        st.stop()
 
-        df["vehicle_id"] = df["vehicle_id"].astype(str)
+    # =========================================
+    # تحويل التاريخ
+    # =========================================
 
-        return df
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+    # =========================================
+    # تنظيف الأرقام
+    # =========================================
+
+    numeric_cols = [
+        "trip_km","total_km","liters","liter_price",
+        "wages","daily_bonus","oil_cost",
+        "traffic_cost","general_cost","maintenance_cost",
+        "total_expense","working_days"
+    ]
+
+    for col in numeric_cols:
+
+        if col in df.columns:
+
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.replace(",", "")
+                .str.replace(" ", "")
+            )
+
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # =========================================
+    # إنشاء أعمدة بديلة إذا لم تكن موجودة
+    # =========================================
+
+    fallback_cols = {
+        "total_km": 0,
+        "liters": 0,
+        "total_expense": 0,
+        "maintenance_cost": 0,
+        "oil_cost": 0,
+        "traffic_cost": 0,
+        "wages": 0,
+        "daily_bonus": 0,
+        "general_cost": 0,
+        "working_days": 0
+    }
+
+    for col, val in fallback_cols.items():
+        if col not in df.columns:
+            df[col] = val
+
+    # حذف الصفوف غير الصالحة
+    df = df.dropna(subset=["date", "vehicle_id"]).copy()
+
+    # توحيد نوع المركبة
+    df["vehicle_id"] = df["vehicle_id"].astype(str).str.strip()
+
+    if "plate_no" in df.columns:
+        df["plate_no"] = df["plate_no"].astype(str).str.strip()
+
+    return df
 
 
     # =========================================
