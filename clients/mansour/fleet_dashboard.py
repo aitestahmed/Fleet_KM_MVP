@@ -317,8 +317,7 @@ def run(deduct_credit=None):
     
         st.success("تم تحميل البيانات بنجاح")
     
-        st.write("Columns after processing:")
-        st.write(df.columns.tolist())
+    
     
         st.write("Preview:")
         st.dataframe(df.head())
