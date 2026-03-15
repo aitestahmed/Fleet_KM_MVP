@@ -82,29 +82,29 @@ def load_and_standardize(file):
         df = pd.read_excel(file)
 
     # تنظيف أسماء الأعمدة
-    df.columns = df.columns.astype(str).str.strip()
+    df.columns = df.columns.astype(str)
+    df.columns = df.columns.str.replace("\n", "").str.strip()
+
+df = df.rename(columns=rename_map)
 
     # توحيد أسماء الأعمدة
     rename_map = {
-
+    
         "التاريخ": "date",
-        "رقم اللوحة": "plate_no",
         "كود المركبة": "vehicle_id",
-
-        "عدد الكيلومترات": "trip_km",
-        "إجمالي الكيلو متر": "total_km",
-
+        "رقم اللوحة": "plate_no",
+    
+        "إجمالي الكيلو": "total_km",
         "عدد اللترات": "liters",
-        "سعر اللتر": "liter_price",
-
+    
         "أجور": "wages",
         "حافز يومي": "daily_bonus",
         "زيت": "oil_cost",
         "مرور": "traffic_cost",
         "عام": "general_cost",
         "قطع غيار وصيانة": "maintenance_cost",
-
-        "إجمالي المصروف": "total_expense",
+    
+        "المبلغ": "total_expense",
         "عدد أيام العمل": "working_days"
     }
 
