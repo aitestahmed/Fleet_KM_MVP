@@ -88,34 +88,66 @@ def run(deduct_credit=None):
     
         # توحيد أسماء الأعمدة
         rename_map = {
-    
-        # التاريخ
-        "التاريخ": "date",
-    
-        # المركبة
-        "كود المركبة": "vehicle_id",
-        "الفرع": "Branch",
-    
-        # الكيلومترات (العمود الصحيح فقط)
-        "اجمالي الكيلو متر": "total_km",
-    
-        # الوقود
-        "عدد اللترات": "liters",
-    
-        # المصروف
-        "اجمالي المصروف": "total_expense",
-    
-        # أيام العمل
-        "عدد أيام العمل": "working_days",
-    
-        # المصروفات التفصيلية
-        "أجور": "wages",
-        "حافز يومي": "daily_bonus",
-        "زيت": "oil_cost",
-        "مرور": "traffic_cost",
-        "عام": "general_cost",
-        "قطع غيار وصيانة": "maintenance_cost"
-    }
+
+            # التاريخ
+            "التاريخ": "date",
+            "date": "date",
+
+            # السيارة
+            "كود المركبة": "vehicle_id",
+            "كود العربية": "vehicle_id",
+            "رقم السيارة": "vehicle_id",
+            "vehicle": "vehicle_id",
+            "vehicle_id": "vehicle_id",
+
+            # الفرع
+            "الفرع": "branch_name",
+            "branch": "branch_name",
+            "branch_name": "branch_name",
+
+            # الكيلومترات
+            "اجمالي الكيلو متر": "total_km",
+            "إجمالي الكيلو متر": "total_km",
+            "total_km": "total_km",
+            "km": "total_km",
+
+            # الوقود
+            "عدد اللترات": "liters",
+            "لترات": "liters",
+            "liters": "liters",
+
+            # البيع / الإيراد
+            "قيمة المبيع": "sales_value",
+            "قيمة البيع": "sales_value",
+            "المبيع": "sales_value",
+            "البيع": "sales_value",
+            "الايراد": "sales_value",
+            "الإيراد": "sales_value",
+            "sales": "sales_value",
+            "sales_value": "sales_value",
+            "revenue": "sales_value",
+            "المبلغ": "sales_value",
+
+            # المصروف
+            "اجمالي المصروف": "total_expense",
+            "إجمالي المصروف": "total_expense",
+            "المصروف": "total_expense",
+            "total_expense": "total_expense",
+            "expense": "total_expense",
+
+            # أيام العمل
+            "عدد أيام العمل": "working_days",
+            "working_days": "working_days",
+
+            # المصروفات التفصيلية
+            "أجور": "wages",
+            "حافز يومي": "daily_bonus",
+            "زيت": "oil_cost",
+            "مرور": "traffic_cost",
+            "عام": "general_cost",
+            "قطع غيار وصيانة": "maintenance_cost"
+        }
+        
     
         df = df.rename(columns=rename_map)
     
@@ -133,10 +165,17 @@ def run(deduct_credit=None):
     
         # الأعمدة الرقمية
         numeric_cols = [
-            "total_km","liters",
-            "wages","daily_bonus","oil_cost",
-            "traffic_cost","general_cost","maintenance_cost",
-            "total_expense","working_days"
+            "total_km",
+            "liters",
+            "sales_value",
+            "wages",
+            "daily_bonus",
+            "oil_cost",
+            "traffic_cost",
+            "general_cost",
+            "maintenance_cost",
+            "total_expense",
+            "working_days"
         ]
     
         for col in numeric_cols:
@@ -154,8 +193,10 @@ def run(deduct_credit=None):
     
         # إنشاء أعمدة بديلة إذا كانت غير موجودة
         fallback_cols = {
+            "branch_name": "غير محدد",
             "total_km": 0,
             "liters": 0,
+            "sales_value": 0,
             "total_expense": 0,
             "maintenance_cost": 0,
             "oil_cost": 0,
@@ -175,6 +216,9 @@ def run(deduct_credit=None):
         df = df.dropna(subset=["date","vehicle_id"]).copy()
     
         df["vehicle_id"] = df["vehicle_id"].astype(str).str.strip()
+        if "branch_name" in df.columns:
+            df["branch_name"] = df["branch_name"].astype(str).str.strip()
+            df["branch_name"] = df["branch_name"].replace({"": "غير محدد", "nan": "غير محدد"})
     
         if "plate_no" in df.columns:
             df["plate_no"] = df["plate_no"].astype(str).str.strip()
