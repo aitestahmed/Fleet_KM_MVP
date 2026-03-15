@@ -289,8 +289,8 @@ def run(deduct_credit=None):
         )
     
         vehicle["km_per_liter"] = np.where(
-            vehicle["total_liters"] > 0,
-            vehicle["total_km"] / vehicle["total_liters"],
+            vehicle["liters"] > 0,
+            vehicle["total_km"] / vehicle["liters"],
             0
         )
     
@@ -333,7 +333,7 @@ def run(deduct_credit=None):
 
             "total_km": float(vehicle["total_km"].sum()),
 
-            "total_liters": float(vehicle["liters"].sum()),
+            "liters": float(vehicle["liters"].sum()),
 
             "maintenance_cost": float(vehicle["maintenance_cost"].sum()),
 
@@ -360,8 +360,8 @@ def run(deduct_credit=None):
         )
 
         fleet["fleet_km_per_liter"] = (
-            fleet["total_km"] / fleet["total_liters"]
-            if fleet["total_liters"] > 0 else 0
+            fleet["total_km"] / fleet["liters"]
+            if fleet["liters"] > 0 else 0
         )
 
         fleet["maintenance_ratio_pct"] = (
@@ -398,7 +398,7 @@ def run(deduct_credit=None):
                 total_sales=("sales_value", "sum"),
                 total_expense=("total_expense", "sum"),
                 total_km=("total_km", "sum"),
-                total_liters=("liters", "sum")
+                liters=("liters", "sum")
             )
         )
 
@@ -726,7 +726,7 @@ def run(deduct_credit=None):
     
             result = (
                 vehicle.sort_values("km_per_liter", ascending=False)
-                [["vehicle_id","total_km","total_liters","km_per_liter"]]
+                [["vehicle_id","total_km","liters","km_per_liter"]]
                 .head(5)
             )
     
@@ -787,7 +787,7 @@ def run(deduct_credit=None):
     
         Total KM: {fleet['total_km']}
         Total Expense: {fleet['total_expense']}
-        Total Liters: {fleet['total_liters']}
+        Total Liters: {fleet['liters']}
     
         Fleet Cost per KM: {fleet['fleet_cost_per_km']}
         Fuel Efficiency KM/L: {fleet['fleet_km_per_liter']}
