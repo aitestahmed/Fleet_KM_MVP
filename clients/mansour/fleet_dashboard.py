@@ -307,15 +307,50 @@ if not uploaded:
 
 
 # ---------------------------------
-# تحميل البيانات
+# ---------------------------------
+# تحميل البيانات مع اظهار الخطأ الحقيقي
 # ---------------------------------
 
-df = load_and_standardize(uploaded)
+try:
 
-if df.empty:
-    st.warning("الملف لا يحتوي على بيانات صالحة.")
+    df = load_and_standardize(uploaded)
+
+    st.success("تم تحميل البيانات بنجاح")
+
+    st.write("Columns after processing:")
+    st.write(df.columns.tolist())
+
+    st.write("Preview:")
+    st.dataframe(df.head())
+
+except Exception as e:
+
+    st.error("حدث خطأ أثناء معالجة الملف")
+
+    st.code(str(e))
+
     st.stop()
 
+
+# ---------------------------------
+# التحقق من البيانات
+# ---------------------------------
+
+if df.empty:
+
+    st.error("⚠️ لا توجد بيانات بعد المعالجة")
+
+    st.write("الأعمدة الموجودة في الملف:")
+
+    df_raw = pd.read_excel(uploaded)
+
+    st.write(df_raw.columns.tolist())
+
+    st.write("معاينة البيانات الأصلية:")
+
+    st.dataframe(df_raw.head())
+
+    st.stop()
 
 # ---------------------------------
 # تجهيز قائمة المركبات
