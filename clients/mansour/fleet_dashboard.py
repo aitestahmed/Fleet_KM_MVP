@@ -843,71 +843,66 @@ def run(deduct_credit=None):
         st.session_state.report_html = None
     
     # ---------------------------------
-    # زر جودة البيانات
+    # زر جودة البيانات بالذكاء الاصطناعي
     # ---------------------------------
     
-    if st.button("🔍 جودة البيانات"):
+    if st.button("🧠 تحليل جودة البيانات AI"):
     
-        diagnostics = []
+        # تجهيز ملخص إحصائي
+        summary = f"""
+        Data Quality Summary
     
-        # سيارات كيلومترات = صفر
-        zero_km = vehicle[vehicle["total_km"] == 0]
+        Total Records: {len(df_f)}
     
-        if not zero_km.empty:
-            diagnostics.append(
-                f"{len(zero_km)} vehicles have zero KM recorded"
+        Sales Mean: {df_f['sales_value'].mean()}
+        Sales Max: {df_f['sales_value'].max()}
+        Sales Min: {df_f['sales_value'].min()}
+    
+        Expense Mean: {df_f['total_expense'].mean()}
+        Expense Max: {df_f['total_expense'].max()}
+        Expense Min: {df_f['total_expense'].min()}
+    
+        KM Mean: {df_f['total_km'].mean()}
+        KM Max: {df_f['total_km'].max()}
+        KM Min: {df_f['total_km'].min()}
+    
+        Fuel Mean: {df_f['liters'].mean()}
+        Fuel Max: {df_f['liters'].max()}
+        Fuel Min: {df_f['liters'].min()}
+        """
+    
+        prompt = f"""
+        أنت خبير تحليل بيانات تشغيلية.
+    
+        قم بتحليل جودة البيانات التالية واكتشف:
+    
+        1- القيم الشاذة في المبيعات
+        2- القيم غير الطبيعية في المصروفات
+        3- مشاكل الكيلومترات
+        4- مشاكل استهلاك الوقود
+        5- احتمالات أخطاء إدخال البيانات
+    
+        {summary}
+    
+        اكتب تقريرًا مختصرًا يوضح مشاكل جودة البيانات إن وجدت.
+        """
+    
+        with st.spinner("AI is analyzing data quality..."):
+    
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "أنت خبير تحليل جودة البيانات."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=300
             )
     
-        # سيارات بدون وقود
-        zero_fuel = vehicle[vehicle["liters"] == 0]
+        result = response.choices[0].message.content
     
-        if not zero_fuel.empty:
-            diagnostics.append(
-                f"{len(zero_fuel)} vehicles have zero fuel consumption"
-            )
+        st.markdown("### 🧠 AI Data Quality Report")
     
-        # سيارات تعمل بخسارة
-        loss_vehicles = vehicle[vehicle["profit"] < 0]
-    
-        if not loss_vehicles.empty:
-            diagnostics.append(
-                f"{len(loss_vehicles)} vehicles are operating at a loss"
-            )
-    
-        # كفاءة وقود غير منطقية
-        abnormal_eff = vehicle[
-            (vehicle["km_per_liter"] > 25) |
-            (vehicle["km_per_liter"] < 1)
-        ]
-    
-        if not abnormal_eff.empty:
-            diagnostics.append(
-                f"{len(abnormal_eff)} vehicles show abnormal fuel efficiency"
-            )
-    
-        # تكلفة كيلومتر مرتفعة
-        high_cost = vehicle[
-            vehicle["cost_per_km"] > vehicle["cost_per_km"].quantile(0.95)
-        ]
-    
-        if not high_cost.empty:
-            diagnostics.append(
-                f"{len(high_cost)} vehicles have unusually high cost per KM"
-            )
-    
-        # عرض النتائج
-        st.markdown("### 🔍 تقرير جودة البيانات")
-    
-        if diagnostics:
-    
-            st.warning("⚠ تم اكتشاف مشاكل في البيانات")
-    
-            for d in diagnostics:
-                st.write("•", d)
-    
-        else:
-    
-            st.success("✅ جودة البيانات جيدة")
+        st.write(result)
     # ---------------------------------
     # زر تشغيل التحليل
     # ---------------------------------
