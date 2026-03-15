@@ -665,7 +665,7 @@ def run(deduct_credit=None):
     # 11️⃣ DASHBOARD
     # =========================================
     
-    daily, vehicle, fleet = compute_kpis(df_f)
+    daily, vehicle, fleet, branch_summary = compute_kpis(df_f)
     
     vehicle["vehicle_id"] = vehicle["vehicle_id"].astype(str)
     
