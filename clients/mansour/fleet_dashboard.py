@@ -286,10 +286,14 @@ def compute_kpis(df):
 # 9️⃣ FILE UPLOAD
 # =========================================
 
-uploaded = st.file_uploader(
-    "📂 قم برفع ملف بيانات الأسطول",
-    type=["xlsx", "csv"]
-)
+uploaded = st.file_uploader("📂 قم برفع ملف الإكسل (.xlsx)", type=["xlsx"])
+
+if uploaded:
+
+    df = pd.read_excel(uploaded)
+
+    st.write("Columns in file:")
+    st.write(df.columns)
 
 if not uploaded:
     st.info("قم برفع ملف Excel أو CSV للبدء.")
