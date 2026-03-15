@@ -696,7 +696,81 @@ def run(deduct_credit=None):
     
     }).sort_values("amount", ascending=False)
     
+    # =========================================
+    # 🚀 EXECUTIVE FLEET INSIGHTS
+    # =========================================
     
+    st.divider()
+    st.markdown("## 📈 Executive Fleet Insights")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    # ---------------------------------
+    # السيارات الأعلى ربح
+    # ---------------------------------
+    
+    top_profit = (
+        vehicle.sort_values("profit", ascending=False)
+        .head(3)
+        [["vehicle_id", "profit", "sales_value", "total_expense"]]
+    )
+    
+    with col1:
+    
+        st.markdown("### 🏆 Most Profitable Vehicles")
+    
+        if not top_profit.empty:
+    
+            for _, row in top_profit.iterrows():
+    
+                st.write(
+                    f"🚚 {row['vehicle_id']} | Profit: {row['profit']:,.0f}"
+                )
+    
+    
+    # ---------------------------------
+    # السيارات الخاسرة
+    # ---------------------------------
+    
+    loss_vehicles = vehicle[vehicle["profit"] < 0]
+    
+    with col2:
+    
+        st.markdown("### ⚠ Loss Making Vehicles")
+    
+        if loss_vehicles.empty:
+    
+            st.success("No loss vehicles detected")
+    
+        else:
+    
+            worst = loss_vehicles.sort_values("profit").head(3)
+    
+            for _, row in worst.iterrows():
+    
+                st.write(
+                    f"🚚 {row['vehicle_id']} | Loss: {row['profit']:,.0f}"
+                )
+    
+    
+    # ---------------------------------
+    # أفضل الفروع ربحية
+    # ---------------------------------
+    
+    best_branch = (
+        branch_summary.sort_values("profit", ascending=False)
+        .head(3)
+    )
+    
+    with col3:
+    
+        st.markdown("### 🏢 Top Branch Profitability")
+    
+        for _, row in best_branch.iterrows():
+    
+            st.write(
+                f"🏢 {row['branch_name']} | Profit: {row['profit']:,.0f}"
+            )
     # =========================================
     # 13️⃣ QUICK INSIGHTS
     # =========================================
