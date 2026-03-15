@@ -15,7 +15,12 @@ from openai import OpenAI
 
 def run(deduct_credit=None):
 
+    # =========================================
+    # OPENAI CLIENT
+    # =========================================
+
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
 
     # =========================================
     # HELPERS
@@ -23,34 +28,52 @@ def run(deduct_credit=None):
 
     def calculate_tokens(response):
         try:
-            return response.usage.total_tokens
+            tokens = response.usage.total_tokens
         except:
-            return 0
+            tokens = 0
+        return tokens
+
 
     def tokens_to_credit(tokens):
-        return round(tokens / 1000, 2)
+        credit = tokens / 1000
+        return round(credit, 2)
+
 
     # =========================================
-    # PAGE TITLE
+    # SESSION STATE CHECK
     # =========================================
 
-    st.markdown(
-        """
-        <h1 style='text-align: right; font-weight: 800;'>
+    if "credits" not in st.session_state:
+        st.session_state.credits = 0
+
+
+
+
+
+
+
+   # =========================================
+# 6️⃣ PAGE HEADER
+# =========================================
+
+st.markdown(
+    """
+    <h1 style='text-align: right; font-weight: 800;'>
         لوحة تحليل أسطول النقل
-        </h1>
-        <p style='text-align:right;color:gray'>
-        تحليل التكاليف – استهلاك الوقود – أداء المركبات
-        </p>
-        """,
-        unsafe_allow_html=True
-    )
+    </h1>
+    <p style='text-align: right; color: gray; margin-top: -10px;'>
+        رفع ملف إكسل → توحيد البيانات → حساب المؤشرات → عرض الرسوم البيانية
+    </p>
+    """,
+    unsafe_allow_html=True
+)
 
-    # =========================================
-    # DATA LOADING
-    # =========================================
 
-   def load_and_standardize(file):
+# =========================================
+# 7️⃣ DATA LOADING
+# =========================================
+
+def load_and_standardize(file):
 
     # قراءة الملف
     if file.name.endswith(".csv"):
@@ -61,7 +84,7 @@ def run(deduct_credit=None):
     # تنظيف أسماء الأعمدة
     df.columns = df.columns.astype(str).str.strip()
 
-    # تحويل الأسماء العربية إلى أسماء قياسية
+    # توحيد أسماء الأعمدة
     rename_map = {
 
         "التاريخ": "date",
@@ -87,10 +110,7 @@ def run(deduct_credit=None):
 
     df = df.rename(columns=rename_map)
 
-    # =========================================
     # التأكد من الأعمدة الأساسية
-    # =========================================
-
     required = ["date", "vehicle_id"]
 
     missing = [c for c in required if c not in df.columns]
@@ -99,16 +119,10 @@ def run(deduct_credit=None):
         st.error(f"الأعمدة الأساسية غير موجودة: {missing}")
         st.stop()
 
-    # =========================================
     # تحويل التاريخ
-    # =========================================
-
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-    # =========================================
-    # تنظيف الأرقام
-    # =========================================
-
+    # الأعمدة الرقمية
     numeric_cols = [
         "trip_km","total_km","liters","liter_price",
         "wages","daily_bonus","oil_cost",
@@ -129,10 +143,7 @@ def run(deduct_credit=None):
 
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # =========================================
-    # إنشاء أعمدة بديلة إذا لم تكن موجودة
-    # =========================================
-
+    # إنشاء أعمدة بديلة إذا كانت غير موجودة
     fallback_cols = {
         "total_km": 0,
         "liters": 0,
@@ -147,13 +158,13 @@ def run(deduct_credit=None):
     }
 
     for col, val in fallback_cols.items():
+
         if col not in df.columns:
             df[col] = val
 
-    # حذف الصفوف غير الصالحة
-    df = df.dropna(subset=["date", "vehicle_id"]).copy()
+    # تنظيف البيانات
+    df = df.dropna(subset=["date","vehicle_id"]).copy()
 
-    # توحيد نوع المركبة
     df["vehicle_id"] = df["vehicle_id"].astype(str).str.strip()
 
     if "plate_no" in df.columns:
@@ -162,253 +173,882 @@ def run(deduct_credit=None):
     return df
 
 
-    # =========================================
-    # FILE UPLOAD
-    # =========================================
-
-    uploaded = st.file_uploader("📂 رفع ملف الأسطول", type=["xlsx","csv"])
-
-    if not uploaded:
-        st.info("قم برفع ملف البيانات")
-        st.stop()
-
-    df = load_and_standardize(uploaded)
 
     # =========================================
-    # FILTERS
-    # =========================================
+# 8️⃣ KPI ENGINE
+# =========================================
 
-    with st.sidebar:
+def compute_kpis(df):
 
-        st.header("🔎 الفلاتر")
-
-        vehicles = sorted(df["vehicle_id"].unique())
-
-        selected_vehicle = st.multiselect(
-            "🚚 المركبات",
-            vehicles,
-            default=vehicles
-        )
-
-        date_range = st.date_input(
-            "📅 الفترة الزمنية",
-            (
-                df["date"].min().date(),
-                df["date"].max().date()
-            )
-        )
-
-    df_f = df.copy()
-
-    if selected_vehicle:
-        df_f = df_f[df_f["vehicle_id"].isin(selected_vehicle)]
-
-    start_date, end_date = date_range
-
-    df_f = df_f[
-        (df_f["date"].dt.date >= start_date) &
-        (df_f["date"].dt.date <= end_date)
-    ]
-
-    # =========================================
-    # KPI ENGINE
-    # =========================================
+    # ---------------------------------
+    # تجميع البيانات لكل مركبة
+    # ---------------------------------
 
     vehicle = (
-        df_f.groupby("vehicle_id", as_index=False)
+        df.groupby("vehicle_id", as_index=False)
         .agg(
-            total_km=("total_km","sum"),
-            total_expense=("total_expense","sum"),
-            total_liters=("liters","sum"),
-            maintenance=("maintenance_cost","sum"),
-            oil=("oil_cost","sum"),
-            wages=("wages","sum"),
-            working_days=("working_days","sum")
+            total_expense=("total_expense", "sum"),
+            total_km=("total_km", "sum"),
+            total_liters=("liters", "sum"),
+            maintenance_cost=("maintenance_cost", "sum"),
+            oil_cost=("oil_cost", "sum"),
+            traffic_cost=("traffic_cost", "sum"),
+            wages=("wages", "sum"),
+            daily_bonus=("daily_bonus", "sum"),
+            general_cost=("general_cost", "sum"),
+            working_days=("working_days", "sum")
         )
     )
 
+    # ---------------------------------
+    # مؤشرات الأداء لكل مركبة
+    # ---------------------------------
+
     vehicle["cost_per_km"] = np.where(
-        vehicle["total_km"]>0,
-        vehicle["total_expense"]/vehicle["total_km"],
+        vehicle["total_km"] > 0,
+        vehicle["total_expense"] / vehicle["total_km"],
         0
     )
 
     vehicle["km_per_liter"] = np.where(
-        vehicle["total_liters"]>0,
-        vehicle["total_km"]/vehicle["total_liters"],
+        vehicle["total_liters"] > 0,
+        vehicle["total_km"] / vehicle["total_liters"],
         0
     )
 
     vehicle["cost_per_day"] = np.where(
-        vehicle["working_days"]>0,
-        vehicle["total_expense"]/vehicle["working_days"],
+        vehicle["working_days"] > 0,
+        vehicle["total_expense"] / vehicle["working_days"],
         0
     )
 
+    # ---------------------------------
+    # ملخص الأسطول بالكامل
+    # ---------------------------------
+
     fleet = {
 
-        "total_km": vehicle["total_km"].sum(),
-        "total_expense": vehicle["total_expense"].sum(),
-        "total_liters": vehicle["total_liters"].sum()
-
+        "total_expense": float(vehicle["total_expense"].sum()),
+        "total_km": float(vehicle["total_km"].sum()),
+        "total_liters": float(vehicle["total_liters"].sum()),
+        "maintenance_cost": float(vehicle["maintenance_cost"].sum()),
+        "oil_cost": float(vehicle["oil_cost"].sum()),
+        "traffic_cost": float(vehicle["traffic_cost"].sum()),
+        "wages": float(vehicle["wages"].sum()),
+        "daily_bonus": float(vehicle["daily_bonus"].sum()),
+        "general_cost": float(vehicle["general_cost"].sum()),
+        "working_days": float(vehicle["working_days"].sum())
     }
 
-    fleet["cost_per_km"] = (
+    # ---------------------------------
+    # مؤشرات الأسطول
+    # ---------------------------------
+
+    fleet["fleet_cost_per_km"] = (
         fleet["total_expense"] / fleet["total_km"]
         if fleet["total_km"] > 0 else 0
     )
 
-    fleet["km_per_liter"] = (
+    fleet["fleet_km_per_liter"] = (
         fleet["total_km"] / fleet["total_liters"]
         if fleet["total_liters"] > 0 else 0
     )
 
+    fleet["maintenance_ratio_pct"] = (
+        fleet["maintenance_cost"] / fleet["total_expense"] * 100
+        if fleet["total_expense"] > 0 else 0
+    )
+
+    # ---------------------------------
+    # تحليل يومي
+    # ---------------------------------
+
+    daily = (
+        df.groupby("date", as_index=False)
+        .agg(
+            total_expense=("total_expense", "sum"),
+            total_km=("total_km", "sum"),
+            total_liters=("liters", "sum")
+        )
+    )
+
+    daily["cost_per_km"] = np.where(
+        daily["total_km"] > 0,
+        daily["total_expense"] / daily["total_km"],
+        0
+    )
+
+    return daily, vehicle, fleet
+
+
+
     # =========================================
-    # KPI DASHBOARD
+# 9️⃣ FILE UPLOAD
+# =========================================
+
+uploaded = st.file_uploader(
+    "📂 قم برفع ملف بيانات الأسطول",
+    type=["xlsx", "csv"]
+)
+
+if not uploaded:
+    st.info("قم برفع ملف Excel أو CSV للبدء.")
+    st.stop()
+
+
+# ---------------------------------
+# تحميل البيانات
+# ---------------------------------
+
+df = load_and_standardize(uploaded)
+
+if df.empty:
+    st.warning("الملف لا يحتوي على بيانات صالحة.")
+    st.stop()
+
+
+# ---------------------------------
+# تجهيز قائمة المركبات
+# ---------------------------------
+
+vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
+
+
+# ---------------------------------
+# تهيئة Session State للفلاتر
+# ---------------------------------
+
+if "selected_vehicle_multi" not in st.session_state:
+    st.session_state.selected_vehicle_multi = vehicles
+
+
+if "fleet_date_range" not in st.session_state:
+
+    st.session_state.fleet_date_range = (
+        df["date"].min().date(),
+        df["date"].max().date()
+    )
+
+
+# ---------------------------------
+# معلومات سريعة عن البيانات
+# ---------------------------------
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric("عدد المركبات", len(vehicles))
+
+with col2:
+    st.metric("عدد السجلات", len(df))
+
+with col3:
+    st.metric("نطاق التاريخ",
+        f"{df['date'].min().date()} → {df['date'].max().date()}"
+    )
+
+
+
     # =========================================
+# 10️⃣ FILTERS
+# =========================================
 
-    st.divider()
+with st.sidebar:
 
-    st.markdown("## 🚛 المؤشرات الرئيسية")
+    st.header("🔎 الفلاتر")
 
-    c1,c2,c3,c4 = st.columns(4)
+    # ---------------------------------
+    # قائمة المركبات
+    # ---------------------------------
 
-    c1.metric(
+    vehicles = sorted(df["vehicle_id"].astype(str).unique().tolist())
+
+    # ---------------------------------
+    # تهيئة Session State
+    # ---------------------------------
+
+    if "selected_vehicle_multi" not in st.session_state:
+        st.session_state.selected_vehicle_multi = vehicles
+
+    if "fleet_date_range" not in st.session_state:
+        st.session_state.fleet_date_range = (
+            df["date"].min().date(),
+            df["date"].max().date()
+        )
+
+    # ---------------------------------
+    # Reset Filters
+    # ---------------------------------
+
+    if st.button("🔄 إعادة ضبط الفلاتر"):
+
+        st.session_state.selected_vehicle_multi = vehicles
+        st.session_state.fleet_date_range = (
+            df["date"].min().date(),
+            df["date"].max().date()
+        )
+
+        st.rerun()
+
+    # ---------------------------------
+    # Vehicle Filter
+    # ---------------------------------
+
+    selected_vehicle = st.multiselect(
+        "🚚 اختيار المركبات",
+        options=vehicles,
+        default=st.session_state.selected_vehicle_multi,
+        key="selected_vehicle_multi"
+    )
+
+    # ---------------------------------
+    # Date Filter
+    # ---------------------------------
+
+    fleet_date_range = st.date_input(
+        "📅 نطاق التاريخ",
+        value=st.session_state.fleet_date_range,
+        min_value=df["date"].min().date(),
+        max_value=df["date"].max().date(),
+        key="fleet_date_range"
+    )
+
+
+# =========================================
+# APPLY FILTERS
+# =========================================
+
+df_f = df.copy()
+
+# ---------------------------------
+# Vehicle Filter
+# ---------------------------------
+
+if selected_vehicle:
+    df_f = df_f[df_f["vehicle_id"].isin(selected_vehicle)]
+
+
+# ---------------------------------
+# Date Filter
+# ---------------------------------
+
+if isinstance(fleet_date_range, tuple):
+
+    if len(fleet_date_range) == 2:
+        start_date, end_date = fleet_date_range
+    else:
+        start_date = end_date = fleet_date_range[0]
+
+else:
+    start_date = end_date = fleet_date_range
+
+
+df_f = df_f[
+    (df_f["date"].dt.date >= start_date) &
+    (df_f["date"].dt.date <= end_date)
+]
+
+
+# ---------------------------------
+# التحقق من وجود بيانات بعد الفلترة
+# ---------------------------------
+
+if df_f.empty:
+
+    st.warning("لا توجد بيانات ضمن الفلاتر المختارة.")
+
+    st.stop()
+
+
+
+    
+   # =========================================
+# 11️⃣ DASHBOARD
+# =========================================
+
+daily, vehicle, fleet = compute_kpis(df_f)
+
+vehicle["vehicle_id"] = vehicle["vehicle_id"].astype(str)
+
+
+# =========================================
+# COST BREAKDOWN
+# =========================================
+
+cost_breakdown = pd.DataFrame({
+
+    "category": [
+        "Maintenance",
+        "Oil",
+        "Traffic",
+        "Wages",
+        "Daily Bonus",
+        "General"
+    ],
+
+    "amount": [
+        fleet["maintenance_cost"],
+        fleet["oil_cost"],
+        fleet["traffic_cost"],
+        fleet["wages"],
+        fleet["daily_bonus"],
+        fleet["general_cost"]
+    ]
+
+}).sort_values("amount", ascending=False)
+
+
+# =========================================
+# 13️⃣ QUICK INSIGHTS
+# =========================================
+
+st.divider()
+st.markdown("## 🤖 Fleet Quick Insights")
+
+col1, col2, col3, col4 = st.columns(4)
+
+
+# أعلى تكلفة كيلومتر
+with col1:
+
+    if st.button("🔴 Highest Cost per KM"):
+
+        result = (
+            vehicle.sort_values("cost_per_km", ascending=False)
+            [["vehicle_id","total_expense","total_km","cost_per_km"]]
+            .head(5)
+        )
+
+        st.dataframe(result, use_container_width=True)
+
+
+# أفضل كفاءة وقود
+with col2:
+
+    if st.button("🟢 Best Fuel Efficiency"):
+
+        result = (
+            vehicle.sort_values("km_per_liter", ascending=False)
+            [["vehicle_id","total_km","total_liters","km_per_liter"]]
+            .head(5)
+        )
+
+        st.dataframe(result, use_container_width=True)
+
+
+# توزيع المصروفات
+with col3:
+
+    if st.button("🟣 Expense Breakdown"):
+
+        st.dataframe(cost_breakdown, use_container_width=True)
+
+
+# أعلى مصروف إجمالي
+with col4:
+
+    if st.button("⚠ Highest Total Expense"):
+
+        result = (
+            vehicle.sort_values("total_expense", ascending=False)
+            [["vehicle_id","total_expense","cost_per_km"]]
+            .head(5)
+        )
+
+        st.dataframe(result, use_container_width=True)
+
+
+
+    
+    # =========================================
+# 14️⃣ AI ENGINE
+# =========================================
+
+# تهيئة متغير التقرير
+if "report_html" not in st.session_state:
+    st.session_state.report_html = None
+
+
+# ---------------------------------
+# زر تشغيل التحليل
+# ---------------------------------
+
+if st.button("Generate AI Insight"):
+
+    # التحقق من الرصيد
+    if st.session_state.credits <= 0:
+        st.error("رصيدك انتهى. يرجى شحن الحساب.")
+        st.stop()
+
+
+    # ---------------------------------
+    # تجهيز ملخص البيانات
+    # ---------------------------------
+
+    summary = f"""
+    Fleet Summary
+
+    Total KM: {fleet['total_km']}
+    Total Expense: {fleet['total_expense']}
+    Total Liters: {fleet['total_liters']}
+
+    Fleet Cost per KM: {fleet['fleet_cost_per_km']}
+    Fuel Efficiency KM/L: {fleet['fleet_km_per_liter']}
+    Maintenance Ratio %: {fleet['maintenance_ratio_pct']}
+    """
+
+
+    # ---------------------------------
+    # بناء الـ Prompt
+    # ---------------------------------
+
+    prompt = f"""
+    قم بتحليل بيانات أسطول النقل التالية وقدم تقريرًا تنفيذيًا احترافيًا.
+
+    {summary}
+
+    المطلوب في التقرير:
+
+    1️⃣ المشكلات التشغيلية المحتملة في الأسطول
+
+    2️⃣ المركبات الأعلى تكلفة تشغيل
+
+    3️⃣ تحليل كفاءة استهلاك الوقود
+
+    4️⃣ فرص تقليل المصروفات التشغيلية
+
+    5️⃣ توصيات عملية للإدارة لتحسين أداء الأسطول
+    """
+
+
+    # ---------------------------------
+    # استدعاء AI
+    # ---------------------------------
+
+    with st.spinner("AI is analyzing fleet data..."):
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "أنت خبير تحليل بيانات تشغيلية لأساطيل النقل."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_tokens=500
+        )
+
+
+    # ---------------------------------
+    # حساب التوكين
+    # ---------------------------------
+
+    tokens_used = calculate_tokens(response)
+
+    credit_used = tokens_to_credit(tokens_used)
+
+
+    # ---------------------------------
+    # خصم الرصيد عبر app.py
+    # ---------------------------------
+
+    if deduct_credit:
+        deduct_credit(credit_used)
+
+    st.session_state.credits -= credit_used
+
+
+    # ---------------------------------
+    # حفظ التقرير
+    # ---------------------------------
+
+    st.session_state.report_html = response.choices[0].message.content
+
+    st.rerun()
+
+
+# =========================================
+# عرض تقرير AI
+# =========================================
+
+if st.session_state.report_html:
+
+    st.markdown("## 📑 AI Fleet Executive Report")
+
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#f9fafb;
+            padding:25px;
+            border-radius:10px;
+            border:1px solid #e5e7eb;
+            line-height:1.8;
+            font-size:16px;
+        ">
+        {st.session_state.report_html}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+
+    
+    # =========================================
+# 15️⃣ KPI DASHBOARD
+# =========================================
+
+st.markdown(
+    "<h2 style='text-align: right; font-weight: 700;'>🚛 الملخص التنفيذي للأسطول</h2>",
+    unsafe_allow_html=True
+)
+
+col1, col2, col3, col4 = st.columns(4)
+
+
+# Cost per KM
+with col1:
+    st.metric(
         "💸 تكلفة الكيلومتر",
-        f"{fleet['cost_per_km']:.2f}"
+        f"{fleet['fleet_cost_per_km']:,.2f}"
     )
 
-    c2.metric(
+
+# Fuel Efficiency
+with col2:
+    st.metric(
         "⛽ كفاءة الوقود KM/L",
-        f"{fleet['km_per_liter']:.2f}"
+        f"{fleet['fleet_km_per_liter']:,.2f}"
     )
 
-    c3.metric(
+
+# Total KM
+with col3:
+    st.metric(
         "🚛 إجمالي الكيلومترات",
         f"{fleet['total_km']:,.0f}"
     )
 
-    c4.metric(
-        "💰 إجمالي المصروف",
-        f"{fleet['total_expense']:,.0f}"
+
+# Maintenance Ratio
+with col4:
+    st.metric(
+        "🔧 نسبة الصيانة %",
+        f"{fleet['maintenance_ratio_pct']:,.2f}%"
     )
 
-    # =========================================
-    # VISUALIZATION
-    # =========================================
 
-    st.divider()
 
-    col1,col2 = st.columns(2)
+   # =========================================
+# 16️⃣ VISUALIZATION ENGINE
+# =========================================
 
-    worst = vehicle.sort_values("cost_per_km",ascending=False).head(5)
+st.markdown(
+    "<h2 style='text-align: right;'>📊 نظرة عامة على أداء الأسطول</h2>",
+    unsafe_allow_html=True
+)
 
-    fig1 = px.bar(
-        worst,
-        x="cost_per_km",
-        y="vehicle_id",
-        orientation="h",
-        title="أعلى تكلفة لكل كيلومتر"
-    )
+colA, colB = st.columns(2)
 
-    col1.plotly_chart(fig1,use_container_width=True)
 
-    best = vehicle.sort_values("km_per_liter",ascending=False).head(5)
+# =========================================
+# 🔴 أعلى تكلفة كيلومتر
+# =========================================
 
-    fig2 = px.bar(
-        best,
-        x="km_per_liter",
-        y="vehicle_id",
-        orientation="h",
-        title="أفضل كفاءة وقود"
-    )
+worst_vehicles = (
+    vehicle.sort_values("cost_per_km", ascending=False)
+           .head(5)
+           .copy()
+)
 
-    col2.plotly_chart(fig2,use_container_width=True)
+worst_vehicles["vehicle_id"] = worst_vehicles["vehicle_id"].astype(str)
 
-    # =========================================
-    # AI INSIGHT
-    # =========================================
+fig1 = px.bar(
+    worst_vehicles,
+    x="cost_per_km",
+    y="vehicle_id",
+    orientation="h",
+    title="🔴 أعلى 5 سيارات تكلفة لكل كيلومتر"
+)
 
-    st.divider()
+fig1.update_traces(
+    marker_color="#D32F2F",
+    texttemplate='%{x:,.2f}',
+    textposition='outside'
+)
 
-    st.markdown("## 🤖 تحليل الذكاء الاصطناعي")
+fig1.update_layout(
+    yaxis=dict(type="category"),
+    yaxis_categoryorder="total ascending"
+)
 
-    if st.button("Generate AI Insight"):
+colA.plotly_chart(fig1, use_container_width=True)
 
-        if st.session_state.credits <= 0:
-            st.error("الرصيد غير كافي")
-            st.stop()
 
-        summary = f"""
+# =========================================
+# 🟢 أفضل كفاءة وقود
+# =========================================
 
-        Fleet Summary
+best_efficiency = (
+    vehicle.sort_values("km_per_liter", ascending=False)
+           .head(5)
+           .copy()
+)
 
-        Total KM : {fleet['total_km']}
-        Total Expense : {fleet['total_expense']}
-        Total Liters : {fleet['total_liters']}
+best_efficiency["vehicle_id"] = best_efficiency["vehicle_id"].astype(str)
 
-        Cost per KM : {fleet['cost_per_km']}
-        KM per Liter : {fleet['km_per_liter']}
-        """
+fig2 = px.bar(
+    best_efficiency,
+    x="km_per_liter",
+    y="vehicle_id",
+    orientation="h",
+    title="🟢 أفضل 5 سيارات كفاءة وقود"
+)
 
-        prompt = f"""
-        قم بتحليل أداء أسطول النقل التالي.
+fig2.update_traces(
+    marker_color="#2E7D32",
+    texttemplate='%{x:,.2f}',
+    textposition='outside'
+)
 
-        {summary}
+fig2.update_layout(
+    yaxis=dict(type="category"),
+    yaxis_categoryorder="total ascending"
+)
 
-        قدم:
+colB.plotly_chart(fig2, use_container_width=True)
 
-        1 المشكلات التشغيلية
-        2 المركبات الأعلى تكلفة
-        3 فرص تقليل المصروفات
-        4 توصيات الإدارة
-        """
 
-        with st.spinner("AI analyzing..."):
 
-            response = client.chat.completions.create(
+# =========================================
+# Charts Row 2
+# =========================================
 
-                model="gpt-4o-mini",
+colC, colD = st.columns(2)
 
-                messages=[
 
-                    {
-                        "role":"system",
-                        "content":"أنت خبير تحليل بيانات أساطيل النقل"
-                    },
+# =========================================
+# 🔵 إجمالي المصروف لكل سيارة
+# =========================================
 
-                    {
-                        "role":"user",
-                        "content":prompt
-                    }
+vehicle_sorted = (
+    vehicle.sort_values("total_expense", ascending=False)
+           .copy()
+)
 
-                ],
+vehicle_sorted["vehicle_id"] = vehicle_sorted["vehicle_id"].astype(str)
 
-                max_tokens=500
+fig3 = px.bar(
+    vehicle_sorted,
+    x="vehicle_id",
+    y="total_expense",
+    title="🔵 إجمالي المصروف لكل سيارة"
+)
 
+fig3.update_traces(
+    marker_color="#1565C0",
+    texttemplate='<b>%{y:,.0f}</b>',
+    textposition='outside'
+)
+
+fig3.update_layout(
+    xaxis=dict(type="category", tickangle=-45)
+)
+
+colC.plotly_chart(fig3, use_container_width=True)
+
+
+
+# =========================================
+# 🟣 توزيع المصروفات
+# =========================================
+
+expense_distribution = pd.DataFrame({
+
+    "category": [
+        "Maintenance",
+        "Oil",
+        "Traffic",
+        "Wages",
+        "Daily Bonus",
+        "General"
+    ],
+
+    "amount": [
+        fleet["maintenance_cost"],
+        fleet["oil_cost"],
+        fleet["traffic_cost"],
+        fleet["wages"],
+        fleet["daily_bonus"],
+        fleet["general_cost"]
+    ]
+
+})
+
+fig4 = px.pie(
+    expense_distribution,
+    names="category",
+    values="amount",
+    title="🟣 توزيع مصروفات الأسطول"
+)
+
+fig4.update_traces(
+    textinfo="percent+label"
+)
+
+colD.plotly_chart(fig4, use_container_width=True)
+
+
+# =========================================
+# 17️⃣ DATA PREVIEW
+# =========================================
+
+st.divider()
+
+st.markdown(
+    "<h3 style='text-align: right;'>📋 معاينة البيانات</h3>",
+    unsafe_allow_html=True
+)
+
+df_preview = df_f.rename(columns={
+    "vehicle_id": "رقم السيارة",
+    "date": "التاريخ",
+    "location": "الموقع",
+    "vehicle_type": "نوع المركبة",
+    "kilometers": "الكيلومترات",
+    "fuel_liters": "لترات الوقود",
+    "maintenance_cost": "تكلفة الصيانة",
+    "oil_cost": "تكلفة الزيت",
+    "traffic_cost": "تكلفة المرور",
+    "wages": "الأجور",
+    "daily_bonus": "الحوافز اليومية",
+    "general_cost": "مصروفات عامة"
+})
+
+df_preview = df_preview[df_preview.columns[::-1]]
+
+st.data_editor(df_preview.head(50), use_container_width=True)
+
+
+# =========================================
+# 💬 CHAT WITH YOUR DATA
+# =========================================
+
+st.divider()
+
+st.markdown(
+    "<h2 style='text-align:right;'>💬 اسأل عن بياناتك</h2>",
+    unsafe_allow_html=True
+)
+
+st.info(
+"""
+يمكنك سؤال النظام عن بيانات الأسطول مثل:
+
+• أعلى تكلفة كيلومتر  
+• أقل تكلفة كيلومتر  
+• إجمالي الكيلومترات  
+• أكثر سيارة مصروف  
+• أفضل كفاءة وقود  
+
+⚠️ يفضل أن يكون السؤال قصيرًا (حتى 5 كلمات).
+"""
+)
+
+question = st.text_input("اكتب سؤال عن البيانات (حد أقصى 5 كلمات)")
+
+if question:
+
+    words = question.split()
+
+    if len(words) > 5:
+        st.error("السؤال يجب ألا يزيد عن 5 كلمات")
+        st.stop()
+
+    # ---------------------------------
+    # العمليات المسموح بها
+    # ---------------------------------
+
+    allowed_operations = """
+    يسمح فقط باستخدام العمليات التالية في pandas:
+
+    groupby
+    sum
+    mean
+    max
+    min
+    sort_values
+    head
+    tail
+    count
+    value_counts
+    """
+
+    # ---------------------------------
+    # تجهيز Prompt
+    # ---------------------------------
+
+    prompt = f"""
+    أنت محلل بيانات متخصص في تحليل أساطيل النقل.
+
+    لديك dataframe اسمه df_f
+
+    الأعمدة هي:
+
+    {list(df_f.columns)}
+
+    {allowed_operations}
+
+    اكتب كود pandas فقط للإجابة عن السؤال.
+
+    الشروط:
+    - لا تستخدم import
+    - لا تستخدم ملفات
+    - لا تستخدم مكتبات أخرى
+    - لا تكتب شرح
+
+    السؤال:
+    {question}
+    """
+
+    with st.spinner("AI analyzing your question..."):
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a fleet data analyst"},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=120
+        )
+
+        code = response.choices[0].message.content
+
+        # تنظيف الكود
+        code = code.replace("```python", "")
+        code = code.replace("```", "")
+        code = code.strip()
+
+        st.markdown("### 🔎 Generated Analysis")
+
+        st.code(code)
+
+        try:
+
+            result = eval(
+                code,
+                {"__builtins__": {}},
+                {"df_f": df_f, "vehicle": vehicle, "fleet": fleet}
             )
 
-        tokens = calculate_tokens(response)
+            st.markdown("### 📊 Result")
 
-        credit_used = tokens_to_credit(tokens)
+            st.write(result)
 
-        if deduct_credit:
-            deduct_credit(credit_used)
+        except Exception:
 
-        st.session_state.credits -= credit_used
-
-        report = response.choices[0].message.content
-
-        st.markdown("### 📑 التقرير التنفيذي")
-
-        st.markdown(report)
-
-    # =========================================
-    # DATA PREVIEW
-    # =========================================
-
-    st.divider()
-
-    st.markdown("## 📋 معاينة البيانات")
-
-    st.dataframe(df_f.head(50), use_container_width=True)
+            st.error("لم يتمكن النظام من تحليل السؤال.")
