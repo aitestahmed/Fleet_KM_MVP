@@ -858,16 +858,40 @@ def run(deduct_credit=None):
         # تجهيز ملخص البيانات
         # ---------------------------------
     
+        # ---------------------------------
+        # تجهيز ملخص البيانات المتقدم
+        # ---------------------------------
+        
+        best_vehicle = vehicle.sort_values("profit", ascending=False).iloc[0]
+        
+        worst_vehicle = vehicle.sort_values("profit").iloc[0]
+        
+        best_branch = branch_summary.sort_values("profit", ascending=False).iloc[0]
+        
         summary = f"""
-        Fleet Summary
-    
+        Fleet Executive Summary
+        
+        Total Vehicles: {len(vehicle)}
         Total KM: {fleet['total_km']}
+        Total Sales: {fleet['total_sales']}
         Total Expense: {fleet['total_expense']}
-        Total Liters: {fleet['liters']}
-    
+        Total Profit: {fleet['total_profit']}
+        
         Fleet Cost per KM: {fleet['fleet_cost_per_km']}
+        Fleet Profit per KM: {fleet['profit_per_km']}
         Fuel Efficiency KM/L: {fleet['fleet_km_per_liter']}
+        
         Maintenance Ratio %: {fleet['maintenance_ratio_pct']}
+        Profit Margin %: {fleet['profit_margin_pct']}
+        
+        Best Vehicle by Profit:
+        Vehicle {best_vehicle['vehicle_id']} | Profit {best_vehicle['profit']}
+        
+        Worst Vehicle by Profit:
+        Vehicle {worst_vehicle['vehicle_id']} | Profit {worst_vehicle['profit']}
+        
+        Best Branch:
+        {best_branch['branch_name']} | Profit {best_branch['profit']}
         """
     
     
@@ -876,21 +900,27 @@ def run(deduct_credit=None):
         # ---------------------------------
     
         prompt = f"""
-        قم بتحليل بيانات أسطول النقل التالية وقدم تقريرًا تنفيذيًا احترافيًا.
-    
+        أنت خبير تحليل بيانات تشغيلية لأساطيل النقل.
+        
+        حلل البيانات التالية واكتب تقريرًا تنفيذيًا للإدارة.
+        
         {summary}
-    
+        
         المطلوب في التقرير:
-    
-        1️⃣ المشكلات التشغيلية المحتملة في الأسطول
-    
-        2️⃣ المركبات الأعلى تكلفة تشغيل
-    
+        
+        1️⃣ تقييم الأداء العام للأسطول
+        
+        2️⃣ تحديد المركبات ذات الأداء السيئ أو التكلفة المرتفعة
+        
         3️⃣ تحليل كفاءة استهلاك الوقود
-    
-        4️⃣ فرص تقليل المصروفات التشغيلية
-    
-        5️⃣ توصيات عملية للإدارة لتحسين أداء الأسطول
+        
+        4️⃣ تحديد فرص تقليل المصروفات
+        
+        5️⃣ تحليل الربحية على مستوى المركبات والفروع
+        
+        6️⃣ توصيات تشغيلية واضحة للإدارة
+        
+        اكتب التقرير بأسلوب احترافي مختصر وموجه للإدارة التنفيذية.
         """
     
     
