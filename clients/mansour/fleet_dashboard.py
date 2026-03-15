@@ -80,7 +80,7 @@ def load_and_standardize(file):
         df = pd.read_csv(file)
     else:
         df = pd.read_excel(file)
-        st.write("Columns detected:", df.columns.tolist())
+        #st.write("Columns detected:", df.columns.tolist())
 
     # تنظيف أسماء الأعمدة
     df.columns = df.columns.astype(str)
@@ -298,8 +298,8 @@ if uploaded:
 
     df = pd.read_excel(uploaded)
 
-    st.write("Columns in file:")
-    st.write(df.columns)
+   #st.write("Columns in file:")
+   #st.write(df.columns)
 
 if not uploaded:
     st.info("قم برفع ملف Excel أو CSV للبدء.")
