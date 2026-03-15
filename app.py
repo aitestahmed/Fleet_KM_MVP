@@ -44,6 +44,9 @@ if "company_id" not in st.session_state:
 if "company_name" not in st.session_state:
     st.session_state.company_name = None
 
+if "role" not in st.session_state:
+    st.session_state.role = None
+
 
 # =========================================
 # LOGIN PAGE
@@ -52,7 +55,6 @@ if "company_name" not in st.session_state:
 if not st.session_state.logged_in:
 
     st.title("Quantory AI Analytics")
-
     st.subheader("Login")
 
     email = st.text_input("Email")
@@ -69,17 +71,33 @@ if not st.session_state.logged_in:
 
                 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-                # مثال بسيط لجلب الشركة
-                company = supabase.table("Companies") \
-                    .select("id,name,credits") \
-                    .limit(1) \
+                # =========================================
+                # GET USER PROFILE
+                # =========================================
+
+                profile = supabase.table("profiles") \
+                    .select("company_id,role") \
+                    .eq("email", email) \
+                    .single() \
                     .execute()
 
-                if company.data:
+                company_id = profile.data["company_id"]
+                role = profile.data["role"]
 
-                    st.session_state.company_id = company.data[0]["id"]
-                    st.session_state.company_name = company.data[0]["name"]
-                    st.session_state.credits = float(company.data[0]["credits"])
+                # =========================================
+                # GET COMPANY DATA
+                # =========================================
+
+                company = supabase.table("Companies") \
+                    .select("id,name,credits") \
+                    .eq("id", company_id) \
+                    .single() \
+                    .execute()
+
+                st.session_state.company_id = company.data["id"]
+                st.session_state.company_name = company.data["name"]
+                st.session_state.credits = float(company.data["credits"])
+                st.session_state.role = role
 
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
@@ -88,12 +106,12 @@ if not st.session_state.logged_in:
 
             except Exception as e:
 
-                st.error("خطأ في الاتصال بقاعدة البيانات")
+                st.error("Login failed")
                 st.exception(e)
 
         else:
 
-            st.error("ادخل البريد وكلمة المرور")
+            st.error("Please enter email and password")
 
     st.stop()
 
@@ -127,12 +145,9 @@ with st.sidebar:
 
     st.divider()
 
-    if st.session_state.company_name:
-        st.write(f"Company: {st.session_state.company_name}")
-    else:
-        st.write("Company: -")
+    st.write(f"Company: {st.session_state.company_name}")
 
-    st.write("Role: admin")
+    st.write(f"Role: {st.session_state.role}")
 
     st.divider()
 
@@ -159,6 +174,7 @@ with st.sidebar:
         st.session_state.company_id = None
         st.session_state.company_name = None
         st.session_state.credits = 0
+        st.session_state.role = None
 
         st.rerun()
 
@@ -172,7 +188,7 @@ st.markdown(
 <div style="text-align:center;padding-top:10px">
 
 <div style="
-font-size:34px;
+font-size:36px;
 font-weight:700;
 color:#1f77b4;
 letter-spacing:1px;
@@ -181,7 +197,7 @@ Quantory
 </div>
 
 <div style="
-font-size:22px;
+font-size:24px;
 color:#00c2ff;
 margin-top:6px;
 font-weight:600;
