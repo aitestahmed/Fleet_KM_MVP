@@ -842,7 +842,72 @@ def run(deduct_credit=None):
     if "report_html" not in st.session_state:
         st.session_state.report_html = None
     
+    # ---------------------------------
+    # زر جودة البيانات
+    # ---------------------------------
     
+    if st.button("🔍 جودة البيانات"):
+    
+        diagnostics = []
+    
+        # سيارات كيلومترات = صفر
+        zero_km = vehicle[vehicle["total_km"] == 0]
+    
+        if not zero_km.empty:
+            diagnostics.append(
+                f"{len(zero_km)} vehicles have zero KM recorded"
+            )
+    
+        # سيارات بدون وقود
+        zero_fuel = vehicle[vehicle["liters"] == 0]
+    
+        if not zero_fuel.empty:
+            diagnostics.append(
+                f"{len(zero_fuel)} vehicles have zero fuel consumption"
+            )
+    
+        # سيارات تعمل بخسارة
+        loss_vehicles = vehicle[vehicle["profit"] < 0]
+    
+        if not loss_vehicles.empty:
+            diagnostics.append(
+                f"{len(loss_vehicles)} vehicles are operating at a loss"
+            )
+    
+        # كفاءة وقود غير منطقية
+        abnormal_eff = vehicle[
+            (vehicle["km_per_liter"] > 25) |
+            (vehicle["km_per_liter"] < 1)
+        ]
+    
+        if not abnormal_eff.empty:
+            diagnostics.append(
+                f"{len(abnormal_eff)} vehicles show abnormal fuel efficiency"
+            )
+    
+        # تكلفة كيلومتر مرتفعة
+        high_cost = vehicle[
+            vehicle["cost_per_km"] > vehicle["cost_per_km"].quantile(0.95)
+        ]
+    
+        if not high_cost.empty:
+            diagnostics.append(
+                f"{len(high_cost)} vehicles have unusually high cost per KM"
+            )
+    
+        # عرض النتائج
+        st.markdown("### 🔍 تقرير جودة البيانات")
+    
+        if diagnostics:
+    
+            st.warning("⚠ تم اكتشاف مشاكل في البيانات")
+    
+            for d in diagnostics:
+                st.write("•", d)
+    
+        else:
+    
+            st.success("✅ جودة البيانات جيدة")
     # ---------------------------------
     # زر تشغيل التحليل
     # ---------------------------------
