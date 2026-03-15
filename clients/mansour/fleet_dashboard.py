@@ -80,6 +80,7 @@ def load_and_standardize(file):
         df = pd.read_csv(file)
     else:
         df = pd.read_excel(file)
+        st.write("Columns detected:", df.columns.tolist())
 
     # تنظيف أسماء الأعمدة
     df.columns = df.columns.astype(str)
@@ -88,23 +89,33 @@ def load_and_standardize(file):
     # توحيد أسماء الأعمدة
     rename_map = {
 
-        "التاريخ": "date",
-        "كود المركبة": "vehicle_id",
-        "رقم اللوحة": "plate_no",
+    # التاريخ
+    "التاريخ": "date",
 
-        "اجمالي الكيلو متر": "total_km",
-        "عدد اللترات": "liters",
+    # المركبة
+    "كود المركبة": "vehicle_id",
+    "رقم اللوحة": "plate_no",
 
-        "أجور": "wages",
-        "حافز يومي": "daily_bonus",
-        "زيت": "oil_cost",
-        "مرور": "traffic_cost",
-        "عام": "general_cost",
-        "قطع غيار وصيانة": "maintenance_cost",
+    # الكيلومترات (العمود الصحيح فقط)
+    "اجمالي الكيلو متر": "total_km",
 
-        "المبلغ": "total_expense",
-        "عدد أيام العمل": "working_days"
-    }
+    # الوقود
+    "عدد اللترات": "liters",
+
+    # المصروف
+    "اجمالي المصروف": "total_expense",
+
+    # أيام العمل
+    "عدد أيام العمل": "working_days",
+
+    # المصروفات التفصيلية
+    "أجور": "wages",
+    "حافز يومي": "daily_bonus",
+    "زيت": "oil_cost",
+    "مرور": "traffic_cost",
+    "عام": "general_cost",
+    "قطع غيار وصيانة": "maintenance_cost"
+}
 
     df = df.rename(columns=rename_map)
 
