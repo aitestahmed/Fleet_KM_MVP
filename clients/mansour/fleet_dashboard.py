@@ -85,25 +85,23 @@ def load_and_standardize(file):
     df.columns = df.columns.astype(str)
     df.columns = df.columns.str.replace("\n", "").str.strip()
 
-df = df.rename(columns=rename_map)
-
     # توحيد أسماء الأعمدة
     rename_map = {
-    
+
         "التاريخ": "date",
         "كود المركبة": "vehicle_id",
         "رقم اللوحة": "plate_no",
-    
+
         "إجمالي الكيلو": "total_km",
         "عدد اللترات": "liters",
-    
+
         "أجور": "wages",
         "حافز يومي": "daily_bonus",
         "زيت": "oil_cost",
         "مرور": "traffic_cost",
         "عام": "general_cost",
         "قطع غيار وصيانة": "maintenance_cost",
-    
+
         "المبلغ": "total_expense",
         "عدد أيام العمل": "working_days"
     }
@@ -124,7 +122,7 @@ df = df.rename(columns=rename_map)
 
     # الأعمدة الرقمية
     numeric_cols = [
-        "trip_km","total_km","liters","liter_price",
+        "total_km","liters",
         "wages","daily_bonus","oil_cost",
         "traffic_cost","general_cost","maintenance_cost",
         "total_expense","working_days"
@@ -171,9 +169,6 @@ df = df.rename(columns=rename_map)
         df["plate_no"] = df["plate_no"].astype(str).str.strip()
 
     return df
-
-
-
     # =========================================
 # 8️⃣ KPI ENGINE
 # =========================================
