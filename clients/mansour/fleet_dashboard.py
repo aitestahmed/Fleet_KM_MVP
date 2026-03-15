@@ -234,20 +234,48 @@ def run(deduct_credit=None):
         # تجميع البيانات لكل مركبة
         # ---------------------------------
     
-        vehicle = (
-            df.groupby("vehicle_id", as_index=False)
-            .agg(
-                total_expense=("total_expense", "sum"),
-                total_km=("total_km", "sum"),
-                total_liters=("liters", "sum"),
-                maintenance_cost=("maintenance_cost", "sum"),
-                oil_cost=("oil_cost", "sum"),
-                traffic_cost=("traffic_cost", "sum"),
-                wages=("wages", "sum"),
-                daily_bonus=("daily_bonus", "sum"),
-                general_cost=("general_cost", "sum"),
-                working_days=("working_days", "sum")
-            )
+        vehicle = df.groupby("vehicle_id").agg(
+
+            total_km=("total_km", "sum"),
+            liters=("liters", "sum"),
+    
+            sales_value=("sales_value", "sum"),
+    
+            wages=("wages", "sum"),
+            daily_bonus=("daily_bonus", "sum"),
+            oil_cost=("oil_cost", "sum"),
+            traffic_cost=("traffic_cost", "sum"),
+            general_cost=("general_cost", "sum"),
+            maintenance_cost=("maintenance_cost", "sum"),
+    
+            total_expense=("total_expense", "sum"),
+    
+            branch_name=("branch_name", "first")
+    
+        ).reset_index()
+
+        # حساب الربح
+        vehicle["profit"] = vehicle["sales_value"] - vehicle["total_expense"]
+
+        # هامش الربح
+        vehicle["profit_margin_pct"] = np.where(
+            vehicle["sales_value"] > 0,
+            vehicle["profit"] / vehicle["sales_value"] * 100,
+            0
+        )
+
+        # البيع لكل كيلومتر
+        vehicle["revenue_per_km"] = np.where(
+            vehicle["total_km"] > 0,
+            vehicle["sales_value"] / vehicle["total_km"],
+            0
+        )
+    
+        # الربح لكل كيلومتر
+        vehicle["profit_per_km"] = np.where(
+            vehicle["total_km"] > 0,
+            vehicle["profit"] / vehicle["total_km"],
+            0
         )
     
         # ---------------------------------
@@ -271,66 +299,147 @@ def run(deduct_credit=None):
             vehicle["total_expense"] / vehicle["working_days"],
             0
         )
+
+        # ---------------------------------
+        # مؤشرات الفروع
+        # ---------------------------------
+        branch_summary = df.groupby("branch_name").agg(
+    
+            total_km=("total_km", "sum"),
+            sales_value=("sales_value", "sum"),
+            total_expense=("total_expense", "sum")
+    
+        ).reset_index()
+    
+        branch_summary["profit"] = branch_summary["sales_value"] - branch_summary["total_expense"]
+    
+        branch_summary["profit_margin_pct"] = np.where(
+            branch_summary["sales_value"] > 0,
+            branch_summary["profit"] / branch_summary["sales_value"] * 100,
+            0
+        )
     
         # ---------------------------------
         # ملخص الأسطول بالكامل
         # ---------------------------------
-    
+
         fleet = {
-    
+
+            "total_sales": float(vehicle["sales_value"].sum()),
+
             "total_expense": float(vehicle["total_expense"].sum()),
+
+            "total_profit": float(vehicle["profit"].sum()),
+
             "total_km": float(vehicle["total_km"].sum()),
-            "total_liters": float(vehicle["total_liters"].sum()),
+
+            "total_liters": float(vehicle["liters"].sum()),
+
             "maintenance_cost": float(vehicle["maintenance_cost"].sum()),
+
             "oil_cost": float(vehicle["oil_cost"].sum()),
+
             "traffic_cost": float(vehicle["traffic_cost"].sum()),
+
             "wages": float(vehicle["wages"].sum()),
+
             "daily_bonus": float(vehicle["daily_bonus"].sum()),
+
             "general_cost": float(vehicle["general_cost"].sum()),
+
             "working_days": float(vehicle["working_days"].sum())
         }
-    
+
         # ---------------------------------
-        # مؤشرات الأسطول
+        # مؤشرات الأسطول التشغيلية
         # ---------------------------------
-    
+
         fleet["fleet_cost_per_km"] = (
             fleet["total_expense"] / fleet["total_km"]
             if fleet["total_km"] > 0 else 0
         )
-    
+
         fleet["fleet_km_per_liter"] = (
             fleet["total_km"] / fleet["total_liters"]
             if fleet["total_liters"] > 0 else 0
         )
-    
+
         fleet["maintenance_ratio_pct"] = (
             fleet["maintenance_cost"] / fleet["total_expense"] * 100
             if fleet["total_expense"] > 0 else 0
         )
-    
+
+        # ---------------------------------
+        # مؤشرات الربحية
+        # ---------------------------------
+
+        fleet["profit_margin_pct"] = (
+            fleet["total_profit"] / fleet["total_sales"] * 100
+            if fleet["total_sales"] > 0 else 0
+        )
+
+        fleet["revenue_per_km"] = (
+            fleet["total_sales"] / fleet["total_km"]
+            if fleet["total_km"] > 0 else 0
+        )
+
+        fleet["profit_per_km"] = (
+            fleet["total_profit"] / fleet["total_km"]
+            if fleet["total_km"] > 0 else 0
+        )
+
         # ---------------------------------
         # تحليل يومي
         # ---------------------------------
-    
+
         daily = (
             df.groupby("date", as_index=False)
             .agg(
+                total_sales=("sales_value", "sum"),
                 total_expense=("total_expense", "sum"),
                 total_km=("total_km", "sum"),
                 total_liters=("liters", "sum")
             )
         )
-    
+
+        daily["profit"] = daily["total_sales"] - daily["total_expense"]
+
         daily["cost_per_km"] = np.where(
             daily["total_km"] > 0,
             daily["total_expense"] / daily["total_km"],
             0
         )
-    
-        return daily, vehicle, fleet
-    
-    
+
+        daily["profit_per_km"] = np.where(
+            daily["total_km"] > 0,
+            daily["profit"] / daily["total_km"],
+            0
+        )
+
+        # ---------------------------------
+        # تحليل الفروع
+        # ---------------------------------
+
+        branch_summary = (
+            df.groupby("branch_name", as_index=False)
+            .agg(
+                total_sales=("sales_value", "sum"),
+                total_expense=("total_expense", "sum"),
+                total_km=("total_km", "sum")
+            )
+        )
+
+        branch_summary["profit"] = (
+            branch_summary["total_sales"] - branch_summary["total_expense"]
+        )
+
+        branch_summary["profit_margin_pct"] = np.where(
+            branch_summary["total_sales"] > 0,
+            branch_summary["profit"] / branch_summary["total_sales"] * 100,
+            0
+        )
+
+        return daily, vehicle, fleet, branch_summary
     
         # =========================================
     # 9️⃣ FILE UPLOAD
