@@ -6,7 +6,6 @@ import streamlit as st
 import importlib
 from supabase import create_client
 
-
 # =========================================
 # PAGE CONFIG
 # =========================================
@@ -16,6 +15,14 @@ st.set_page_config(
     layout="wide"
 )
 
+# =========================================
+# SUPABASE CONNECTION
+# =========================================
+
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =========================================
 # READ URL PARAMS
@@ -24,28 +31,22 @@ st.set_page_config(
 params = st.query_params
 client = params.get("client")
 
-
 # =========================================
 # SESSION STATE
 # =========================================
 
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+defaults = {
+    "logged_in": False,
+    "user_email": None,
+    "credits": 0,
+    "company_id": None,
+    "company_name": None,
+    "role": None
+}
 
-if "user_email" not in st.session_state:
-    st.session_state.user_email = None
-
-if "credits" not in st.session_state:
-    st.session_state.credits = 0
-
-if "company_id" not in st.session_state:
-    st.session_state.company_id = None
-
-if "company_name" not in st.session_state:
-    st.session_state.company_name = None
-
-if "role" not in st.session_state:
-    st.session_state.role = None
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 
 # =========================================
@@ -55,25 +56,15 @@ if "role" not in st.session_state:
 if not st.session_state.logged_in:
 
     st.title("Quantory AI Analytics")
-    st.subheader("Login")
 
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
 
     if st.button("Login"):
 
-        if email and password:
+        if email:
 
             try:
-
-                SUPABASE_URL = st.secrets["SUPABASE_URL"]
-                SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-
-                supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-                # =========================================
-                # GET USER PROFILE
-                # =========================================
 
                 profile = supabase.table("profiles") \
                     .select("company_id,role") \
@@ -83,10 +74,6 @@ if not st.session_state.logged_in:
 
                 company_id = profile.data["company_id"]
                 role = profile.data["role"]
-
-                # =========================================
-                # GET COMPANY DATA
-                # =========================================
 
                 company = supabase.table("Companies") \
                     .select("id,name,credits") \
@@ -98,23 +85,16 @@ if not st.session_state.logged_in:
                 st.session_state.company_name = company.data["name"]
                 st.session_state.credits = float(company.data["credits"])
                 st.session_state.role = role
-
-                st.session_state.logged_in = True
                 st.session_state.user_email = email
+                st.session_state.logged_in = True
 
                 st.rerun()
 
-            except Exception as e:
+            except:
 
-                st.error("Login failed")
-                st.exception(e)
-
-        else:
-
-            st.error("Please enter email and password")
+                st.error("Login Failed")
 
     st.stop()
-
 
 # =========================================
 # CLIENT CHECK
@@ -122,11 +102,9 @@ if not st.session_state.logged_in:
 
 if not client:
 
-    st.warning("يجب تحديد العميل في الرابط")
+    st.warning("حدد العميل في الرابط")
 
-    st.code(
-        "https://fleetkmmvp-5nekmubayo3xclgn7ceevk.streamlit.app/?client=mansour"
-    )
+    st.code("?client=mansour")
 
     st.stop()
 
@@ -137,23 +115,19 @@ if not client:
 
 with st.sidebar:
 
-    st.image("LOGO.png", use_container_width=True)
-
-    st.markdown("---")
+    st.image("LOGO.png")
 
     st.success(f"Logged in: {st.session_state.user_email}")
 
-    st.divider()
-
     st.write(f"Company: {st.session_state.company_name}")
-
     st.write(f"Role: {st.session_state.role}")
 
     st.divider()
 
-    st.write("Credits")
+    st.markdown("### Credits")
 
-    st.write(f"{st.session_state.credits:.2f} جنيه")
+    credit_box = st.empty()
+    credit_box.write(f"{st.session_state.credits:.2f} جنيه")
 
     st.divider()
 
@@ -169,65 +143,62 @@ with st.sidebar:
 
     if st.button("Logout"):
 
-        st.session_state.logged_in = False
-        st.session_state.user_email = None
-        st.session_state.company_id = None
-        st.session_state.company_name = None
-        st.session_state.credits = 0
-        st.session_state.role = None
+        for k in defaults.keys():
+            st.session_state[k] = defaults[k]
 
         st.rerun()
 
-
 # =========================================
-# HEADER (Brand + Slogan)
+# HEADER
 # =========================================
 
 st.markdown(
 """
-<div style="text-align:center;padding-top:10px">
+<div style="text-align:center">
 
-<div style="
-font-size:36px;
-font-weight:700;
-color:#1f77b4;
-letter-spacing:1px;
-">
-Quantory
-</div>
+<h1 style="color:#1f77b4;">Quantory</h1>
 
-<div style="
-font-size:24px;
-color:#00c2ff;
-margin-top:6px;
-font-weight:600;
-">
+<div style="font-size:22px;color:#00c2ff">
 Data That Speaks
 </div>
 
-<div style="
-font-size:18px;
-color:gray;
-margin-top:4px;
-">
+<div style="font-size:18px;color:gray">
 حيث تتحدث البيانات
 </div>
 
-<hr style="margin-top:20px;margin-bottom:30px">
+<hr>
 
 </div>
 """,
 unsafe_allow_html=True
 )
 
-
-# =========================================
-# MAIN PAGE
-# =========================================
-
 st.title("AI Analytics Platform")
 
 st.subheader(f"Client: {client}")
+
+# =========================================
+# CREDIT FUNCTION
+# =========================================
+
+def deduct_credit(cost):
+
+    new_credit = st.session_state.credits - cost
+
+    if new_credit < 0:
+
+        st.error("رصيدك لا يكفي لتشغيل التحليل")
+
+        return False
+
+    supabase.table("Companies") \
+        .update({"credits": new_credit}) \
+        .eq("id", st.session_state.company_id) \
+        .execute()
+
+    st.session_state.credits = new_credit
+
+    return True
 
 
 # =========================================
@@ -242,18 +213,19 @@ try:
             f"clients.{client}.sales_dashboard"
         )
 
-        module.run()
+        module.run(deduct_credit)
 
 
-    elif page == "🚚 Fleet Dashboard":
+    if page == "🚚 Fleet Dashboard":
 
         module = importlib.import_module(
             f"clients.{client}.fleet_dashboard"
         )
 
-        module.run()
+        module.run(deduct_credit)
 
 except Exception as e:
 
-    st.error("حدث خطأ أثناء تشغيل الداشبورد")
+    st.error("Dashboard Error")
+
     st.exception(e)
