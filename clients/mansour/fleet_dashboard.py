@@ -247,6 +247,8 @@ def run(deduct_credit=None):
             traffic_cost=("traffic_cost", "sum"),
             general_cost=("general_cost", "sum"),
             maintenance_cost=("maintenance_cost", "sum"),
+            
+            working_days=("working_days", "sum"),
     
             total_expense=("total_expense", "sum"),
     
