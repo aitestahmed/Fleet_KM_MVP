@@ -836,7 +836,7 @@ def run(deduct_credit=None):
     
             result = (
                 vehicle.sort_values("km_per_liter", ascending=False)
-                [["vehicle_id","total_km","liters","km_per_liter"]]
+                [["vehicle_id","total_km","liters","fuel_cost","km_per_liter"]]
                 .head(5)
             )
     
@@ -844,13 +844,13 @@ def run(deduct_credit=None):
                 "vehicle_id": "السيارة",
                 "total_km": "إجمالي الكيلومترات",
                 "liters": "إجمالي اللترات",
+                "fuel_cost": "تكلفة الوقود",
                 "km_per_liter": "كم/لتر"
             })
     
             result = format_numbers(result)
     
             st.dataframe(result, use_container_width=True)
-        
     
     # توزيع المصروفات
     with col3:
