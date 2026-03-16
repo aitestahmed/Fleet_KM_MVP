@@ -117,6 +117,8 @@ def run(deduct_credit=None):
             "liters": "liters",
 
             # البيع / الإيراد
+            "بيع شهر 1": "sales_value",
+            "مبيعات شهر 1": "sales_value",
             "قيمة المبيع": "sales_value",
             "قيمة البيع": "sales_value",
             "المبيع": "sales_value",
@@ -125,8 +127,7 @@ def run(deduct_credit=None):
             "الإيراد": "sales_value",
             "sales": "sales_value",
             "sales_value": "sales_value",
-            "revenue": "sales_value",
-            "المبلغ": "sales_value",
+            "revenue": "sales_value
 
             # المصروف
             "اجمالي المصروف": "total_expense",
@@ -150,6 +151,9 @@ def run(deduct_credit=None):
         
     
         df = df.rename(columns=rename_map)
+        if "sales_value" in df.columns:
+            st.write("✅ مصدر المبيعات المستخدم:", "sales_value")
+            st.write("إجمالي sales_value بعد التوحيد:", df["sales_value"].sum())
     
         # التأكد من الأعمدة الأساسية
         required = ["date", "vehicle_id"]
