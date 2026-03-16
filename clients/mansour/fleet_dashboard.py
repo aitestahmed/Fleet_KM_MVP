@@ -778,7 +778,7 @@ def run(deduct_credit=None):
     st.divider()
     st.markdown("## 🤖 تحليلات سريعة للأسطول")
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     
     # أعلى تكلفة كيلومتر
@@ -826,6 +826,21 @@ def run(deduct_credit=None):
                 vehicle.sort_values("total_expense", ascending=False)
                 [["vehicle_id","total_expense","cost_per_km"]]
                 .head(5)
+            )
+    
+            st.dataframe(result, use_container_width=True)
+    # ---------------------------------
+    # تحليل الفروع
+    # ---------------------------------
+    
+    with col5:
+    
+        if st.button("🏢 تحليل الفروع"):
+    
+            result = (
+                branch_summary
+                .sort_values("profit", ascending=False)
+                [["branch_name","total_sales","total_expense","profit","profit_margin_pct"]]
             )
     
             st.dataframe(result, use_container_width=True)
