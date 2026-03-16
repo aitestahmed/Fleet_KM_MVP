@@ -474,8 +474,7 @@ def run(deduct_credit=None):
     
     
     
-        st.write("Preview:")
-        st.dataframe(df.head())
+        
     
     except Exception as e:
     
@@ -1269,7 +1268,7 @@ def run(deduct_credit=None):
     
     
     # =========================================
-    # 17️⃣ DATA PREVIEW
+    # 17️⃣ DATA 
     # =========================================
     
     st.divider()
@@ -1279,7 +1278,7 @@ def run(deduct_credit=None):
         unsafe_allow_html=True
     )
     
-    df_preview = df_f.rename(columns={
+    df_ = df_f.rename(columns={
         "vehicle_id": "رقم السيارة",
         "date": "التاريخ",
         "location": "الموقع",
@@ -1294,7 +1293,7 @@ def run(deduct_credit=None):
         "general_cost": "مصروفات عامة"
     })
     
-    df_preview = df_preview[df_preview.columns[::-1]]
+    df_ = df_[df_preview.columns[::-1]]
     
     st.data_editor(df_preview.head(50), use_container_width=True)
     
