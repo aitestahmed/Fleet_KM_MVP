@@ -810,47 +810,47 @@ def run(deduct_credit=None):
     
     with col1:
 
-    if st.button("🔴 أعلى تكلفة لكل كيلومتر"):
-
-        result = (
-            vehicle.sort_values("cost_per_km", ascending=False)
-            [["vehicle_id","total_expense","total_km","cost_per_km"]]
-            .head(5)
-        )
-
-        result = result.rename(columns={
-            "vehicle_id": "السيارة",
-            "total_expense": "إجمالي المصروف",
-            "total_km": "إجمالي الكيلومترات",
-            "cost_per_km": "تكلفة الكيلومتر"
-        })
-
-        result = format_numbers(result)
-
-        st.dataframe(result, use_container_width=True)
+        if st.button("🔴 أعلى تكلفة لكل كيلومتر"):
+    
+            result = (
+                vehicle.sort_values("cost_per_km", ascending=False)
+                [["vehicle_id","total_expense","total_km","cost_per_km"]]
+                .head(5)
+            )
+    
+            result = result.rename(columns={
+                "vehicle_id": "السيارة",
+                "total_expense": "إجمالي المصروف",
+                "total_km": "إجمالي الكيلومترات",
+                "cost_per_km": "تكلفة الكيلومتر"
+            })
+    
+            result = format_numbers(result)
+    
+            st.dataframe(result, use_container_width=True)
     
     
     with col2:
 
-    if st.button("🟢 أفضل كفاءة وقود"):
-
-        result = (
-            vehicle.sort_values("km_per_liter", ascending=False)
-            [["vehicle_id","total_km","liters","km_per_liter"]]
-            .head(5)
-        )
-
-        result = result.rename(columns={
-            "vehicle_id": "السيارة",
-            "total_km": "إجمالي الكيلومترات",
-            "liters": "إجمالي اللترات",
-            "km_per_liter": "كم/لتر"
-        })
-
-        result = format_numbers(result)
-
-        st.dataframe(result, use_container_width=True)
+        if st.button("🟢 أفضل كفاءة وقود"):
     
+            result = (
+                vehicle.sort_values("km_per_liter", ascending=False)
+                [["vehicle_id","total_km","liters","km_per_liter"]]
+                .head(5)
+            )
+    
+            result = result.rename(columns={
+                "vehicle_id": "السيارة",
+                "total_km": "إجمالي الكيلومترات",
+                "liters": "إجمالي اللترات",
+                "km_per_liter": "كم/لتر"
+            })
+    
+            result = format_numbers(result)
+    
+            st.dataframe(result, use_container_width=True)
+        
     
     # توزيع المصروفات
     with col3:
@@ -864,48 +864,48 @@ def run(deduct_credit=None):
     
     with col4:
 
-    if st.button("⚠ أعلى مصروف إجمالي"):
-
-        result = (
-            vehicle.sort_values("total_expense", ascending=False)
-            [["vehicle_id","total_expense","cost_per_km"]]
-            .head(5)
-        )
-
-        result = result.rename(columns={
-            "vehicle_id": "السيارة",
-            "total_expense": "إجمالي المصروف",
-            "cost_per_km": "تكلفة الكيلومتر"
-        })
-
-        result = format_numbers(result)
-
-        st.dataframe(result, use_container_width=True)
-    # ---------------------------------
-    # تحليل الفروع
-    # ---------------------------------
+        if st.button("⚠ أعلى مصروف إجمالي"):
+    
+            result = (
+                vehicle.sort_values("total_expense", ascending=False)
+                [["vehicle_id","total_expense","cost_per_km"]]
+                .head(5)
+            )
+    
+            result = result.rename(columns={
+                "vehicle_id": "السيارة",
+                "total_expense": "إجمالي المصروف",
+                "cost_per_km": "تكلفة الكيلومتر"
+            })
+    
+            result = format_numbers(result)
+    
+            st.dataframe(result, use_container_width=True)
+        # ---------------------------------
+        # تحليل الفروع
+        # ---------------------------------
     
     with col5:
 
-    if st.button("🏢 تحليل الفروع"):
-
-        result = (
-            branch_summary
-            .sort_values("profit", ascending=False)
-            [["branch_name","total_sales","total_expense","profit","profit_margin_pct"]]
-        )
-
-        result = result.rename(columns={
-            "branch_name": "الفرع",
-            "total_sales": "إجمالي المبيعات",
-            "total_expense": "إجمالي المصروف",
-            "profit": "الربح",
-            "profit_margin_pct": "هامش الربح %"
-        })
-
-        result = format_numbers(result)
-
-        st.dataframe(result, use_container_width=True)    
+        if st.button("🏢 تحليل الفروع"):
+    
+            result = (
+                branch_summary
+                .sort_values("profit", ascending=False)
+                [["branch_name","total_sales","total_expense","profit","profit_margin_pct"]]
+            )
+    
+            result = result.rename(columns={
+                "branch_name": "الفرع",
+                "total_sales": "إجمالي المبيعات",
+                "total_expense": "إجمالي المصروف",
+                "profit": "الربح",
+                "profit_margin_pct": "هامش الربح %"
+            })
+    
+            result = format_numbers(result)
+    
+            st.dataframe(result, use_container_width=True)    
     
     
     # =========================================
