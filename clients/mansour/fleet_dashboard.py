@@ -983,6 +983,7 @@ def run(deduct_credit=None):
         
         اكتب التقرير بأسلوب احترافي مختصر وموجه للإدارة التنفيذية.
         """
+        
     
     
         # ---------------------------------
@@ -1416,3 +1417,70 @@ def run(deduct_credit=None):
             except Exception:
     
                 st.error("لم يتمكن النظام من تحليل السؤال.")
+
+    # =========================================
+    # AI QUESTION ENGINE
+    # =========================================
+    
+    st.markdown("---")
+    st.markdown("## 💬 اسأل عن بيانات الأسطول")
+    
+    question = st.text_input("اكتب سؤال عن البيانات")
+    
+    if st.button("اسأل AI") and question:
+    
+        # تجهيز ملخص البيانات
+    
+        summary = f"""
+    Fleet Data Summary
+    
+    Total Vehicles: {vehicle['vehicle_id'].nunique()}
+    
+    Total Sales: {vehicle['sales_value'].sum()}
+    
+    Total Expense: {vehicle['total_expense'].sum()}
+    
+    Total KM: {vehicle['total_km'].sum()}
+    
+    Average Cost per KM: {vehicle['cost_per_km'].mean()}
+    
+    Top Branch by Profit:
+    {branch_summary.sort_values('profit', ascending=False).head(3)}
+    
+    Top Loss Vehicles:
+    {vehicle.sort_values('profit').head(3)}
+    
+    Top Profitable Vehicles:
+    {vehicle.sort_values('profit', ascending=False).head(3)}
+    """
+    
+        prompt = f"""
+    أنت خبير تحليل تشغيل الأساطيل.
+    
+    قم بالإجابة على سؤال المستخدم اعتمادًا على البيانات التالية.
+    
+    السؤال:
+    {question}
+    
+    البيانات:
+    {summary}
+    
+    أجب بشكل واضح ومختصر باللغة العربية.
+    """
+    
+        with st.spinner("AI يفكر..."):
+    
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "أنت خبير تحليل بيانات تشغيلية."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=300
+            )
+    
+        answer = response.choices[0].message.content
+    
+        st.markdown("### 🤖 إجابة AI")
+    
+        st.write(answer)
