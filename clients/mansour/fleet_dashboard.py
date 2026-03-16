@@ -1295,7 +1295,7 @@ def run(deduct_credit=None):
     
     df_ = df_[df_preview.columns[::-1]]
     
-    st.data_editor(df_preview.head(50), use_container_width=True)
+    
     
     
     # =========================================
