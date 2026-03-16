@@ -1293,8 +1293,7 @@ def run(deduct_credit=None):
         "general_cost": "مصروفات عامة"
     })
     
-    df_ = df_[df_preview.columns[::-1]]
-    
+   
     
     
     
