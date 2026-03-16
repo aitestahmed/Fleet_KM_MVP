@@ -236,29 +236,34 @@ def run(deduct_credit=None):
     # 8️⃣ KPI ENGINE
     # =========================================
     
-    vehicle = df.groupby("vehicle_id").agg(
-
-        total_km=("total_km", "sum"),
-        liters=("liters", "sum"),
+    # =========================================
+    # 8️⃣ KPI ENGINE
+    # =========================================
     
-        fuel_cost=("fuel_cost","sum"),   # أضف هذا السطر
+    def compute_kpis(df):
     
-        sales_value=("sales_value", "sum"),
+        vehicle = df.groupby("vehicle_id").agg(
     
-        wages=("wages", "sum"),
-        daily_bonus=("daily_bonus", "sum"),
-        oil_cost=("oil_cost", "sum"),
-        traffic_cost=("traffic_cost", "sum"),
-        general_cost=("general_cost", "sum"),
-        maintenance_cost=("maintenance_cost", "sum"),
+            total_km=("total_km", "sum"),
+            liters=("liters", "sum"),
+            fuel_cost=("fuel_cost","sum"),
     
-        working_days=("working_days", "sum"),
+            sales_value=("sales_value", "sum"),
     
-        total_expense=("total_expense", "sum"),
+            wages=("wages", "sum"),
+            daily_bonus=("daily_bonus", "sum"),
+            oil_cost=("oil_cost", "sum"),
+            traffic_cost=("traffic_cost", "sum"),
+            general_cost=("general_cost", "sum"),
+            maintenance_cost=("maintenance_cost", "sum"),
     
-        branch_name=("branch_name", "first")
+            working_days=("working_days", "sum"),
     
-    ).reset_index()
+            total_expense=("total_expense", "sum"),
+    
+            branch_name=("branch_name", "first")
+    
+        ).reset_index()
         # حساب الربح
         vehicle["profit"] = vehicle["sales_value"] - vehicle["total_expense"]
 
