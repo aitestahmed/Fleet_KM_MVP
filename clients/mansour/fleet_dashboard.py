@@ -115,6 +115,8 @@ def run(deduct_credit=None):
             "عدد اللترات": "liters",
             "لترات": "liters",
             "liters": "liters",
+            
+            "المبلغ": "fuel_cost",
 
             # البيع / الإيراد
             "بيع شهر 1": "sales_value",
@@ -127,7 +129,7 @@ def run(deduct_credit=None):
             "الإيراد": "sales_value",
             "sales": "sales_value",
             "sales_value": "sales_value",
-            "revenue": "sales_value
+            "revenue": "sales_value",
 
             # المصروف
             "اجمالي المصروف": "total_expense",
@@ -179,6 +181,7 @@ def run(deduct_credit=None):
             "general_cost",
             "maintenance_cost",
             "total_expense",
+            "fuel_cost",
             "working_days"
         ]
     
@@ -208,6 +211,7 @@ def run(deduct_credit=None):
             "wages": 0,
             "daily_bonus": 0,
             "general_cost": 0,
+            "fuel_cost": 0,
             "working_days": 0
         }
     
