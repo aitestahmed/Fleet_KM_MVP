@@ -835,29 +835,29 @@ def run(deduct_credit=None):
     
     with col5:
 
-    if st.button("🏢 تحليل الفروع"):
-
-        result = (
-            branch_summary
-            .sort_values("profit", ascending=False)
-            [["branch_name","total_sales","total_expense","profit","profit_margin_pct"]]
-        )
-
-        result = result.rename(columns={
-            "branch_name": "الفرع",
-            "total_sales": "إجمالي المبيعات",
-            "total_expense": "إجمالي المصروف",
-            "profit": "الربح",
-            "profit_margin_pct": "هامش الربح %"
-        })
-
-        # تنسيق الأرقام
-        result["إجمالي المبيعات"] = result["إجمالي المبيعات"].map("{:,.0f}".format)
-        result["إجمالي المصروف"] = result["إجمالي المصروف"].map("{:,.0f}".format)
-        result["الربح"] = result["الربح"].map("{:,.0f}".format)
-        result["هامش الربح %"] = result["هامش الربح %"].map("{:,.2f}".format)
-
-        st.dataframe(result, use_container_width=True)
+        if st.button("🏢 تحليل الفروع"):
+    
+            result = (
+                branch_summary
+                .sort_values("profit", ascending=False)
+                [["branch_name","total_sales","total_expense","profit","profit_margin_pct"]]
+            )
+    
+            result = result.rename(columns={
+                "branch_name": "الفرع",
+                "total_sales": "إجمالي المبيعات",
+                "total_expense": "إجمالي المصروف",
+                "profit": "الربح",
+                "profit_margin_pct": "هامش الربح %"
+            })
+    
+            # تنسيق الأرقام
+            result["إجمالي المبيعات"] = result["إجمالي المبيعات"].map("{:,.0f}".format)
+            result["إجمالي المصروف"] = result["إجمالي المصروف"].map("{:,.0f}".format)
+            result["الربح"] = result["الربح"].map("{:,.0f}".format)
+            result["هامش الربح %"] = result["هامش الربح %"].map("{:,.2f}".format)
+    
+            st.dataframe(result, use_container_width=True)
     
     
     
