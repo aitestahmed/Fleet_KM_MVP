@@ -717,7 +717,7 @@ def run(deduct_credit=None):
     
     with col1:
     
-        st.markdown("### 🏆 Most Profitable Vehicles")
+        st.markdown("### 🏆 أكثر المركبات ربحًا")
     
         if not top_profit.empty:
     
@@ -736,7 +736,7 @@ def run(deduct_credit=None):
     
     with col2:
     
-        st.markdown("### ⚠ Loss Making Vehicles")
+        st.markdown("### ⚠ المركبات الخاسرة")
     
         if loss_vehicles.empty:
     
@@ -764,7 +764,7 @@ def run(deduct_credit=None):
     
     with col3:
     
-        st.markdown("### 🏢 Top Branch Profitability")
+        st.markdown("### 🏢 أكثر الفروع ربحية")
     
         for _, row in best_branch.iterrows():
     
@@ -776,7 +776,7 @@ def run(deduct_credit=None):
     # =========================================
     
     st.divider()
-    st.markdown("## 🤖 Fleet Quick Insights")
+    st.markdown("## 🤖 تحليلات سريعة للأسطول")
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -784,7 +784,7 @@ def run(deduct_credit=None):
     # أعلى تكلفة كيلومتر
     with col1:
     
-        if st.button("🔴 Highest Cost per KM"):
+        if st.button("🔴 أعلى تكلفة لكل كيلومتر"):
     
             result = (
                 vehicle.sort_values("cost_per_km", ascending=False)
@@ -798,7 +798,7 @@ def run(deduct_credit=None):
     # أفضل كفاءة وقود
     with col2:
     
-        if st.button("🟢 Best Fuel Efficiency"):
+        if st.button("🟢 أفضل كفاءة وقود"):
     
             result = (
                 vehicle.sort_values("km_per_liter", ascending=False)
@@ -812,7 +812,7 @@ def run(deduct_credit=None):
     # توزيع المصروفات
     with col3:
     
-        if st.button("🟣 Expense Breakdown"):
+        if st.button("🟣 توزيع المصروفات"):
     
             st.dataframe(cost_breakdown, use_container_width=True)
     
@@ -820,7 +820,7 @@ def run(deduct_credit=None):
     # أعلى مصروف إجمالي
     with col4:
     
-        if st.button("⚠ Highest Total Expense"):
+        if st.button("⚠ أعلى مصروف إجمالي"):
     
             result = (
                 vehicle.sort_values("total_expense", ascending=False)
@@ -906,7 +906,7 @@ def run(deduct_credit=None):
     # زر تشغيل التحليل
     # ---------------------------------
     
-    if st.button("Generate AI Insight"):
+    if st.button("🤖 إنشاء تحليل بالذكاء الاصطناعي"):
     
         # التحقق من الرصيد
         if st.session_state.credits <= 0:
