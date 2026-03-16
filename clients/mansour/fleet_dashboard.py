@@ -456,19 +456,19 @@ def run(deduct_credit=None):
     # =========================================
     def format_numbers(df):
 
-    for col in df.columns:
-
-        if df[col].dtype in ["float64", "int64"]:
-
-            # نسب مئوية
-            if "pct" in col.lower() or "%" in col:
-                df[col] = df[col].map(lambda x: f"{x:,.2f}")
-
-            # أرقام عادية
-            else:
-                df[col] = df[col].map(lambda x: f"{x:,.0f}")
-
-    return df
+        for col in df.columns:
+    
+            if df[col].dtype in ["float64", "int64"]:
+    
+                # نسب مئوية
+                if "pct" in col.lower() or "%" in col:
+                    df[col] = df[col].map(lambda x: f"{x:,.2f}")
+    
+                # أرقام عادية
+                else:
+                    df[col] = df[col].map(lambda x: f"{x:,.0f}")
+    
+        return df
     
     # =========================================
     # 9️⃣ FILE UPLOAD
