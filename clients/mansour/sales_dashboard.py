@@ -910,6 +910,17 @@ def run():
     
         st.markdown("## 📑 AI Sales Executive Report")
     
+        import re
+
+        def format_numbers(text):
+            def repl(match):
+                num = float(match.group())
+                return f"<b>{num:,.0f}</b>"
+            
+            return re.sub(r'\b\d+(?:\.\d+)?\b', repl, text)
+        
+        formatted_report = format_numbers(st.session_state.report_html)
+        
         st.markdown(
             f"""
             <div style="
@@ -920,7 +931,7 @@ def run():
                 line-height:1.8;
                 font-size:16px;
             ">
-            {st.session_state.report_html}
+            {formatted_report}
             </div>
             """,
             unsafe_allow_html=True
