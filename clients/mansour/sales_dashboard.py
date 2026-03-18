@@ -778,7 +778,7 @@ def run():
                             "content": prompt
                         }
                     ],
-                    max_tokens=500
+                    max_tokens=1000
                 )
     
                 report = response.choices[0].message.content
