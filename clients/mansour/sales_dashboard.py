@@ -663,7 +663,41 @@ def run():
         0
     )
     
-    
+    # =========================================
+    # Branch Performance (Customers & Sales)
+    # =========================================
+
+    st.divider()
+    st.markdown("## 🏬 أداء الفروع والعملاء")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### 💰 مبيعات الفروع")
+        fig_branch_sales = px.bar(
+            branch_customer_kpis,
+            x="branch_name",
+            y="total_sales",
+            title="إجمالي المبيعات لكل فرع"
+        )
+        st.plotly_chart(fig_branch_sales, use_container_width=True)
+
+    with col2:
+        st.markdown("### 👥 عدد العملاء المخدومين")
+        fig_branch_customers = px.bar(
+            branch_customer_kpis,
+            x="branch_name",
+            y="total_customers_served",
+            title="عدد العملاء لكل فرع"
+        )
+        st.plotly_chart(fig_branch_customers, use_container_width=True)
+
+    st.markdown("### 📊 جدول أداء الفروع")
+
+    st.dataframe(
+        branch_customer_kpis.sort_values("total_sales", ascending=False),
+        use_container_width=True
+    )
     # =========================================
     # Brand Sales
     # =========================================
