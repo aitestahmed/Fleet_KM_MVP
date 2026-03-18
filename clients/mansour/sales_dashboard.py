@@ -730,7 +730,6 @@ def run():
         branch_display.sort_values("إجمالي المبيعات", ascending=False),
         use_container_width=True
     )
-    )
     # =========================================
     # Brand Sales
     # =========================================
