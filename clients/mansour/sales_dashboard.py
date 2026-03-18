@@ -680,6 +680,11 @@ def run():
             y="total_sales",
             title="إجمالي المبيعات لكل فرع"
         )
+        fig_branch_sales.update_traces(
+            text=branch_customer_kpis["total_sales"],
+            texttemplate='%{text:,.0f}',
+            textposition='outside'
+        )
         st.plotly_chart(fig_branch_sales, use_container_width=True)
 
     with col2:
@@ -689,6 +694,11 @@ def run():
             x="branch_name",
             y="total_customers_served",
             title="عدد العملاء لكل فرع"
+        )
+        fig_branch_customers.update_traces(
+            text=branch_customer_kpis["total_customers_served"],
+            texttemplate='%{text:,.0f}',
+            textposition='outside'
         )
         st.plotly_chart(fig_branch_customers, use_container_width=True)
 
