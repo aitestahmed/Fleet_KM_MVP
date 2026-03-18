@@ -607,6 +607,61 @@ def run():
     # =========================================
     
     daily, branch, brand, governorate, sales = compute_kpis(df_f)
+    # =========================================
+    # Branch-Customer KPIs
+    # =========================================
+
+    branch_customer_kpis = (
+        df_f.groupby("branch_name", as_index=False)
+            .agg(
+                total_sales=("total_amount", "sum"),
+                total_customers_served=("customer_id", "nunique"),
+                total_invoices=("order_id", "nunique"),
+                total_quantity=("quantity", "sum")
+            )
+            .sort_values("total_sales", ascending=False)
+    )
+
+    branch_customer_kpis["avg_sales_per_customer"] = np.where(
+        branch_customer_kpis["total_customers_served"] > 0,
+        branch_customer_kpis["total_sales"] / branch_customer_kpis["total_customers_served"],
+        0
+    )
+
+    branch_customer_kpis["avg_invoice_value"] = np.where(
+        branch_customer_kpis["total_invoices"] > 0,
+        branch_customer_kpis["total_sales"] / branch_customer_kpis["total_invoices"],
+        0
+    )
+
+
+    # =========================================
+    # Customer KPIs
+    # =========================================
+
+    customer_kpis = (
+        df_f.groupby(["branch_name", "customer_id", "customer_name"], as_index=False)
+            .agg(
+                total_sales=("total_amount", "sum"),
+                total_invoices=("order_id", "nunique"),
+                total_quantity=("quantity", "sum"),
+                total_discount=("total_discount", "sum"),
+                active_days=("date", "nunique")
+            )
+            .sort_values("total_sales", ascending=False)
+    )
+
+    customer_kpis["avg_invoice_value"] = np.where(
+        customer_kpis["total_invoices"] > 0,
+        customer_kpis["total_sales"] / customer_kpis["total_invoices"],
+        0
+    )
+
+    customer_kpis["discount_ratio_pct"] = np.where(
+        customer_kpis["total_sales"] > 0,
+        customer_kpis["total_discount"] / customer_kpis["total_sales"] * 100,
+        0
+    )
     
     
     # =========================================
