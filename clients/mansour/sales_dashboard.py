@@ -694,9 +694,42 @@ def run():
 
     st.markdown("### 📊 جدول أداء الفروع")
 
+    # =========================================
+    # Arabic Formatting for Display
+    # =========================================
+
+    branch_display = branch_customer_kpis.copy()
+
+    # إعادة تسمية الأعمدة بالعربي
+    branch_display = branch_display.rename(columns={
+        "branch_name": "الفرع",
+        "total_sales": "إجمالي المبيعات",
+        "total_customers_served": "عدد العملاء",
+        "total_invoices": "عدد الفواتير",
+        "total_quantity": "إجمالي الكمية",
+        "avg_sales_per_customer": "متوسط مبيعات العميل",
+        "avg_invoice_value": "متوسط قيمة الفاتورة"
+    })
+
+    # تنسيق الأرقام
+    numeric_cols = [
+        "إجمالي المبيعات",
+        "إجمالي الكمية",
+        "متوسط مبيعات العميل",
+        "متوسط قيمة الفاتورة"
+    ]
+
+    for col in numeric_cols:
+        if col in branch_display.columns:
+            branch_display[col] = branch_display[col].apply(
+                lambda x: f"{x:,.0f}" if pd.notnull(x) else ""
+            )
+
+    # عرض الجدول
     st.dataframe(
-        branch_customer_kpis.sort_values("total_sales", ascending=False),
+        branch_display.sort_values("إجمالي المبيعات", ascending=False),
         use_container_width=True
+    )
     )
     # =========================================
     # Brand Sales
