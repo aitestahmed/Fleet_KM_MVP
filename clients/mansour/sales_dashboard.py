@@ -926,7 +926,7 @@ def run():
             """,
             unsafe_allow_html=True
         )
-                report = response.choices[0].message.content
+                
     # =========================================
     # Branch-Customer KPIs
     # =========================================
