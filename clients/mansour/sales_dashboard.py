@@ -610,6 +610,7 @@ def run():
 
     # =========================================
     # =========================================
+    # =========================================
     # 14️⃣ AI ENGINE
     # =========================================
     
@@ -700,6 +701,24 @@ def run():
                     .sort_values("total_sales", ascending=False).head(10)
     
                 # ---------------------------------
+                # Discount Analysis
+                # ---------------------------------
+    
+                branch_discount = df_f.groupby("branch_name", as_index=False).agg(
+                    total_sales=("total_amount", "sum"),
+                    total_discount=("total_discount", "sum"),
+                    discount_customers=("customer_id", lambda x: x[df_f.loc[x.index, "total_discount"] > 0].nunique())
+                )
+    
+                branch_discount["discount_ratio_pct"] = np.where(
+                    branch_discount["total_sales"] > 0,
+                    branch_discount["total_discount"] / branch_discount["total_sales"] * 100,
+                    0
+                )
+    
+                branch_discount = branch_discount.sort_values("discount_ratio_pct", ascending=False).head(5)
+    
+                # ---------------------------------
                 # تحويل النص
                 # ---------------------------------
     
@@ -712,6 +731,7 @@ def run():
                 branch_customer_text = branch_customer.to_string(index=False)
                 sales_rep_invoice_text = sales_rep_invoices.to_string(index=False)
                 top_customers_text = top_customers.to_string(index=False)
+                branch_discount_text = branch_discount.to_string(index=False)
     
                 summary = f"""
     Total Sales: {total_sales}
@@ -731,15 +751,16 @@ def run():
                 # ---------------------------------
     
                 prompt = f"""
-    قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي احترافي.
+    قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي احترافي يعتمد على الأرقام.
     
-    📊 ملخص:
+    ==============================
+    📊 الملخص:
     {summary}
     
-    🏢 أعلى الفروع:
+    🏢 الفروع الأعلى:
     {branch_top_text}
     
-    🏢 أقل الفروع:
+    🏢 الفروع الأقل:
     {branch_bottom_text}
     
     🏷 البراندات:
@@ -751,6 +772,7 @@ def run():
     📦 المنتجات:
     {product_top_text}
     
+    ==============================
     👥 العملاء لكل فرع:
     {branch_customer_text}
     
@@ -760,22 +782,42 @@ def run():
     ⭐ كبار العملاء:
     {top_customers_text}
     
-    ---------------------------------
+    💸 الخصومات لكل فرع:
+    {branch_discount_text}
     
-    المطلوب:
+    ==============================
+    
+    ⚠️ تحليل إجباري:
+    
+    - تحليل العملاء داخل كل فرع
+    - تحليل تأثير الخصومات على الأداء
+    - تحليل العلاقة بين العملاء والخصومات
+    - تحديد الفروع التي تعتمد على الخصومات
+    - تحديد الفروع التي تعتمد على عدد قليل من العملاء
+    
+    ==============================
+    
+    🎯 المطلوب:
     
     1. تحليل الأداء العام
-    2. مقارنة الفروع (مبيعات + عملاء)
-    3. تحليل العملاء داخل الفروع
+    2. مقارنة الفروع (مبيعات + عملاء + خصومات)
+    3. تحليل العملاء (إجباري)
     4. تحليل المندوبين (فواتير + أداء)
-    5. تحليل تركّز العملاء
-    6. تحليل الخصومات
-    7. تحديد المخاطر
-    8. فرص التحسين
-    9. توصيات واضحة للإدارة
+    5. تحليل الخصومات وتأثيرها
+    6. تحديد المخاطر
+    7. تحديد الفرص
+    8. توصيات تنفيذية واضحة
     
-    ⚠️ استخدم أرقام حقيقية واذكر أسماء الفروع والعملاء.
-    اكتب بأسلوب إداري احترافي.
+    ==============================
+    
+    ⚠️ قواعد:
+    
+    - استخدم أرقام فعلية
+    - اذكر أسماء الفروع والعملاء
+    - اربط بين المؤشرات
+    - لا تكتب كلام عام
+    - اكتب بأسلوب إداري احترافي
+    
     """
     
                 # ---------------------------------
@@ -785,10 +827,10 @@ def run():
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
-                        {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات وBI"},
+                        {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات وذكاء أعمال"},
                         {"role": "user", "content": prompt}
                     ],
-                    max_tokens=1000
+                    max_tokens=1200
                 )
     
                 report = response.choices[0].message.content
