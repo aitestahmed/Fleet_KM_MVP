@@ -610,7 +610,7 @@ def run():
 
     # =========================================
     # =========================================
-    # 14️⃣ AI ENGINE (FULL DATA - NO LIMIT)
+    # 14️⃣ AI ENGINE
     # =========================================
     
     # تخزين التقرير
@@ -638,8 +638,9 @@ def run():
             try:
     
                 # ---------------------------------
-                # Summary
+                # تجهيز ملخص البيانات
                 # ---------------------------------
+    
                 total_sales = float(df_f["total_amount"].sum())
                 total_orders = int(df_f["order_id"].nunique())
                 total_quantity = float(df_f["quantity"].sum())
@@ -654,24 +655,28 @@ def run():
                 governorates = int(df_f["governorate"].nunique())
     
                 # ---------------------------------
-                # FULL DATA (NO LIMIT)
+                # Top Analysis
                 # ---------------------------------
     
-                branch_perf = df_f.groupby("branch_name", as_index=False)\
+                branch_top = df_f.groupby("branch_name", as_index=False)\
                     .agg(total_sales=("total_amount", "sum"))\
-                    .sort_values("total_sales", ascending=False)
+                    .sort_values("total_sales", ascending=False).head(5)
     
-                brand_perf = df_f.groupby("brand_name", as_index=False)\
+                branch_bottom = df_f.groupby("branch_name", as_index=False)\
                     .agg(total_sales=("total_amount", "sum"))\
-                    .sort_values("total_sales", ascending=False)
+                    .sort_values("total_sales", ascending=True).head(5)
     
-                sales_rep_perf = df_f.groupby("sales_rep_name", as_index=False)\
+                brand_top = df_f.groupby("brand_name", as_index=False)\
                     .agg(total_sales=("total_amount", "sum"))\
-                    .sort_values("total_sales", ascending=False)
+                    .sort_values("total_sales", ascending=False).head(5)
     
-                product_perf = df_f.groupby("product_name", as_index=False)\
+                sales_rep_top = df_f.groupby("sales_rep_name", as_index=False)\
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=False).head(5)
+    
+                product_top = df_f.groupby("product_name", as_index=False)\
                     .agg(total_qty=("quantity", "sum"))\
-                    .sort_values("total_qty", ascending=False)
+                    .sort_values("total_qty", ascending=False).head(5)
     
                 # ---------------------------------
                 # Customer Analysis
@@ -682,42 +687,31 @@ def run():
                         total_customers=("customer_id", "nunique"),
                         total_orders=("order_id", "nunique"),
                         total_sales=("total_amount", "sum")
-                    ).sort_values("total_sales", ascending=False)
+                    ).sort_values("total_sales", ascending=False).head(5)
+    
+                sales_rep_invoices = df_f.groupby("sales_rep_name", as_index=False)\
+                    .agg(
+                        total_invoices=("order_id", "nunique"),
+                        total_sales=("total_amount", "sum")
+                    ).sort_values("total_invoices", ascending=False).head(5)
     
                 top_customers = df_f.groupby("customer_name", as_index=False)\
                     .agg(total_sales=("total_amount", "sum"))\
-                    .sort_values("total_sales", ascending=False)
+                    .sort_values("total_sales", ascending=False).head(10)
     
                 # ---------------------------------
-                # Discount Analysis
+                # تحويل النص
                 # ---------------------------------
     
-                branch_discount = df_f.groupby("branch_name", as_index=False).agg(
-                    total_sales=("total_amount", "sum"),
-                    total_discount=("total_discount", "sum"),
-                    discount_customers=("customer_id", lambda x: x[df_f.loc[x.index, "total_discount"] > 0].nunique())
-                )
-    
-                branch_discount["discount_ratio_pct"] = np.where(
-                    branch_discount["total_sales"] > 0,
-                    branch_discount["total_discount"] / branch_discount["total_sales"] * 100,
-                    0
-                )
-    
-                branch_discount = branch_discount.sort_values("discount_ratio_pct", ascending=False)
-    
-                # ---------------------------------
-                # Convert to Text
-                # ---------------------------------
-    
-                branch_perf_text = branch_perf.to_string(index=False)
-                brand_perf_text = brand_perf.to_string(index=False)
-                sales_rep_perf_text = sales_rep_perf.to_string(index=False)
-                product_perf_text = product_perf.to_string(index=False)
+                branch_top_text = branch_top.to_string(index=False)
+                branch_bottom_text = branch_bottom.to_string(index=False)
+                brand_top_text = brand_top.to_string(index=False)
+                sales_rep_top_text = sales_rep_top.to_string(index=False)
+                product_top_text = product_top.to_string(index=False)
     
                 branch_customer_text = branch_customer.to_string(index=False)
+                sales_rep_invoice_text = sales_rep_invoices.to_string(index=False)
                 top_customers_text = top_customers.to_string(index=False)
-                branch_discount_text = branch_discount.to_string(index=False)
     
                 summary = f"""
     Total Sales: {total_sales}
@@ -733,60 +727,55 @@ def run():
     """
     
                 # ---------------------------------
-                # PROMPT (FORCE FULL ANALYSIS)
+                # Prompt
                 # ---------------------------------
     
                 prompt = f"""
-    أنت خبير تحليل بيانات مبيعات على مستوى تنفيذي.
-
-المطلوب:
-قم بتحليل البيانات التالية وإخراج تقرير احترافي باللغة العربية فقط.
-
-❌ ممنوع استخدام اللغة الإنجليزية نهائيًا
-❌ ممنوع كتابة أرقام بدون تنسيق
-
-✅ يجب تنسيق الأرقام باستخدام الفاصلة (مثال: 1,250,000)
-✅ استخدم لغة إدارية تنفيذية واضحة
-
----
-
-المطلوب في التقرير:
-
-1) ملخص تنفيذي واضح
-
-2) تحليل أداء الفروع:
-- إجمالي المبيعات لكل فرع
-- عدد العملاء لكل فرع
-- متوسط المبيعات لكل عميل
-
-3) تحليل الخصومات:
-- إجمالي الخصومات لكل فرع
-- نسبة الخصم من المبيعات لكل فرع
-- عدد العملاء الذين حصلوا على خصومات
-
-4) تحليل العملاء:
-- أهم العملاء من حيث المبيعات
-- نسبة مساهمة كبار العملاء
-- هل هناك اعتماد على عدد قليل من العملاء
-
-5) تحليل المخاطر:
-- الفروع ذات عدد العملاء المنخفض
-- الفروع التي تعتمد على الخصومات بشكل كبير
-- الفروع ذات الأداء غير المتوازن
-
-6) الفرص:
-- فرص زيادة المبيعات
-- فرص تحسين كفاءة الفروع
-
-7) التوصيات التنفيذية:
-- توصيات واضحة وقابلة للتنفيذ
-
----
-
-مهم جدًا:
-- اربط التحليل بالأرقام
-- لا تكتب كلام عام
-- كل نقطة يجب أن تكون مبنية على بيانات    
+    قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي احترافي.
+    
+    📊 ملخص:
+    {summary}
+    
+    🏢 أعلى الفروع:
+    {branch_top_text}
+    
+    🏢 أقل الفروع:
+    {branch_bottom_text}
+    
+    🏷 البراندات:
+    {brand_top_text}
+    
+    👤 المندوبين:
+    {sales_rep_top_text}
+    
+    📦 المنتجات:
+    {product_top_text}
+    
+    👥 العملاء لكل فرع:
+    {branch_customer_text}
+    
+    🧾 فواتير المندوبين:
+    {sales_rep_invoice_text}
+    
+    ⭐ كبار العملاء:
+    {top_customers_text}
+    
+    ---------------------------------
+    
+    المطلوب:
+    
+    1. تحليل الأداء العام
+    2. مقارنة الفروع (مبيعات + عملاء)
+    3. تحليل العملاء داخل الفروع
+    4. تحليل المندوبين (فواتير + أداء)
+    5. تحليل تركّز العملاء
+    6. تحليل الخصومات
+    7. تحديد المخاطر
+    8. فرص التحسين
+    9. توصيات واضحة للإدارة
+    
+    ⚠️ استخدم أرقام حقيقية واذكر أسماء الفروع والعملاء.
+    اكتب بأسلوب إداري احترافي.
     """
     
                 # ---------------------------------
@@ -796,16 +785,16 @@ def run():
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
-                        {"role": "system", "content": "You are a senior business intelligence analyst"},
+                        {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات وBI"},
                         {"role": "user", "content": prompt}
                     ],
-                    max_tokens=1500
+                    max_tokens=1000
                 )
     
                 report = response.choices[0].message.content
     
                 # ---------------------------------
-                # Credit Calculation
+                # خصم الكريديت
                 # ---------------------------------
     
                 tokens_used = calculate_tokens(response)
@@ -819,13 +808,14 @@ def run():
     
                 st.session_state.credits = new_credit
     
-                # Save Report
+                # حفظ التقرير
                 st.session_state.report_html = report
     
             except Exception as e:
-                st.error("حدث خطأ أثناء تحليل البيانات")
+    
+                st.error("لم يتمكن النظام من تحليل البيانات.")
                 st.session_state.ai_running = False
-        
+    
 
     # =========================================
     # 13️⃣ QUICK INSIGHTS
@@ -896,7 +886,6 @@ def run():
     # عرض تقرير AI
     # =========================================
     
-   
     if st.session_state.report_html:
     
         st.markdown("## 📑 AI Sales Executive Report")
@@ -916,7 +905,6 @@ def run():
             """,
             unsafe_allow_html=True
         )
-                
     # =========================================
     # Branch-Customer KPIs
     # =========================================
