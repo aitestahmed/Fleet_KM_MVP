@@ -609,6 +609,7 @@ def run():
     daily, branch, brand, governorate, sales = compute_kpis(df_f)
 
     # =========================================
+    # =========================================
     # 14️⃣ AI ENGINE
     # =========================================
     
@@ -652,140 +653,148 @@ def run():
                 brands = int(df_f["brand_name"].nunique())
                 sales_reps = int(df_f["sales_rep_name"].nunique())
                 governorates = int(df_f["governorate"].nunique())
-                branch_top = (
-                df_f.groupby("branch_name", as_index=False)
-                    .agg(total_sales=("total_amount", "sum"))
-                    .sort_values("total_sales", ascending=False)
-                    .head(5)
-                )
-                
-                branch_bottom = (
-                    df_f.groupby("branch_name", as_index=False)
-                    .agg(total_sales=("total_amount", "sum"))
-                    .sort_values("total_sales", ascending=True)
-                    .head(5)
-                )
-                
-                brand_top = (
-                    df_f.groupby("brand_name", as_index=False)
-                    .agg(total_sales=("total_amount", "sum"))
-                    .sort_values("total_sales", ascending=False)
-                    .head(5)
-                )
-                
-                sales_rep_top = (
-                    df_f.groupby("sales_rep_name", as_index=False)
-                    .agg(total_sales=("total_amount", "sum"))
-                    .sort_values("total_sales", ascending=False)
-                    .head(5)
-                )
-                
-                product_top = (
-                    df_f.groupby("product_name", as_index=False)
-                    .agg(total_qty=("quantity", "sum"))
-                    .sort_values("total_qty", ascending=False)
-                    .head(5)
-                )
-                
+    
+                # ---------------------------------
+                # Top Analysis
+                # ---------------------------------
+    
+                branch_top = df_f.groupby("branch_name", as_index=False)\
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=False).head(5)
+    
+                branch_bottom = df_f.groupby("branch_name", as_index=False)\
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=True).head(5)
+    
+                brand_top = df_f.groupby("brand_name", as_index=False)\
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=False).head(5)
+    
+                sales_rep_top = df_f.groupby("sales_rep_name", as_index=False)\
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=False).head(5)
+    
+                product_top = df_f.groupby("product_name", as_index=False)\
+                    .agg(total_qty=("quantity", "sum"))\
+                    .sort_values("total_qty", ascending=False).head(5)
+    
+                # ---------------------------------
+                # Customer Analysis
+                # ---------------------------------
+    
+                branch_customer = df_f.groupby("branch_name", as_index=False)\
+                    .agg(
+                        total_customers=("customer_id", "nunique"),
+                        total_orders=("order_id", "nunique"),
+                        total_sales=("total_amount", "sum")
+                    ).sort_values("total_sales", ascending=False).head(5)
+    
+                sales_rep_invoices = df_f.groupby("sales_rep_name", as_index=False)\
+                    .agg(
+                        total_invoices=("order_id", "nunique"),
+                        total_sales=("total_amount", "sum")
+                    ).sort_values("total_invoices", ascending=False).head(5)
+    
+                top_customers = df_f.groupby("customer_name", as_index=False)\
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=False).head(10)
+    
+                # ---------------------------------
+                # تحويل النص
+                # ---------------------------------
+    
                 branch_top_text = branch_top.to_string(index=False)
                 branch_bottom_text = branch_bottom.to_string(index=False)
                 brand_top_text = brand_top.to_string(index=False)
                 sales_rep_top_text = sales_rep_top.to_string(index=False)
                 product_top_text = product_top.to_string(index=False)
     
-                summary = f"""
-    Sales Summary
+                branch_customer_text = branch_customer.to_string(index=False)
+                sales_rep_invoice_text = sales_rep_invoices.to_string(index=False)
+                top_customers_text = top_customers.to_string(index=False)
     
+                summary = f"""
     Total Sales: {total_sales}
     Total Orders: {total_orders}
-    Total Quantity Sold: {total_quantity}
+    Total Quantity: {total_quantity}
     Total Discount: {total_discount}
-    
-    Average Order Value: {avg_order_value}
-    Discount Ratio (%): {discount_ratio_pct}
-    
+    Avg Order Value: {avg_order_value}
+    Discount %: {discount_ratio_pct}
     Branches: {branches}
     Brands: {brands}
     Sales Reps: {sales_reps}
     Governorates: {governorates}
     """
     
-    
                 # ---------------------------------
-                # بناء الـ Prompt
+                # Prompt
                 # ---------------------------------
     
                 prompt = f"""
-    قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي واضح.
+    قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي احترافي.
     
-    ملخص عام:
+    📊 ملخص:
     {summary}
     
-    أعلى الفروع مبيعات:
+    🏢 أعلى الفروع:
     {branch_top_text}
     
-    أقل الفروع مبيعات:
+    🏢 أقل الفروع:
     {branch_bottom_text}
     
-    أعلى البراندات:
+    🏷 البراندات:
     {brand_top_text}
     
-    أفضل المندوبين:
+    👤 المندوبين:
     {sales_rep_top_text}
     
-    أكثر المنتجات مبيعًا:
+    📦 المنتجات:
     {product_top_text}
     
-    المطلوب في التقرير:
+    👥 العملاء لكل فرع:
+    {branch_customer_text}
     
-    1 تحليل أداء المبيعات بشكل عام
-    2 مقارنة الفروع مع ذكر أسماء الفروع الأعلى والأضعف
-    3 تحليل أداء البراندات
-    4 تحليل أداء المندوبين
-    5 تحليل تأثير الخصومات على الإيرادات
-    6 تحديد فرص تحسين المبيعات
-    7 تقديم توصيات عملية للإدارة
+    🧾 فواتير المندوبين:
+    {sales_rep_invoice_text}
     
-    اكتب التحليل باللغة العربية مع ذكر أسماء الفروع والبراندات والأرقام المهمة.
+    ⭐ كبار العملاء:
+    {top_customers_text}
+    
+    ---------------------------------
+    
+    المطلوب:
+    
+    1. تحليل الأداء العام
+    2. مقارنة الفروع (مبيعات + عملاء)
+    3. تحليل العملاء داخل الفروع
+    4. تحليل المندوبين (فواتير + أداء)
+    5. تحليل تركّز العملاء
+    6. تحليل الخصومات
+    7. تحديد المخاطر
+    8. فرص التحسين
+    9. توصيات واضحة للإدارة
+    
+    ⚠️ استخدم أرقام حقيقية واذكر أسماء الفروع والعملاء.
+    اكتب بأسلوب إداري احترافي.
     """
     
-    
                 # ---------------------------------
-                # استدعاء AI
+                # AI CALL
                 # ---------------------------------
     
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
-                        {
-                            "role": "system",
-                            "content": """
-    أنت خبير في تحليل بيانات المبيعات وذكاء الأعمال.
-    
-    مهمتك:
-    تحليل البيانات وتقديم تقرير تنفيذي يساعد الإدارة على اتخاذ القرار.
-    
-    ركز على:
-    - أداء المبيعات
-    - الفروع الأعلى مبيعات
-    - تأثير الخصومات
-    - فرص زيادة الإيرادات
-    - توصيات الإدارة
-    """
-                        },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
+                        {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات وBI"},
+                        {"role": "user", "content": prompt}
                     ],
                     max_tokens=1000
                 )
     
                 report = response.choices[0].message.content
     
-    
                 # ---------------------------------
-                # خصم الكريديت بعد النجاح فقط
+                # خصم الكريديت
                 # ---------------------------------
     
                 tokens_used = calculate_tokens(response)
@@ -798,7 +807,6 @@ def run():
                 }).eq("id", st.session_state.company_id).execute()
     
                 st.session_state.credits = new_credit
-    
     
                 # حفظ التقرير
                 st.session_state.report_html = report
