@@ -808,6 +808,71 @@ def run():
                 st.error("لم يتمكن النظام من تحليل البيانات.")
                 st.session_state.ai_running = False
     
+
+    # =========================================
+    # 13️⃣ QUICK INSIGHTS
+    # =========================================
+    
+    st.divider()
+    st.markdown("## 🤖 Sales Quick Insights")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    
+    # ===============================
+    # Top Branches
+    # ===============================
+    with col1:
+        if st.button("🏢 أعلى الفروع مبيعات"):
+            top_branch = (
+                df_f.groupby("branch_name", as_index=False)
+                    .agg(total_sales=("total_amount","sum"))
+                    .sort_values("total_sales", ascending=False)
+                    .head(5)
+            )
+            st.dataframe(top_branch)
+    
+    
+    # ===============================
+    # Top Brands
+    # ===============================
+    with col2:
+        if st.button("🏷 أكثر البراندات مبيعًا"):
+            top_brand = (
+                df_f.groupby("brand_name", as_index=False)
+                    .agg(total_sales=("total_amount","sum"))
+                    .sort_values("total_sales", ascending=False)
+                    .head(5)
+            )
+            st.dataframe(top_brand)
+    
+    
+    # ===============================
+    # Top Sales Reps
+    # ===============================
+    with col3:
+        if st.button("👤 أفضل المندوبين مبيعات"):
+            top_sales_rep = (
+                df_f.groupby("sales_rep_name", as_index=False)
+                    .agg(total_sales=("total_amount","sum"))
+                    .sort_values("total_sales", ascending=False)
+                    .head(5)
+            )
+            st.dataframe(top_sales_rep)
+    
+    
+    # ===============================
+    # Top Governorates
+    # ===============================
+    with col4:
+        if st.button("📍 أعلى المحافظات مبيعات"):
+            top_geo = (
+                df_f.groupby("governorate", as_index=False)
+                    .agg(total_sales=("total_amount","sum"))
+                    .sort_values("total_sales", ascending=False)
+                    .head(5)
+            )
+            st.dataframe(top_geo)
     
     # =========================================
     # عرض تقرير AI
@@ -1007,70 +1072,6 @@ def run():
             .agg(total_discount=("total_discount", "sum"))
             .sort_values("total_discount", ascending=False)
     )
-    # =========================================
-    # 13️⃣ QUICK INSIGHTS
-    # =========================================
-    
-    st.divider()
-    st.markdown("## 🤖 Sales Quick Insights")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    
-    # ===============================
-    # Top Branches
-    # ===============================
-    with col1:
-        if st.button("🏢 أعلى الفروع مبيعات"):
-            top_branch = (
-                df_f.groupby("branch_name", as_index=False)
-                    .agg(total_sales=("total_amount","sum"))
-                    .sort_values("total_sales", ascending=False)
-                    .head(5)
-            )
-            st.dataframe(top_branch)
-    
-    
-    # ===============================
-    # Top Brands
-    # ===============================
-    with col2:
-        if st.button("🏷 أكثر البراندات مبيعًا"):
-            top_brand = (
-                df_f.groupby("brand_name", as_index=False)
-                    .agg(total_sales=("total_amount","sum"))
-                    .sort_values("total_sales", ascending=False)
-                    .head(5)
-            )
-            st.dataframe(top_brand)
-    
-    
-    # ===============================
-    # Top Sales Reps
-    # ===============================
-    with col3:
-        if st.button("👤 أفضل المندوبين مبيعات"):
-            top_sales_rep = (
-                df_f.groupby("sales_rep_name", as_index=False)
-                    .agg(total_sales=("total_amount","sum"))
-                    .sort_values("total_sales", ascending=False)
-                    .head(5)
-            )
-            st.dataframe(top_sales_rep)
-    
-    
-    # ===============================
-    # Top Governorates
-    # ===============================
-    with col4:
-        if st.button("📍 أعلى المحافظات مبيعات"):
-            top_geo = (
-                df_f.groupby("governorate", as_index=False)
-                    .agg(total_sales=("total_amount","sum"))
-                    .sort_values("total_sales", ascending=False)
-                    .head(5)
-            )
-            st.dataframe(top_geo)
     
     # =========================================
     # 15️⃣ KPI DASHBOARD
