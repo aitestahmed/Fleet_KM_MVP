@@ -52,92 +52,42 @@ def run():
     
     
     # =========================================
-    # 4️⃣ AUTHENTICATION
+    # =========================================
+    # 4️⃣ AUTH UI (FINAL CLEAN VERSION)
     # =========================================
     
     def auth_ui():
+    
         st.sidebar.title("🔐 Account")
     
-        tab1, tab2 = st.sidebar.tabs(["Login", "Sign up"])
+        # =========================================
+        # CHECK LOGIN FROM MAIN APP
+        # =========================================
+        if not st.session_state.get("logged_in", False):
+            st.sidebar.warning("⚠️ يرجى تسجيل الدخول من الصفحة الرئيسية")
+            st.stop()
     
-        # -------- LOGIN --------
-        with tab1:
-            email = st.text_input("Email", key="login_email")
-            password = st.text_input("Password", type="password", key="login_pass")
+        # =========================================
+        # USER INFO
+        # =========================================
+        st.sidebar.success(f"✅ Logged in: {st.session_state.get('user_email', '-')}")
+        st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name', '-')}")
+        st.sidebar.markdown(f"👤 Role: admin")
     
-            if st.button("Login"):
-                try:
-                    res = supabase.auth.sign_in_with_password({
-                        "email": email,
-                        "password": password
-                    })
+        # =========================================
+        # CREDITS
+        # =========================================
+        st.sidebar.markdown("### 💳 Credits")
     
-                    st.session_state.user = res.user
+        st.sidebar.metric(
+            "📊 Sales Credit",
+            f"{st.session_state.get('credits_sales', 0):.2f}"
+        )
     
-                    # 🔹 جلب بيانات profile
-                    user_id = res.user.id
-    
-                    profile = supabase.table("profiles") \
-                        .select("company_id, role") \
-                        .eq("id", user_id) \
-                        .single() \
-                        .execute()
-    
-                    if not profile.data:
-                        st.error("Account not linked to a company.")
-                        st.stop()
-    
-                    company_id = profile.data["company_id"]
-                    role = profile.data["role"]
-    
-                    # 🔹 جلب بيانات الشركة
-                    company = supabase.table("Companies") \
-                        .select("name, max_users, credits") \
-                        .eq("id", company_id) \
-                        .single() \
-                        .execute()
-    
-                    st.session_state.company_id = company_id
-                    st.session_state.role = role
-                    st.session_state.company_name = company.data["name"]
-                    st.session_state.max_users = company.data["max_users"]
-                    
-    
-                    st.success("Logged in ✅")
-                    st.rerun()
-    
-                except Exception as e:
-                    st.error("Login failed.")
-    
-    
-        
-        # -------- SIGN UP --------
-        with tab2:
-            email = st.text_input("Email", key="signup_email")
-            password = st.text_input("Password", type="password", key="signup_pass")
-    
-            if st.button("Create account"):
-                try:
-                    supabase.auth.sign_up({
-                        "email": email,
-                        "password": password
-                    })
-                    st.success("Account created ✅")
-                except Exception:
-                    st.error("Sign up failed.")
-    
-        # -------- Logged state --------
-        # -------- Logged state --------
-        if st.session_state.user:
-            st.sidebar.success(f"✅ Logged in: {st.session_state.user.email}")
-            st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name','-')}")
-            st.sidebar.markdown(f"👤 Role: {st.session_state.get('role','-')}")
-        
-            st.sidebar.markdown("### 💳 Credits")
-        
-            
-            
-        
+        st.sidebar.metric(
+            "🚚 Fleet Credit",
+            f"{st.session_state.get('credits_fleet', 0):.2f}"
+        )
    
 
     
