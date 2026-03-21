@@ -71,42 +71,54 @@ if not st.session_state.logged_in:
 
                 # مثال بسيط لجلب الشركة
                 company = supabase.table("Companies") \
-                    .select("id,name,credits") \
+                    .select("id,name") \
                     .limit(1) \
                     .execute()
 
                 if company.data:
 
+                    # ===============================
+                    # Company Info
+                    # ===============================
                     st.session_state.company_id = company.data[0]["id"]
                     st.session_state.company_name = company.data[0]["name"]
-                    
+                
+                    # ===============================
+                    # Load Credits (NEW SYSTEM)
+                    # ===============================
                     credits_data = supabase.table("company_credits") \
                         .select("feature, credits") \
                         .eq("company_id", st.session_state.company_id) \
                         .execute()
-                    
+                
                     # default values
                     st.session_state.credits_sales = 0.0
                     st.session_state.credits_fleet = 0.0
-                    
-                    # لو مفيش بيانات في الجدول
+                
+                    # لو فيه بيانات
                     if credits_data.data:
-                    
+                
                         for c in credits_data.data:
-                    
-                            feature = c.get("feature")
+                
+                            feature = (c.get("feature") or "").lower().strip()
                             credit_value = float(c.get("credits", 0) or 0)
-                    
+                
                             if feature == "sales":
                                 st.session_state.credits_sales = credit_value
-                    
+                
                             elif feature == "fleet":
                                 st.session_state.credits_fleet = credit_value
-
-                st.session_state.logged_in = True
-                st.session_state.user_email = email
-
-                st.rerun()
+                
+                    # ===============================
+                    # LOGIN SUCCESS
+                    # ===============================
+                    st.session_state.logged_in = True
+                    st.session_state.user_email = email
+                
+                    st.rerun()
+                
+                else:
+                    st.error("❌ لا توجد شركة مرتبطة بهذا الحساب")
 
             except Exception as e:
 
