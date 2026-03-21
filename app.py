@@ -44,6 +44,15 @@ if "company_id" not in st.session_state:
 if "company_name" not in st.session_state:
     st.session_state.company_name = None
 
+# ===============================
+# CREDITS DEFAULTS (ADD THIS)
+# ===============================
+if "credits_sales" not in st.session_state:
+    st.session_state.credits_sales = 0.0
+
+if "credits_fleet" not in st.session_state:
+    st.session_state.credits_fleet = 0.0
+
 
 # =========================================
 # =========================================
@@ -138,6 +147,9 @@ if not st.session_state.logged_in:
                         elif feature == "fleet":
                             st.session_state.credits_fleet = credit_value
 
+                st.write("DEBUG company_id:", st.session_state.company_id)
+                st.write("DEBUG credits:", credits_data.data)
+
                 # =========================================
                 # ✅ LOGIN SUCCESS
                 # =========================================
@@ -224,18 +236,8 @@ with st.sidebar:
 
     # Logout
     if st.button("Logout"):
-
-        st.session_state.logged_in = False
-        st.session_state.user_email = None
-        st.session_state.company_id = None
-        st.session_state.company_name = None
-
-        # reset credits
-        st.session_state.credits_sales = 0
-        st.session_state.credits_fleet = 0
-
+        st.session_state.clear()
         st.rerun()
-
 # =========================================
 # HEADER (Brand + Slogan)
 # =========================================
