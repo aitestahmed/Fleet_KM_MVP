@@ -49,8 +49,7 @@ def run():
     if "user" not in st.session_state:
         st.session_state.user = None
     
-    if "credits" not in st.session_state:
-        st.session_state.credits = 0
+    
     
     # =========================================
     # 4️⃣ AUTHENTICATION
@@ -102,7 +101,7 @@ def run():
                     st.session_state.role = role
                     st.session_state.company_name = company.data["name"]
                     st.session_state.max_users = company.data["max_users"]
-                    st.session_state.credits = company.data["credits"]
+                    
     
                     st.success("Logged in ✅")
                     st.rerun()
@@ -136,10 +135,8 @@ def run():
         
             st.sidebar.markdown("### 💳 Credits")
         
-            st.sidebar.metric(
-                "الرصيد المتبقي",
-                f"{st.session_state.credits:.2f} جنيه"
-            )
+            
+            
         
    
 
