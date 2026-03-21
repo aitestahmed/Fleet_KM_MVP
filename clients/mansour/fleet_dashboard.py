@@ -984,7 +984,7 @@ def run(deduct_credit=None):
     if st.button("🤖 إنشاء تحليل بالذكاء الاصطناعي"):
     
         # التحقق من الرصيد
-        if st.session_state.credits <= 0:
+        if st.session_state.credits_fleet <= 0
             st.error("رصيدك انتهى. يرجى شحن الحساب.")
             st.stop()
     
