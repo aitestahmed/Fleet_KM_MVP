@@ -68,17 +68,17 @@ def load_credits(supabase):
     fleet_credit = 0.0
 
     if res.data:
-    for row in res.data:
-        feature = (row.get("feature") or "").strip().lower()
-        credit = float(row.get("credits") or 0)
-
-        if feature == "sales":
-            sales_credit = credit
-        elif feature == "fleet":
-            fleet_credit = credit
-
-    st.session_state.credits_sales = sales_credit
-    st.session_state.credits_fleet = fleet_credit
+        for row in res.data:
+            feature = (row.get("feature") or "").strip().lower()
+            credit = float(row.get("credits") or 0)
+    
+            if feature == "sales":
+                sales_credit = credit
+            elif feature == "fleet":
+                fleet_credit = credit
+    
+        st.session_state.credits_sales = sales_credit
+        st.session_state.credits_fleet = fleet_credit
 
 else:
     # 👇 مهم جدًا
