@@ -7,10 +7,20 @@ import numpy as np
 import plotly.express as px
 import streamlit as st
 from openai import OpenAI
+from supabase import create_client   # 👈 أضف ده
+
+# =========================================
+# 🔗 SUPABASE CONNECTION (ADD THIS)
+# =========================================
+
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 # =========================================
-# MAIN MODULE
+# MAIN MODULE    
 # =========================================
 
 def run(deduct_credit=None):
