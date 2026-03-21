@@ -46,10 +46,10 @@ if "company_name" not in st.session_state:
 # CREDITS DEFAULTS (ADD THIS)
 # ===============================
 if "credits_sales" not in st.session_state:
-    st.session_state.credits_sales = 0.0
+    st.session_state.credits_sales = 100
 
 if "credits_fleet" not in st.session_state:
-    st.session_state.credits_fleet = 0.0
+    st.session_state.credits_fleet = 100
 
 
 # =========================================
