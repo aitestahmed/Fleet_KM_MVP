@@ -628,7 +628,7 @@ def run():
         st.session_state.ai_running = True
     
         # التحقق من الرصيد
-        if st.session_state.credits <= 0:
+        if st.session_state.credits_sales <= 0:
             st.error("رصيدك انتهى. يرجى شحن الحساب.")
             st.session_state.ai_running = False
             st.stop()
@@ -799,14 +799,17 @@ def run():
     
                 tokens_used = calculate_tokens(response)
                 credit_used = tokens_to_credit(tokens_used)
+                credit_used = max(credit_used, 0)
     
-                new_credit = float(st.session_state.credits) - float(credit_used)
-    
-                supabase.table("Companies").update({
+                new_credit = float(st.session_state.credits_sales) - float(credit_used)
+
+                supabase.table("company_credits").update({
                     "credits": new_credit
-                }).eq("id", st.session_state.company_id).execute()
-    
-                st.session_state.credits = new_credit
+                }).eq("company_id", st.session_state.company_id)\
+                 .eq("feature", "sales")\
+                 .execute()
+                
+                st.session_state.credits_sales = new_credit
     
                 # حفظ التقرير
                 st.session_state.report_html = report
