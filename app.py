@@ -79,7 +79,29 @@ if not st.session_state.logged_in:
 
                     st.session_state.company_id = company.data[0]["id"]
                     st.session_state.company_name = company.data[0]["name"]
-                    st.session_state.credits = float(company.data[0]["credits"])
+                    
+                    credits_data = supabase.table("company_credits") \
+                        .select("feature, credits") \
+                        .eq("company_id", st.session_state.company_id) \
+                        .execute()
+                    
+                    # default values
+                    st.session_state.credits_sales = 0.0
+                    st.session_state.credits_fleet = 0.0
+                    
+                    # لو مفيش بيانات في الجدول
+                    if credits_data.data:
+                    
+                        for c in credits_data.data:
+                    
+                            feature = c.get("feature")
+                            credit_value = float(c.get("credits", 0) or 0)
+                    
+                            if feature == "sales":
+                                st.session_state.credits_sales = credit_value
+                    
+                            elif feature == "fleet":
+                                st.session_state.credits_fleet = credit_value
 
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
@@ -114,6 +136,7 @@ if not client:
 
 
 # =========================================
+# =========================================
 # SIDEBAR
 # =========================================
 
@@ -127,6 +150,7 @@ with st.sidebar:
 
     st.divider()
 
+    # Company
     if st.session_state.company_name:
         st.write(f"Company: {st.session_state.company_name}")
     else:
@@ -136,12 +160,24 @@ with st.sidebar:
 
     st.divider()
 
-    st.write("Credits")
+    # ===============================
+    # Credits (NEW SYSTEM)
+    # ===============================
+    st.markdown("### 💳 Credits")
 
-    st.write(f"{st.session_state.credits:.2f} جنيه")
+    st.metric(
+        "📊 Sales Credit",
+        f"{st.session_state.get('credits_sales', 0):.2f}"
+    )
+
+    st.metric(
+        "🚚 Fleet Credit",
+        f"{st.session_state.get('credits_fleet', 0):.2f}"
+    )
 
     st.divider()
 
+    # Navigation
     page = st.radio(
         "Navigation",
         [
@@ -152,16 +188,19 @@ with st.sidebar:
 
     st.divider()
 
+    # Logout
     if st.button("Logout"):
 
         st.session_state.logged_in = False
         st.session_state.user_email = None
         st.session_state.company_id = None
         st.session_state.company_name = None
-        st.session_state.credits = 0
+
+        # reset credits
+        st.session_state.credits_sales = 0
+        st.session_state.credits_fleet = 0
 
         st.rerun()
-
 
 # =========================================
 # HEADER (Brand + Slogan)
