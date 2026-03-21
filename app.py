@@ -80,10 +80,10 @@ def load_credits(supabase):
         st.session_state.credits_sales = sales_credit
         st.session_state.credits_fleet = fleet_credit
 
-else:
-    # 👇 مهم جدًا
-    st.session_state.credits_sales = 100
-    st.session_state.credits_fleet = 100
+    else:
+        # 👇 مهم جدًا
+        st.session_state.credits_sales = 100
+        st.session_state.credits_fleet = 100
 
 
 # =========================================
