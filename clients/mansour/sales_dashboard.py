@@ -37,7 +37,7 @@ def run():
     
     
     def tokens_to_credit(tokens):
-        credit = tokens / 5000
+        credit = tokens / 1000
         return round(credit, 2)
     
     
