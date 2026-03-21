@@ -1087,7 +1087,7 @@ def run(deduct_credit=None):
     
         # ---------------------------------
         # خصم الرصيد عبر app.py
-        new_credit = float(st.session_state.credits_fleet) - float(credit_used)
+        new_credit = round(float(st.session_state.credits_fleet) - float(credit_used), 2)
 
         supabase.table("company_credits").update({
             "credits": new_credit
