@@ -56,8 +56,40 @@ if "credits_fleet" not in st.session_state:
 
 # =========================================
 # =========================================
+# 🔧 LOAD CREDITS FUNCTION (ضعها أعلى الملف)
+# =========================================
+
+def load_credits(supabase):
+
+    res = supabase.table("company_credits") \
+        .select("credits, feature") \
+        .eq("company_id", st.session_state.company_id) \
+        .execute()
+
+    sales_credit = 0.0
+    fleet_credit = 0.0
+
+    if res.data:
+        for row in res.data:
+            feature = (row.get("feature") or "").strip().lower()
+            credit = float(row.get("credits") or 0)
+
+            if feature == "sales":
+                sales_credit = credit
+            elif feature == "fleet":
+                fleet_credit = credit
+
+    st.session_state.credits_sales = sales_credit
+    st.session_state.credits_fleet = fleet_credit
+
+
+# =========================================
 # LOGIN PAGE
 # =========================================
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
 
 if not st.session_state.logged_in:
 
@@ -78,7 +110,7 @@ if not st.session_state.logged_in:
                 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
                 # =========================================
-                # 🔐 AUTHENTICATION (IMPORTANT FIX)
+                # 🔐 AUTH
                 # =========================================
                 auth = supabase.auth.sign_in_with_password({
                     "email": email,
@@ -92,7 +124,7 @@ if not st.session_state.logged_in:
                     st.stop()
 
                 # =========================================
-                # 🏢 GET PROFILE (IMPORTANT)
+                # 🏢 PROFILE
                 # =========================================
                 profile = supabase.table("profiles") \
                     .select("company_id") \
@@ -107,7 +139,7 @@ if not st.session_state.logged_in:
                 company_id = profile.data["company_id"]
 
                 # =========================================
-                # 🏢 GET COMPANY
+                # 🏢 COMPANY
                 # =========================================
                 company = supabase.table("Companies") \
                     .select("id, name") \
@@ -119,42 +151,21 @@ if not st.session_state.logged_in:
                     st.error("❌ لم يتم العثور على الشركة")
                     st.stop()
 
+                # =========================================
+                # 💾 SESSION SETUP
+                # =========================================
                 st.session_state.company_id = company.data["id"]
                 st.session_state.company_name = company.data["name"]
-
-                # =========================================
-                # 💳 LOAD CREDITS (FIXED)
-                # =========================================
-                credits_data = supabase.table("company_credits") \
-                    .select("feature, credits") \
-                    .eq("company_id", st.session_state.company_id) \
-                    .execute()
-
-                # default values
-                st.session_state.credits_sales = 0.0
-                st.session_state.credits_fleet = 0.0
-
-                if credits_data.data:
-
-                    for c in credits_data.data:
-
-                        feature = (c.get("feature") or "").strip().lower()
-                        credit_value = float(c.get("credits") or 0)
-
-                        if feature == "sales":
-                            st.session_state.credits_sales = credit_value
-
-                        elif feature == "fleet":
-                            st.session_state.credits_fleet = credit_value
-
-                st.write("DEBUG company_id:", st.session_state.company_id)
-                st.write("DEBUG credits:", credits_data.data)
-
-                # =========================================
-                # ✅ LOGIN SUCCESS
-                # =========================================
-                st.session_state.logged_in = True
                 st.session_state.user_email = email
+                st.session_state.logged_in = True
+
+                # =========================================
+                # 💳 LOAD CREDITS (المهم)
+                # =========================================
+                load_credits(supabase)
+
+                # DEBUG (اختياري)
+                # st.write("DEBUG credits:", st.session_state.credits_sales, st.session_state.credits_fleet)
 
                 st.rerun()
 
