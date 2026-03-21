@@ -35,8 +35,6 @@ if "logged_in" not in st.session_state:
 if "user_email" not in st.session_state:
     st.session_state.user_email = None
 
-if "credits" not in st.session_state:
-    st.session_state.credits = 0
 
 if "company_id" not in st.session_state:
     st.session_state.company_id = None
@@ -177,6 +175,25 @@ if not st.session_state.logged_in:
             st.error("⚠️ ادخل البريد وكلمة المرور")
 
     st.stop()
+
+
+# =========================================
+# AUTO LOAD CREDITS AFTER REFRESH
+# =========================================
+
+if st.session_state.logged_in:
+
+    if st.session_state.company_id and (
+        st.session_state.credits_sales == 0 and 
+        st.session_state.credits_fleet == 0
+    ):
+
+        SUPABASE_URL = st.secrets["SUPABASE_URL"]
+        SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+        load_credits(supabase)
 # =========================================
 # CLIENT CHECK
 # =========================================
@@ -247,7 +264,14 @@ with st.sidebar:
 
     # Logout
     if st.button("Logout"):
-        st.session_state.clear()
+        st.session_state.logged_in = False
+        st.session_state.user_email = None
+        st.session_state.company_id = None
+        st.session_state.company_name = None
+        st.session_state.credits_sales = 0
+        st.session_state.credits_fleet = 0
+
+
         st.rerun()
 # =========================================
 # HEADER (Brand + Slogan)
