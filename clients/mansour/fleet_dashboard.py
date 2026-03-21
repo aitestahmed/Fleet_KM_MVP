@@ -39,14 +39,7 @@ def run(deduct_credit=None):
         return round(credit, 2)
 
 
-    # =========================================
-    # SESSION STATE CHECK
-    # =========================================
-
-    if "credits" not in st.session_state:
-        st.session_state.credits = 0
-
-
+    
 
 
 
@@ -984,7 +977,7 @@ def run(deduct_credit=None):
     if st.button("🤖 إنشاء تحليل بالذكاء الاصطناعي"):
     
         # التحقق من الرصيد
-        if st.session_state.credits_fleet <= 0
+        if st.session_state.credits_fleet <= 0:
             st.error("رصيدك انتهى. يرجى شحن الحساب.")
             st.stop()
     
@@ -1089,16 +1082,20 @@ def run(deduct_credit=None):
         tokens_used = calculate_tokens(response)
     
         credit_used = tokens_to_credit(tokens_used)
+        credit_used = max(credit_used, 0)
     
     
         # ---------------------------------
         # خصم الرصيد عبر app.py
-        # ---------------------------------
-    
-        if deduct_credit:
-            deduct_credit(credit_used)
-    
-        st.session_state.credits -= credit_used
+        new_credit = float(st.session_state.credits_fleet) - float(credit_used)
+
+        supabase.table("company_credits").update({
+            "credits": new_credit
+        }).eq("company_id", st.session_state.company_id)\
+         .eq("feature", "fleet")\
+         .execute()
+        
+        st.session_state.credits_fleet = new_credit
     
     
         # ---------------------------------
