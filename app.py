@@ -46,13 +46,13 @@ if "company_name" not in st.session_state:
 
 
 # =========================================
+# =========================================
 # LOGIN PAGE
 # =========================================
 
 if not st.session_state.logged_in:
 
     st.title("Quantory AI Analytics")
-
     st.subheader("Login")
 
     email = st.text_input("Email")
@@ -63,75 +63,97 @@ if not st.session_state.logged_in:
         if email and password:
 
             try:
-
                 SUPABASE_URL = st.secrets["SUPABASE_URL"]
                 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
                 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-                # مثال بسيط لجلب الشركة
-                company = supabase.table("Companies") \
-                    .select("id,name") \
-                    .limit(1) \
+                # =========================================
+                # 🔐 AUTHENTICATION (IMPORTANT FIX)
+                # =========================================
+                auth = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password
+                })
+
+                user = auth.user
+
+                if not user:
+                    st.error("❌ بيانات الدخول غير صحيحة")
+                    st.stop()
+
+                # =========================================
+                # 🏢 GET PROFILE (IMPORTANT)
+                # =========================================
+                profile = supabase.table("profiles") \
+                    .select("company_id") \
+                    .eq("id", user.id) \
+                    .single() \
                     .execute()
 
-                if company.data:
+                if not profile.data:
+                    st.error("❌ المستخدم غير مربوط بشركة")
+                    st.stop()
 
-                    # ===============================
-                    # Company Info
-                    # ===============================
-                    st.session_state.company_id = company.data[0]["id"]
-                    st.session_state.company_name = company.data[0]["name"]
-                
-                    # ===============================
-                    # Load Credits (NEW SYSTEM)
-                    # ===============================
-                    credits_data = supabase.table("company_credits") \
-                        .select("feature, credits") \
-                        .eq("company_id", st.session_state.company_id) \
-                        .execute()
-                
-                    # default values
-                    st.session_state.credits_sales = 0.0
-                    st.session_state.credits_fleet = 0.0
-                
-                    # لو فيه بيانات
-                    if credits_data.data:
-                
-                        for c in credits_data.data:
-                
-                            feature = (c.get("feature") or "").lower().strip()
-                            credit_value = float(c.get("credits", 0) or 0)
-                
-                            if feature == "sales":
-                                st.session_state.credits_sales = credit_value
-                
-                            elif feature == "fleet":
-                                st.session_state.credits_fleet = credit_value
-                
-                    # ===============================
-                    # LOGIN SUCCESS
-                    # ===============================
-                    st.session_state.logged_in = True
-                    st.session_state.user_email = email
-                
-                    st.rerun()
-                
-                else:
-                    st.error("❌ لا توجد شركة مرتبطة بهذا الحساب")
+                company_id = profile.data["company_id"]
+
+                # =========================================
+                # 🏢 GET COMPANY
+                # =========================================
+                company = supabase.table("Companies") \
+                    .select("id, name") \
+                    .eq("id", company_id) \
+                    .single() \
+                    .execute()
+
+                if not company.data:
+                    st.error("❌ لم يتم العثور على الشركة")
+                    st.stop()
+
+                st.session_state.company_id = company.data["id"]
+                st.session_state.company_name = company.data["name"]
+
+                # =========================================
+                # 💳 LOAD CREDITS (FIXED)
+                # =========================================
+                credits_data = supabase.table("company_credits") \
+                    .select("feature, credits") \
+                    .eq("company_id", st.session_state.company_id) \
+                    .execute()
+
+                # default values
+                st.session_state.credits_sales = 0.0
+                st.session_state.credits_fleet = 0.0
+
+                if credits_data.data:
+
+                    for c in credits_data.data:
+
+                        feature = (c.get("feature") or "").strip().lower()
+                        credit_value = float(c.get("credits") or 0)
+
+                        if feature == "sales":
+                            st.session_state.credits_sales = credit_value
+
+                        elif feature == "fleet":
+                            st.session_state.credits_fleet = credit_value
+
+                # =========================================
+                # ✅ LOGIN SUCCESS
+                # =========================================
+                st.session_state.logged_in = True
+                st.session_state.user_email = email
+
+                st.rerun()
 
             except Exception as e:
-
-                st.error("خطأ في الاتصال بقاعدة البيانات")
+                st.error("❌ خطأ في تسجيل الدخول")
                 st.exception(e)
 
         else:
-
-            st.error("ادخل البريد وكلمة المرور")
+            st.error("⚠️ ادخل البريد وكلمة المرور")
 
     st.stop()
-
-
 # =========================================
 # CLIENT CHECK
 # =========================================
