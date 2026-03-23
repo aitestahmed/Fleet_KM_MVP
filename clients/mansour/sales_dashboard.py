@@ -604,161 +604,127 @@ def run():
                 # ---------------------------------
                 # Top Analysis
                 # ---------------------------------
-
-                # كل الفروع مع تفاصيل كاملة (مبيعات + فواتير + عملاء)
-                branch_full = df_f.groupby("branch_name", as_index=False)\
-                    .agg(
-                        total_sales=("total_amount", "sum"),
-                        total_invoices=("order_id", "nunique"),
-                        total_customers=("customer_id", "nunique"),
-                        total_quantity=("quantity", "sum"),
-                        total_discount=("total_discount", "sum")
-                    ).sort_values("total_sales", ascending=False)
-
-                branch_full["avg_invoice_value"] = np.where(
-                    branch_full["total_invoices"] > 0,
-                    (branch_full["total_sales"] / branch_full["total_invoices"]).round(2),
-                    0
-                )
-
-                branch_full["discount_pct"] = np.where(
-                    branch_full["total_sales"] > 0,
-                    (branch_full["total_discount"] / branch_full["total_sales"] * 100).round(2),
-                    0
-                )
-
-                branch_top3 = branch_full.head(3)
-                branch_bottom3 = branch_full.tail(3).sort_values("total_sales", ascending=True)
-
+    
+                branch_top = df_f.groupby("branch_name", as_index=False)\
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=False).head(5)
+    
+                branch_bottom = df_f.groupby("branch_name", as_index=False)\
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=True).head(5)
+    
                 brand_top = df_f.groupby("brand_name", as_index=False)\
-                    .agg(
-                        total_sales=("total_amount", "sum"),
-                        total_invoices=("order_id", "nunique"),
-                        total_quantity=("quantity", "sum")
-                    ).sort_values("total_sales", ascending=False).head(5)
-
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=False).head(5)
+    
                 sales_rep_top = df_f.groupby("sales_rep_name", as_index=False)\
-                    .agg(
-                        total_sales=("total_amount", "sum"),
-                        total_invoices=("order_id", "nunique"),
-                        total_customers=("customer_id", "nunique")
-                    ).sort_values("total_sales", ascending=False).head(5)
-
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=False).head(5)
+    
                 product_top = df_f.groupby("product_name", as_index=False)\
                     .agg(total_qty=("quantity", "sum"))\
                     .sort_values("total_qty", ascending=False).head(5)
-
+    
                 # ---------------------------------
                 # Customer Analysis
                 # ---------------------------------
-
+    
                 branch_customer = df_f.groupby("branch_name", as_index=False)\
                     .agg(
                         total_customers=("customer_id", "nunique"),
                         total_orders=("order_id", "nunique"),
                         total_sales=("total_amount", "sum")
-                    ).sort_values("total_sales", ascending=False)
-
+                    ).sort_values("total_sales", ascending=False).head(5)
+    
                 sales_rep_invoices = df_f.groupby("sales_rep_name", as_index=False)\
                     .agg(
                         total_invoices=("order_id", "nunique"),
-                        total_customers=("customer_id", "nunique"),
                         total_sales=("total_amount", "sum")
                     ).sort_values("total_invoices", ascending=False).head(5)
-
+    
                 top_customers = df_f.groupby("customer_name", as_index=False)\
-                    .agg(
-                        total_sales=("total_amount", "sum"),
-                        total_invoices=("order_id", "nunique")
-                    ).sort_values("total_sales", ascending=False).head(10)
-
-                # إجمالي العملاء الفريدين
-                total_unique_customers = int(df_f["customer_id"].nunique())
-
+                    .agg(total_sales=("total_amount", "sum"))\
+                    .sort_values("total_sales", ascending=False).head(10)
+    
                 # ---------------------------------
                 # تحويل النص
                 # ---------------------------------
-
-                branch_full_text = branch_full.to_string(index=False)
-                branch_top3_text = branch_top3.to_string(index=False)
-                branch_bottom3_text = branch_bottom3.to_string(index=False)
+    
+                branch_top_text = branch_top.to_string(index=False)
+                branch_bottom_text = branch_bottom.to_string(index=False)
                 brand_top_text = brand_top.to_string(index=False)
                 sales_rep_top_text = sales_rep_top.to_string(index=False)
                 product_top_text = product_top.to_string(index=False)
-
+    
                 branch_customer_text = branch_customer.to_string(index=False)
                 sales_rep_invoice_text = sales_rep_invoices.to_string(index=False)
                 top_customers_text = top_customers.to_string(index=False)
     
                 summary = f"""
     Total Sales: {total_sales}
-    Total Orders (Invoices): {total_orders}
+    Total Orders: {total_orders}
     Total Quantity: {total_quantity}
     Total Discount: {total_discount}
-    Avg Order Value: {avg_order_value:.2f}
-    Discount %: {discount_ratio_pct:.2f}%
-    Total Unique Customers: {total_unique_customers}
+    Avg Order Value: {avg_order_value}
+    Discount %: {discount_ratio_pct}
     Branches: {branches}
     Brands: {brands}
     Sales Reps: {sales_reps}
     Governorates: {governorates}
     """
-
+    
                 # ---------------------------------
                 # Prompt
                 # ---------------------------------
-
+    
                 prompt = f"""
-    قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي احترافي ومفصل.
-
-    📊 ملخص عام:
+    قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي احترافي.
+    
+    📊 ملخص:
     {summary}
-
-    🏢 جميع الفروع (مرتبة من الأعلى للأدنى) مع المبيعات والفواتير والعملاء:
-    {branch_full_text}
-
-    🥇 أفضل 3 فروع تفصيلياً (مبيعات + فواتير + عملاء + متوسط الفاتورة + نسبة الخصم):
-    {branch_top3_text}
-
-    🔴 أضعف 3 فروع تفصيلياً (مبيعات + فواتير + عملاء + متوسط الفاتورة + نسبة الخصم):
-    {branch_bottom3_text}
-
-    🏷 أعلى البراندات مبيعًا (مع الفواتير والكميات):
+    
+    🏢 أعلى الفروع:
+    {branch_top_text}
+    
+    🏢 أقل الفروع:
+    {branch_bottom_text}
+    
+    🏷 البراندات:
     {brand_top_text}
-
-    👤 أفضل المندوبين (مع الفواتير والعملاء والمبيعات):
+    
+    👤 المندوبين:
     {sales_rep_top_text}
-
-    📦 أكثر المنتجات طلبًا (بالكمية):
+    
+    📦 المنتجات:
     {product_top_text}
-
-    👥 توزيع العملاء والفواتير على كل الفروع:
+    
+    👥 العملاء لكل فرع:
     {branch_customer_text}
-
-    🧾 أكثر المندوبين إصدارًا للفواتير:
+    
+    🧾 فواتير المندوبين:
     {sales_rep_invoice_text}
-
-    ⭐ كبار العملاء (مع عدد فواتيرهم):
+    
+    ⭐ كبار العملاء:
     {top_customers_text}
-
+    
     ---------------------------------
-
-    المطلوب في التقرير:
-
-    1. تحليل الأداء العام (إجمالي المبيعات، الفواتير، العملاء، متوسط الفاتورة، نسبة الخصم)
-    2. مقارنة كاملة للفروع مع ذكر أفضل 3 وأسوأ 3 فروع بالأرقام الدقيقة (مبيعات + فواتير + عملاء)
-    3. تحليل كفاءة الفروع: أي الفروع يحقق أعلى مبيعات لكل عميل وأعلى متوسط فاتورة
-    4. تحليل المندوبين: أفضل أداء مع ذكر عدد الفواتير وعدد العملاء لكل مندوب
-    5. تحليل تركّز العملاء وخطر الاعتماد على عدد محدود
-    6. تحليل الخصومات وتأثيرها على الإيرادات
-    7. تحديد المخاطر بشكل واضح مع الأسباب
-    8. فرص التحسين المحددة لكل فرع ضعيف
-    9. توصيات إدارية قابلة للتنفيذ مع أولويات واضحة
-
-    ⚠️ استخدم أرقام حقيقية من البيانات. اذكر أسماء الفروع والعملاء والمندوبين صراحةً.
-    اكتب بأسلوب إداري احترافي ومنظم بعناوين واضحة.
+    
+    المطلوب:
+    
+    1. تحليل الأداء العام
+    2. مقارنة الفروع (مبيعات + عملاء)
+    3. تحليل العملاء داخل الفروع
+    4. تحليل المندوبين (فواتير + أداء)
+    5. تحليل تركّز العملاء
+    6. تحليل الخصومات
+    7. تحديد المخاطر
+    8. فرص التحسين
+    9. توصيات واضحة للإدارة
+    
+    ⚠️ استخدم أرقام حقيقية واذكر أسماء الفروع والعملاء.
+    اكتب بأسلوب إداري احترافي.
     """
-
+    
                 # ---------------------------------
                 # AI CALL
                 # ---------------------------------
@@ -769,7 +735,7 @@ def run():
                         {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات وBI"},
                         {"role": "user", "content": prompt}
                     ],
-                    max_tokens=2800
+                    max_tokens=1000
                 )
     
                 report = response.choices[0].message.content
@@ -1499,6 +1465,3 @@ def run():
     
             except Exception as e:
                 st.error("لم يتمكن النظام من تحليل السؤال.")
-
-
-    
