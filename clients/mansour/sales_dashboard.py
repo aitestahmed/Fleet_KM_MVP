@@ -602,10 +602,15 @@ def run():
                 governorates = int(df_f["governorate"].nunique())
     
                 # ---------------------------------
-                # Top Analysis
+                # إجمالي العملاء الفريدين (الصحيح - على مستوى كل البيانات)
                 # ---------------------------------
 
-                # كل الفروع مع تفاصيل كاملة (مبيعات + فواتير + عملاء)
+                total_unique_customers = int(df_f["customer_id"].nunique())
+
+                # ---------------------------------
+                # كل الفروع مع تفاصيل كاملة
+                # ---------------------------------
+
                 branch_full = df_f.groupby("branch_name", as_index=False)\
                     .agg(
                         total_sales=("total_amount", "sum"),
@@ -613,7 +618,7 @@ def run():
                         total_customers=("customer_id", "nunique"),
                         total_quantity=("quantity", "sum"),
                         total_discount=("total_discount", "sum")
-                    ).sort_values("total_sales", ascending=False)
+                    ).sort_values("total_sales", ascending=False).reset_index(drop=True)
 
                 branch_full["avg_invoice_value"] = np.where(
                     branch_full["total_invoices"] > 0,
@@ -621,14 +626,24 @@ def run():
                     0
                 )
 
+                branch_full["avg_per_customer"] = np.where(
+                    branch_full["total_customers"] > 0,
+                    (branch_full["total_sales"] / branch_full["total_customers"]).round(2),
+                    0
+                )
+
                 branch_full["discount_pct"] = np.where(
-                    branch_full["total_sales"] > 0,
+                    branch_full["total_sales"] != 0,
                     (branch_full["total_discount"] / branch_full["total_sales"] * 100).round(2),
                     0
                 )
 
-                branch_top3 = branch_full.head(3)
+                branch_top3    = branch_full.head(3)
                 branch_bottom3 = branch_full.tail(3).sort_values("total_sales", ascending=True)
+
+                # ---------------------------------
+                # براندات + مندوبين + منتجات
+                # ---------------------------------
 
                 brand_top = df_f.groupby("brand_name", as_index=False)\
                     .agg(
@@ -649,10 +664,10 @@ def run():
                     .sort_values("total_qty", ascending=False).head(5)
 
                 # ---------------------------------
-                # Customer Analysis
+                # توزيع العملاء على كل الفروع
                 # ---------------------------------
 
-                branch_customer = df_f.groupby("branch_name", as_index=False)\
+                branch_customer_all = df_f.groupby("branch_name", as_index=False)\
                     .agg(
                         total_customers=("customer_id", "nunique"),
                         total_orders=("order_id", "nunique"),
@@ -672,36 +687,32 @@ def run():
                         total_invoices=("order_id", "nunique")
                     ).sort_values("total_sales", ascending=False).head(10)
 
-                # إجمالي العملاء الفريدين
-                total_unique_customers = int(df_f["customer_id"].nunique())
-
                 # ---------------------------------
                 # تحويل النص
                 # ---------------------------------
 
-                branch_full_text = branch_full.to_string(index=False)
-                branch_top3_text = branch_top3.to_string(index=False)
-                branch_bottom3_text = branch_bottom3.to_string(index=False)
-                brand_top_text = brand_top.to_string(index=False)
-                sales_rep_top_text = sales_rep_top.to_string(index=False)
-                product_top_text = product_top.to_string(index=False)
-
-                branch_customer_text = branch_customer.to_string(index=False)
+                branch_full_text      = branch_full.to_string(index=False)
+                branch_top3_text      = branch_top3.to_string(index=False)
+                branch_bottom3_text   = branch_bottom3.to_string(index=False)
+                brand_top_text        = brand_top.to_string(index=False)
+                sales_rep_top_text    = sales_rep_top.to_string(index=False)
+                product_top_text      = product_top.to_string(index=False)
+                branch_customer_text  = branch_customer_all.to_string(index=False)
                 sales_rep_invoice_text = sales_rep_invoices.to_string(index=False)
-                top_customers_text = top_customers.to_string(index=False)
-    
+                top_customers_text    = top_customers.to_string(index=False)
+
                 summary = f"""
-    Total Sales: {total_sales}
-    Total Orders (Invoices): {total_orders}
-    Total Quantity: {total_quantity}
-    Total Discount: {total_discount}
-    Avg Order Value: {avg_order_value:.2f}
-    Discount %: {discount_ratio_pct:.2f}%
-    Total Unique Customers: {total_unique_customers}
-    Branches: {branches}
-    Brands: {brands}
-    Sales Reps: {sales_reps}
-    Governorates: {governorates}
+    إجمالي المبيعات: {total_sales:,.2f}
+    إجمالي الفواتير: {total_orders}
+    إجمالي العملاء الفريدين (بدون تكرار): {total_unique_customers}
+    إجمالي الكمية: {total_quantity:,.0f}
+    إجمالي الخصم: {total_discount:,.2f}
+    متوسط قيمة الفاتورة: {avg_order_value:,.2f}
+    نسبة الخصم: {discount_ratio_pct:.2f}%
+    عدد الفروع: {branches}
+    عدد البراندات: {brands}
+    عدد المندوبين: {sales_reps}
+    عدد المحافظات: {governorates}
     """
 
                 # ---------------------------------
@@ -714,13 +725,13 @@ def run():
     📊 ملخص عام:
     {summary}
 
-    🏢 جميع الفروع (مرتبة من الأعلى للأدنى) مع المبيعات والفواتير والعملاء:
+    🏢 جميع الفروع مرتبة من الأعلى للأدنى (مبيعات + فواتير + عملاء + متوسط الفاتورة + متوسط/عميل + نسبة الخصم):
     {branch_full_text}
 
-    🥇 أفضل 3 فروع تفصيلياً (مبيعات + فواتير + عملاء + متوسط الفاتورة + نسبة الخصم):
+    🥇 أفضل 3 فروع تفصيلياً:
     {branch_top3_text}
 
-    🔴 أضعف 3 فروع تفصيلياً (مبيعات + فواتير + عملاء + متوسط الفاتورة + نسبة الخصم):
+    🔴 أضعف 3 فروع تفصيلياً:
     {branch_bottom3_text}
 
     🏷 أعلى البراندات مبيعًا (مع الفواتير والكميات):
@@ -745,12 +756,12 @@ def run():
 
     المطلوب في التقرير:
 
-    1. تحليل الأداء العام (إجمالي المبيعات، الفواتير، العملاء، متوسط الفاتورة، نسبة الخصم)
-    2. مقارنة كاملة للفروع مع ذكر أفضل 3 وأسوأ 3 فروع بالأرقام الدقيقة (مبيعات + فواتير + عملاء)
-    3. تحليل كفاءة الفروع: أي الفروع يحقق أعلى مبيعات لكل عميل وأعلى متوسط فاتورة
+    1. تحليل الأداء العام (إجمالي المبيعات، الفواتير، العملاء الفريدين، متوسط الفاتورة، نسبة الخصم)
+    2. مقارنة كاملة لجميع الفروع مع ذكر أفضل 3 وأسوأ 3 بالأرقام الدقيقة (مبيعات + فواتير + عملاء)
+    3. تحليل كفاءة الفروع: أعلى مبيعات لكل عميل وأعلى متوسط فاتورة
     4. تحليل المندوبين: أفضل أداء مع ذكر عدد الفواتير وعدد العملاء لكل مندوب
     5. تحليل تركّز العملاء وخطر الاعتماد على عدد محدود
-    6. تحليل الخصومات وتأثيرها على الإيرادات
+    6. تحليل الخصومات وتأثيرها على الإيرادات مع تحديد الفروع الأعلى خصمًا
     7. تحديد المخاطر بشكل واضح مع الأسباب
     8. فرص التحسين المحددة لكل فرع ضعيف
     9. توصيات إدارية قابلة للتنفيذ مع أولويات واضحة
@@ -762,11 +773,11 @@ def run():
                 # ---------------------------------
                 # AI CALL
                 # ---------------------------------
-    
+
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
-                        {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات وBI"},
+                        {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات وBI. تكتب تقارير تنفيذية مفصلة بالعربية بأسلوب احترافي."},
                         {"role": "user", "content": prompt}
                     ],
                     max_tokens=2800
@@ -1499,6 +1510,3 @@ def run():
     
             except Exception as e:
                 st.error("لم يتمكن النظام من تحليل السؤال.")
-
-
-    
