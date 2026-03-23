@@ -602,15 +602,10 @@ def run():
                 governorates = int(df_f["governorate"].nunique())
     
                 # ---------------------------------
-                # إجمالي العملاء الفريدين (الصحيح - على مستوى كل البيانات)
+                # Top Analysis
                 # ---------------------------------
 
-                total_unique_customers = int(df_f["customer_id"].nunique())
-
-                # ---------------------------------
-                # كل الفروع مع تفاصيل كاملة
-                # ---------------------------------
-
+                # كل الفروع مع تفاصيل كاملة (مبيعات + فواتير + عملاء)
                 branch_full = df_f.groupby("branch_name", as_index=False)\
                     .agg(
                         total_sales=("total_amount", "sum"),
@@ -618,7 +613,7 @@ def run():
                         total_customers=("customer_id", "nunique"),
                         total_quantity=("quantity", "sum"),
                         total_discount=("total_discount", "sum")
-                    ).sort_values("total_sales", ascending=False).reset_index(drop=True)
+                    ).sort_values("total_sales", ascending=False)
 
                 branch_full["avg_invoice_value"] = np.where(
                     branch_full["total_invoices"] > 0,
@@ -626,24 +621,14 @@ def run():
                     0
                 )
 
-                branch_full["avg_per_customer"] = np.where(
-                    branch_full["total_customers"] > 0,
-                    (branch_full["total_sales"] / branch_full["total_customers"]).round(2),
-                    0
-                )
-
                 branch_full["discount_pct"] = np.where(
-                    branch_full["total_sales"] != 0,
+                    branch_full["total_sales"] > 0,
                     (branch_full["total_discount"] / branch_full["total_sales"] * 100).round(2),
                     0
                 )
 
-                branch_top3    = branch_full.head(3)
+                branch_top3 = branch_full.head(3)
                 branch_bottom3 = branch_full.tail(3).sort_values("total_sales", ascending=True)
-
-                # ---------------------------------
-                # براندات + مندوبين + منتجات
-                # ---------------------------------
 
                 brand_top = df_f.groupby("brand_name", as_index=False)\
                     .agg(
@@ -664,10 +649,10 @@ def run():
                     .sort_values("total_qty", ascending=False).head(5)
 
                 # ---------------------------------
-                # توزيع العملاء على كل الفروع
+                # Customer Analysis
                 # ---------------------------------
 
-                branch_customer_all = df_f.groupby("branch_name", as_index=False)\
+                branch_customer = df_f.groupby("branch_name", as_index=False)\
                     .agg(
                         total_customers=("customer_id", "nunique"),
                         total_orders=("order_id", "nunique"),
@@ -687,32 +672,36 @@ def run():
                         total_invoices=("order_id", "nunique")
                     ).sort_values("total_sales", ascending=False).head(10)
 
+                # إجمالي العملاء الفريدين
+                total_unique_customers = int(df_f["customer_id"].nunique())
+
                 # ---------------------------------
                 # تحويل النص
                 # ---------------------------------
 
-                branch_full_text      = branch_full.to_string(index=False)
-                branch_top3_text      = branch_top3.to_string(index=False)
-                branch_bottom3_text   = branch_bottom3.to_string(index=False)
-                brand_top_text        = brand_top.to_string(index=False)
-                sales_rep_top_text    = sales_rep_top.to_string(index=False)
-                product_top_text      = product_top.to_string(index=False)
-                branch_customer_text  = branch_customer_all.to_string(index=False)
-                sales_rep_invoice_text = sales_rep_invoices.to_string(index=False)
-                top_customers_text    = top_customers.to_string(index=False)
+                branch_full_text = branch_full.to_string(index=False)
+                branch_top3_text = branch_top3.to_string(index=False)
+                branch_bottom3_text = branch_bottom3.to_string(index=False)
+                brand_top_text = brand_top.to_string(index=False)
+                sales_rep_top_text = sales_rep_top.to_string(index=False)
+                product_top_text = product_top.to_string(index=False)
 
+                branch_customer_text = branch_customer.to_string(index=False)
+                sales_rep_invoice_text = sales_rep_invoices.to_string(index=False)
+                top_customers_text = top_customers.to_string(index=False)
+    
                 summary = f"""
-    إجمالي المبيعات: {total_sales:,.2f}
-    إجمالي الفواتير: {total_orders}
-    إجمالي العملاء الفريدين (بدون تكرار): {total_unique_customers}
-    إجمالي الكمية: {total_quantity:,.0f}
-    إجمالي الخصم: {total_discount:,.2f}
-    متوسط قيمة الفاتورة: {avg_order_value:,.2f}
-    نسبة الخصم: {discount_ratio_pct:.2f}%
-    عدد الفروع: {branches}
-    عدد البراندات: {brands}
-    عدد المندوبين: {sales_reps}
-    عدد المحافظات: {governorates}
+    Total Sales: {total_sales}
+    Total Orders (Invoices): {total_orders}
+    Total Quantity: {total_quantity}
+    Total Discount: {total_discount}
+    Avg Order Value: {avg_order_value:.2f}
+    Discount %: {discount_ratio_pct:.2f}%
+    Total Unique Customers: {total_unique_customers}
+    Branches: {branches}
+    Brands: {brands}
+    Sales Reps: {sales_reps}
+    Governorates: {governorates}
     """
 
                 # ---------------------------------
@@ -720,18 +709,18 @@ def run():
                 # ---------------------------------
 
                 prompt = f"""
-    قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي احترافي ومفصل جداً.
+    قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي احترافي ومفصل.
 
     📊 ملخص عام:
     {summary}
 
-    🏢 جميع الفروع مرتبة من الأعلى للأدنى (مبيعات + فواتير + عملاء + متوسط الفاتورة + متوسط/عميل + نسبة الخصم):
+    🏢 جميع الفروع (مرتبة من الأعلى للأدنى) مع المبيعات والفواتير والعملاء:
     {branch_full_text}
 
-    🥇 أفضل 3 فروع تفصيلياً:
+    🥇 أفضل 3 فروع تفصيلياً (مبيعات + فواتير + عملاء + متوسط الفاتورة + نسبة الخصم):
     {branch_top3_text}
 
-    🔴 أضعف 3 فروع تفصيلياً:
+    🔴 أضعف 3 فروع تفصيلياً (مبيعات + فواتير + عملاء + متوسط الفاتورة + نسبة الخصم):
     {branch_bottom3_text}
 
     🏷 أعلى البراندات مبيعًا (مع الفواتير والكميات):
@@ -754,68 +743,33 @@ def run():
 
     ---------------------------------
 
-    اكتب تقريرًا تنفيذيًا شاملًا يحتوي على النقاط التسع التالية، كل نقطة بعنوان واضح وفقرة كاملة مفصلة:
+    المطلوب في التقرير:
 
-    1. تحليل الأداء العام
-    - اذكر إجمالي المبيعات والفواتير والعملاء الفريدين (بدون تكرار) ومتوسط الفاتورة ونسبة الخصم بالأرقام الحقيقية.
-    - قدم تقييمًا لهذه المؤشرات.
-
-    2. مقارنة أداء الفروع
-    - اذكر جميع الفروع مرتبة من الأعلى للأدنى مع مبيعاتها وفواتيرها وعملاءها.
-    - ثم خصص فقرة لأفضل 3 فروع بأرقامها الدقيقة.
-    - وفقرة لأسوأ 3 فروع بأرقامها الدقيقة.
-
-    3. تحليل كفاءة الفروع
-    - حدد الفرع الأعلى مبيعات لكل عميل والأعلى متوسط فاتورة مع الأرقام.
-    - قارن بين الفروع من حيث الكفاءة.
-
-    4. تحليل المندوبين
-    - اذكر أفضل 5 مندوبين بالاسم مع مبيعاتهم وفواتيرهم وعدد عملاءهم.
-    - قيّم الفجوة بين أفضل مندوب وبقية المندوبين.
-
-    5. تحليل تركّز العملاء
-    - اذكر أكبر 5 عملاء بالاسم ومبيعاتهم وفواتيرهم.
-    - احسب نسبة مساهمتهم في إجمالي المبيعات.
-    - وضح خطورة الاعتماد عليهم.
-
+    1. تحليل الأداء العام (إجمالي المبيعات، الفواتير، العملاء، متوسط الفاتورة، نسبة الخصم)
+    2. مقارنة كاملة للفروع مع ذكر أفضل 3 وأسوأ 3 فروع بالأرقام الدقيقة (مبيعات + فواتير + عملاء)
+    3. تحليل كفاءة الفروع: أي الفروع يحقق أعلى مبيعات لكل عميل وأعلى متوسط فاتورة
+    4. تحليل المندوبين: أفضل أداء مع ذكر عدد الفواتير وعدد العملاء لكل مندوب
+    5. تحليل تركّز العملاء وخطر الاعتماد على عدد محدود
     6. تحليل الخصومات وتأثيرها على الإيرادات
-    - اذكر إجمالي الخصم ونسبته.
-    - حدد الفروع الأعلى خصمًا بأسمائها ونسبها.
-    - قدر الأثر المالي لهذه الخصومات.
+    7. تحديد المخاطر بشكل واضح مع الأسباب
+    8. فرص التحسين المحددة لكل فرع ضعيف
+    9. توصيات إدارية قابلة للتنفيذ مع أولويات واضحة
 
-    7. تحديد المخاطر
-    - اذكر على الأقل 4 مخاطر محددة مرتبة بحسب الأولوية مع الأسباب.
-
-    8. فرص التحسين
-    - لكل فرع من أسوأ 3 فروع: خطة تحسين مخصصة وقابلة للتنفيذ.
-
-    9. توصيات إدارية
-    - 5 توصيات على الأقل مرتبة بحسب الأولوية وقابلة للتنفيذ الفوري.
-
-    ⚠️ استخدم الأرقام الحقيقية من البيانات فقط. اذكر الأسماء صراحةً في كل نقطة.
-    لا تختصر أي نقطة. كل نقطة يجب أن تكون فقرة كاملة لا تقل عن 3 جمل.
+    ⚠️ استخدم أرقام حقيقية من البيانات. اذكر أسماء الفروع والعملاء والمندوبين صراحةً.
+    اكتب بأسلوب إداري احترافي ومنظم بعناوين واضحة.
     """
 
                 # ---------------------------------
                 # AI CALL
                 # ---------------------------------
-
+    
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
-                        {"role": "system", "content": """أنت خبير تحليل بيانات مبيعات وBI متخصص في إعداد التقارير التنفيذية.
-
-قواعد صارمة يجب الالتزام بها:
-- اكتب تقريرًا مفصلًا وكاملًا يغطي كل نقطة مطلوبة دون اختصار.
-- استخدم الأرقام الحقيقية الموجودة في البيانات بالضبط، ولا تخترع أرقامًا.
-- اذكر أسماء الفروع والعملاء والمندوبين صراحةً في كل نقطة ذات صلة.
-- لكل فرع ضعيف: اذكر رقمه بالضبط ثم قدم توصية مخصصة له.
-- لا تكتف بجملة واحدة لكل نقطة — كل نقطة يجب أن تكون فقرة كاملة.
-- رتّب التقرير بعناوين واضحة ومرقمة كما هو مطلوب.
-- لا تختصر أو تحذف أي نقطة من النقاط التسع المطلوبة."""},
+                        {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات وBI"},
                         {"role": "user", "content": prompt}
                     ],
-                    max_tokens=3500
+                    max_tokens=2800
                 )
     
                 report = response.choices[0].message.content
@@ -1545,3 +1499,6 @@ def run():
     
             except Exception as e:
                 st.error("لم يتمكن النظام من تحليل السؤال.")
+
+
+    
