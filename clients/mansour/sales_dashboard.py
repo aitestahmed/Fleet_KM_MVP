@@ -1499,3 +1499,6 @@ def run():
     
             except Exception as e:
                 st.error("لم يتمكن النظام من تحليل السؤال.")
+
+
+    
