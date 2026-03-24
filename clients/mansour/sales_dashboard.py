@@ -735,7 +735,7 @@ def run():
                         {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات وBI"},
                         {"role": "user", "content": prompt}
                     ],
-                    max_output_tokens=1000
+                    max_output_tokens=3000
                 )
                 
                 report = response.output[0].content[0].text
