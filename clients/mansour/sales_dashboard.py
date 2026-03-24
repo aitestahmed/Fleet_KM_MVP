@@ -820,6 +820,14 @@ def run():
     st.markdown("## 🤖 Sales Quick Insights")
     
     col1, col2, col3, col4 = st.columns(4)
+
+    # =========================================
+    # 📊 عرض AI Dashboard
+    # =========================================
+    
+    if st.session_state.get("report_data"):
+
+        data = st.session_state.report_data
     
     
     # ===============================
@@ -881,13 +889,7 @@ def run():
     # عرض تقرير AI
     # =========================================
     
-    # =========================================
-# 📊 عرض AI Dashboard
-# =========================================
-
-if st.session_state.get("report_data"):
-
-    data = st.session_state.report_data
+    
 
     # ==============================
     # 📊 SUMMARY
