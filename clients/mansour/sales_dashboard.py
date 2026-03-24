@@ -760,7 +760,17 @@ def run():
                     max_output_tokens=3000
                 )
                 
-                report = response.output[0].content[0].text
+                raw = response.output[0].content[0].text
+
+                # تنظيف
+                raw = raw.replace("```json", "").replace("```", "").strip()
+                
+                try:
+                    report_data = json.loads(raw)
+                    st.session_state.report_data = report_data
+                except:
+                    st.error("⚠️ AI لم يرجع JSON صالح")
+                    st.code(raw)
     
                 # ---------------------------------
                 # خصم الكريديت
@@ -858,25 +868,55 @@ def run():
     # عرض تقرير AI
     # =========================================
     
-    if st.session_state.report_html:
-    
-        st.markdown("## 📑 AI Sales Executive Report")
-    
-        st.markdown(
-            f"""
-            <div style="
-                background-color:#f9fafb;
-                padding:25px;
-                border-radius:10px;
-                border:1px solid #e5e7eb;
-                line-height:1.8;
-                font-size:16px;
-            ">
-            {st.session_state.report_html}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    # =========================================
+# 📊 عرض AI Dashboard
+# =========================================
+
+if st.session_state.report_data:
+
+    data = st.session_state.report_data
+
+    # ==============================
+    # 📊 SUMMARY
+    # ==============================
+    st.markdown("## 📊 الملخص التنفيذي")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("إجمالي المبيعات", f"{data['summary']['total_sales']:,.0f}")
+    col2.metric("عدد الفواتير", data['summary']['total_orders'])
+    col3.metric("عدد العملاء", data['summary']['total_customers'])
+    col4.metric("متوسط الفاتورة", f"{data['summary']['avg_invoice']:,.0f}")
+
+    # ==============================
+    # 🏢 TOP BRANCHES
+    # ==============================
+    st.markdown("## 🏢 أفضل الفروع")
+
+    df_branches = pd.DataFrame(data["top_branches"])
+    st.dataframe(df_branches, use_container_width=True)
+
+    # ==============================
+    # 🧠 INSIGHTS
+    # ==============================
+    st.markdown("## 🧠 التحليل الذكي")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("### ✅ نقاط القوة")
+        for item in data["insights"]["strengths"]:
+            st.write(f"- {item}")
+
+    with col2:
+        st.markdown("### ⚠️ المشاكل")
+        for item in data["insights"]["issues"]:
+            st.write(f"- {item}")
+
+    with col3:
+        st.markdown("### 🚀 الفرص")
+        for item in data["insights"]["opportunities"]:
+            st.write(f"- {item}")
     # =========================================
     # Branch-Customer KPIs
     # =========================================
@@ -1483,7 +1523,7 @@ def run():
                 code = code.replace("```python", "").replace("```", "").strip()
             
                 st.markdown("### 🔎 الكود الذي أنشأه AI")
-                st.code(code)
+                
             
                 # حماية
                 if "import" in code or "=" in code:
