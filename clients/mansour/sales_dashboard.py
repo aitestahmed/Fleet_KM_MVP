@@ -1437,6 +1437,7 @@ def run():
         with st.spinner("🤖 AI يحلل سؤالك..."):
     
             try:
+
                 response = client.responses.create(
                     model="gpt-5.4-mini",
                     input=[
@@ -1451,21 +1452,28 @@ def run():
                     ],
                     max_output_tokens=120
                 )
-                
-                # استخراج النص من الريسبونس الجديد
-                code = response.output[0].content[0].text
-                
-                # تنظيف الكود
+            
+                try:
+                    code = response.output[0].content[0].text
+                except:
+                    code = response.output_text
+            
                 code = code.replace("```python", "").replace("```", "").strip()
-                
+            
                 st.markdown("### 🔎 الكود الذي أنشأه AI")
                 st.code(code)
-                
-                # تنفيذ الكود
+            
+                # حماية
+                if "import" in code or "=" in code:
+                    st.error("الكود غير مسموح")
+                    st.stop()
+            
                 result = eval(code, {"df_sample": df_sample, "pd": pd})
-                
+            
                 st.markdown("### 📊 النتيجة")
                 st.write(result)
-
+            
+            except Exception as e:
+                st.error(f"خطأ أثناء تحليل السؤال: {e}")
 
     
