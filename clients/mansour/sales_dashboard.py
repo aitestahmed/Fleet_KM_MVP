@@ -562,8 +562,8 @@ def run():
     # =========================================
     
     # تخزين التقرير
-    if "report_html" not in st.session_state:
-        st.session_state.report_html = None
+    if "report_data" not in st.session_state:
+        st.session_state.report_data = None
     
     # منع تشغيل AI أكثر من مرة
     if "ai_running" not in st.session_state:
@@ -679,51 +679,72 @@ def run():
                 # ---------------------------------
     
                 prompt = f"""
-    قم بتحليل بيانات المبيعات التالية وتقديم تقرير تنفيذي احترافي.
+    أنت نظام تحليل بيانات مبيعات احترافي (BI System).
     
-    📊 ملخص:
+    ارجع النتيجة في JSON فقط بدون أي نص إضافي.
+    
+    البيانات:
+    
+    SUMMARY:
     {summary}
     
-    🏢 أعلى الفروع:
+    TOP BRANCHES:
     {branch_top_text}
     
-    🏢 أقل الفروع:
+    BOTTOM BRANCHES:
     {branch_bottom_text}
     
-    🏷 البراندات:
+    TOP BRANDS:
     {brand_top_text}
     
-    👤 المندوبين:
+    TOP SALES REPS:
     {sales_rep_top_text}
     
-    📦 المنتجات:
+    TOP PRODUCTS:
     {product_top_text}
     
-    👥 العملاء لكل فرع:
+    BRANCH CUSTOMERS:
     {branch_customer_text}
     
-    🧾 فواتير المندوبين:
+    SALES REP INVOICES:
     {sales_rep_invoice_text}
     
-    ⭐ كبار العملاء:
+    TOP CUSTOMERS:
     {top_customers_text}
     
-    ---------------------------------
+    -----------------------------
     
-    المطلوب:
+    ارجع JSON بهذا الشكل:
     
-    1. تحليل الأداء العام
-    2. مقارنة الفروع (مبيعات + عملاء)
-    3. تحليل العملاء داخل الفروع
-    4. تحليل المندوبين (فواتير + أداء)
-    5. تحليل تركّز العملاء
-    6. تحليل الخصومات
-    7. تحديد المخاطر
-    8. فرص التحسين
-    9. توصيات واضحة للإدارة
+    {{
+      "summary": {{
+        "total_sales": number,
+        "total_orders": number,
+        "total_customers": number,
+        "avg_invoice": number
+      }},
+      "top_branches": [
+        {{
+          "branch_name": string,
+          "total_sales": number,
+          "orders": number,
+          "customers": number,
+          "avg_invoice": number,
+          "discount_pct": number,
+          "contribution_pct": number
+        }}
+      ],
+      "insights": {{
+        "strengths": [string],
+        "issues": [string],
+        "opportunities": [string]
+      }}
+    }}
     
-    ⚠️ استخدم أرقام حقيقية واذكر أسماء الفروع والعملاء.
-    اكتب بأسلوب إداري احترافي.
+    ⚠️ قواعد:
+    - لا تكتب أي نص خارج JSON
+    - لا تكتب شرح
+    - استخدم أرقام حقيقية
     """
     
                 # ---------------------------------
