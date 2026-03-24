@@ -1,7 +1,7 @@
 # =========================================
 # 1️⃣ IMPORTS
 # =========================================
-import pandas as pd 
+import pandas as pd
 import numpy as np
 import plotly.express as px
 import streamlit as st
@@ -9,104 +9,195 @@ from supabase import create_client
 from openai import OpenAI
 
 
-
 def run():
 
-       # =========================================
-       # 2️⃣ CONFIGURATION
-       # =========================================
-       
-       SUPABASE_URL = st.secrets["SUPABASE_URL"]
-       SUPABASE_ANON_KEY = st.secrets["SUPABASE_KEY"]
-       
-       supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-       
-       client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-       
-       
-       # =========================================
-       # HELPERS
-       # =========================================
-       
-       def calculate_tokens(response):
-       try:
-       tokens = response.usage.total_tokens
-       except:
-       tokens = 0
-       return tokens
-       
-       
-       def tokens_to_credit(tokens):
-       credit = tokens / 1000
-       return round(credit, 2)
-       
-       
-       
-       # =========================================
-       # 3️⃣ SESSION STATE
-       # =========================================
-       
-       if "user" not in st.session_state:
-       st.session_state.user = None
-       
-       
-       
-       # =========================================
-       # =========================================
-       # 4️⃣ AUTH UI (FINAL CLEAN VERSION)
-       # =========================================
-       
-       def auth_ui():
-       
-       st.sidebar.title("🔐 Account")
-       
-       # =========================================
-       # CHECK LOGIN FROM MAIN APP
-       # =========================================
-       if not st.session_state.get("logged_in", False):
-       st.sidebar.warning("⚠️ يرجى تسجيل الدخول من الصفحة الرئيسية")
-       st.stop()
-       
-       # =========================================
-       # USER INFO
-       # =========================================
-       st.sidebar.success(f"✅ Logged in: {st.session_state.get('user_email', '-')}")
-       st.sidebar.markdown(f"🏢 Company: {st.session_state.get('company_name', '-')}")
-       st.sidebar.markdown(f"👤 Role: admin")
-       
-       # =========================================
-       # CREDITS
-       # =========================================
-       st.sidebar.markdown("### 💳 Credits")
-       
-       st.sidebar.metric(
-       "📊 Sales Credit",
-       f"{st.session_state.get('credits_sales', 0):.2f}"
-       )
-       
-       st.sidebar.metric(
-       "🚚 Fleet Credit",
-       f"{st.session_state.get('credits_fleet', 0):.2f}"
-       )
-       
-       
-       
-       # =========================================
-       # 6️⃣ PAGE CONFIG
-       # =========================================
-       
-       st.set_page_config(page_title="Fleet Intelligence - Cost/KM", layout="wide")
-       st.markdown(
-       """
-              <h1 style='text-align: right; font-weight: 800;'>
-                  لوحة تحليل المبيعات 
-              </h1>
-              <p style='text-align: right; color: gray; margin-top: -10px;'>
-                  رفع ملف إكسل → توحيد البيانات → حساب المؤشرات → عرض الرسوم البيانية
-              </p>
-              """,
-       unsafe_allow_html=True
-       )
+    # =========================================
+    # 2️⃣ CONFIGURATION
+    # =========================================
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
+
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    client = OpenAI(api_key=OPENAI_KEY)
+
+    # =========================================
+    # HELPERS
+    # =========================================
+    def calculate_tokens(response):
+        try:
+            return response.usage.total_tokens
+        except:
+            return 0
+
+    def tokens_to_credit(tokens):
+        return round(tokens / 1000, 2)
+
+    # =========================================
+    # SESSION STATE
+    # =========================================
+    if "report_html" not in st.session_state:
+        st.session_state.report_html = None
+
+    if "ai_running" not in st.session_state:
+        st.session_state.ai_running = False
+
+    if "credits_sales" not in st.session_state:
+        st.session_state.credits_sales = 100
+
+    # =========================================
+    # PAGE
+    # =========================================
+    st.set_page_config(page_title="Sales Dashboard", layout="wide")
+
+    st.markdown(
+        "<h1 style='text-align:right;'>📊 لوحة تحليل المبيعات</h1>",
+        unsafe_allow_html=True
+    )
+
+    # =========================================
+    # LOAD DATA
+    # =========================================
+    @st.cache_data
+    def load_data(file):
+        df = pd.read_excel(file)
+        df.columns = df.columns.str.strip()
+
+        rename_map = {
+            "اسم الفرع": "branch_name",
+            "رقم الاوردر": "order_id",
+            "اسم العميل": "customer_name",
+            "كود العميل": "customer_id",
+            "اسم المندوب": "sales_rep_name",
+            "التاريخ": "date",
+            "الكمية": "quantity",
+            "السعر": "price",
+            "اجمالي الخصومات": "total_discount",
+            "الاجمالي": "total_amount",
+            "اسم البراند": "brand_name",
+            "اسم المحافظة": "governorate"
+        }
+
+        df = df.rename(columns=rename_map)
+
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+        numeric_cols = ["quantity", "price", "total_discount", "total_amount"]
+        for col in numeric_cols:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        df = df.dropna(subset=["order_id", "date"])
+
+        return df
+
+    # =========================================
+    # FILE UPLOAD
+    # =========================================
+    uploaded = st.file_uploader("📂 ارفع ملف Excel", type=["xlsx"])
+
+    if not uploaded:
+        st.stop()
+
+    df = load_data(uploaded)
+
+    # =========================================
+    # KPIs
+    # =========================================
+    total_sales = df["total_amount"].sum()
+    total_orders = df["order_id"].nunique()
+    total_discount = df["total_discount"].sum()
+    total_customers = df["customer_id"].nunique()
+
+    avg_order = total_sales / total_orders if total_orders else 0
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("💰 المبيعات", f"{total_sales:,.0f}")
+    col2.metric("🧾 الأوردرات", f"{total_orders:,.0f}")
+    col3.metric("👥 العملاء", f"{total_customers:,.0f}")
+    col4.metric("📊 متوسط الفاتورة", f"{avg_order:,.2f}")
+
+    # =========================================
+    # CHART
+    # =========================================
+    branch_sales = (
+        df.groupby("branch_name", as_index=False)
+        .agg(total_sales=("total_amount", "sum"))
+        .sort_values("total_sales", ascending=False)
+    )
+
+    fig = px.bar(branch_sales, x="branch_name", y="total_sales")
+
+    fig.update_traces(
+        text=branch_sales["total_sales"],
+        texttemplate="%{text:,.0f}",
+        textposition="outside"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # =========================================
+    # AI ENGINE
+    # =========================================
+    if st.button("🤖 Generate AI Report"):
+
+        if st.session_state.credits_sales <= 0:
+            st.error("الرصيد انتهى")
+            st.stop()
+
+        with st.spinner("AI جاري التحليل..."):
+
+            summary = f"""
+            Total Sales: {total_sales}
+            Total Orders: {total_orders}
+            Total Customers: {total_customers}
+            Total Discount: {total_discount}
+            Avg Order: {avg_order}
+            """
+
+            prompt = f"""
+            حلل بيانات المبيعات التالية وقدم تقرير إداري واضح:
+
+            {summary}
+
+            ركز على:
+            - أداء الفروع
+            - العملاء
+            - الخصومات
+            - التوصيات
+            """
+
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "أنت خبير BI"},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1200
+            )
+
+            report = response.choices[0].message.content
+
+            tokens = calculate_tokens(response)
+            credit = tokens_to_credit(tokens)
+
+            st.session_state.credits_sales -= credit
+            st.session_state.report_html = report
+
+    # =========================================
+    # SHOW REPORT
+    # =========================================
+    if st.session_state.report_html:
+        st.markdown("## 📑 AI Report")
+
+        st.markdown(
+            f"""
+            <div style='padding:20px;background:#f5f5f5;border-radius:10px'>
+            {st.session_state.report_html}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
        # =========================================
        # =========================================
        # 7️⃣ DATA LOADING
