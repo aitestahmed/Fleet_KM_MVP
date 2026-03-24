@@ -809,7 +809,9 @@ def run():
             except Exception as e:
     
                 st.error("لم يتمكن النظام من تحليل البيانات.")
+                st.session_state.report_data = None
                 st.session_state.ai_running = False
+                
     
 
     # =========================================
@@ -894,6 +896,13 @@ def run():
     # ==============================
     # 📊 SUMMARY
     # ==============================
+    if st.session_state.get("report_data"):
+
+    data = st.session_state.report_data
+
+    # ==============================
+    # 📊 SUMMARY
+    # ==============================
     st.markdown("## 📊 الملخص التنفيذي")
 
     col1, col2, col3, col4 = st.columns(4)
@@ -902,6 +911,8 @@ def run():
     col2.metric("عدد الفواتير", data['summary']['total_orders'])
     col3.metric("عدد العملاء", data['summary']['total_customers'])
     col4.metric("متوسط الفاتورة", f"{data['summary']['avg_invoice']:,.0f}")
+
+    # باقي التقرير كله هنا 👇
 
     # ==============================
     # 🏢 TOP BRANCHES
