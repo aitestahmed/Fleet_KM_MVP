@@ -12,6 +12,19 @@ from openai import OpenAI
 
 
 def run():
+
+    # =========================================
+    # INIT SESSION STATE (VERY IMPORTANT)
+    # =========================================
+    
+    if "report_data" not in st.session_state:
+        st.session_state.report_data = None
+    
+    if "ai_running" not in st.session_state:
+        st.session_state.ai_running = False
+    
+    if "report_html" not in st.session_state:
+        st.session_state.report_html = None
     
     # =========================================
     # 2️⃣ CONFIGURATION
@@ -791,7 +804,7 @@ def run():
                 st.session_state.credits_sales = new_credit
     
                 # حفظ التقرير
-                st.session_state.report_html = report
+                
     
             except Exception as e:
     
@@ -872,7 +885,7 @@ def run():
 # 📊 عرض AI Dashboard
 # =========================================
 
-if st.session_state.report_data:
+if st.session_state.get("report_data"):
 
     data = st.session_state.report_data
 
