@@ -1,26 +1,11 @@
 # =========================================
-# IMPORTS
+# SALES MODULE (CLEAN PRODUCTION VERSION)
 # =========================================
+
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import streamlit as st
-from supabase import create_client
-from openai import OpenAI
-
-
-# =========================================
-# HELPERS
-# =========================================
-def calculate_tokens(response):
-    try:
-        return response.usage.total_tokens
-    except:
-        return 0
-
-
-def tokens_to_credit(tokens):
-    return round(tokens / 1000, 2)
 
 
 # =========================================
@@ -28,54 +13,123 @@ def tokens_to_credit(tokens):
 # =========================================
 @st.cache_data
 def load_data(file):
-    df = pd.read_excel(file)
-    df.columns = df.columns.str.strip()
+    try:
+        df = pd.read_excel(file)
+        df.columns = df.columns.str.strip()
 
-    rename_map = {
-        "اسم الفرع": "branch_name",
-        "رقم الاوردر": "order_id",
-        "اسم العميل": "customer_name",
-        "كود العميل": "customer_id",
-        "اسم المندوب": "sales_rep_name",
-        "التاريخ": "date",
-        "الكمية": "quantity",
-        "السعر": "price",
-        "اجمالي الخصومات": "total_discount",
-        "الاجمالي": "total_amount",
-        "اسم البراند": "brand_name",
-        "اسم المحافظة": "governorate"
-    }
+        rename_map = {
+            "اسم الفرع": "branch_name",
+            "رقم الاوردر": "order_id",
+            "اسم العميل": "customer_name",
+            "كود العميل": "customer_id",
+            "اسم المندوب": "sales_rep_name",
+            "التاريخ": "date",
+            "الكمية": "quantity",
+            "السعر": "price",
+            "اجمالي الخصومات": "total_discount",
+            "الاجمالي": "total_amount",
+            "اسم البراند": "brand_name",
+            "اسم المحافظة": "governorate"
+        }
 
-    df = df.rename(columns=rename_map)
+        df = df.rename(columns=rename_map)
 
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        required = ["order_id", "date", "total_amount"]
 
-    for col in ["quantity", "price", "total_discount", "total_amount"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            raise ValueError(f"Missing columns: {missing}")
 
-    df = df.dropna(subset=["order_id", "date"])
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-    return df
+        for col in ["quantity", "price", "total_discount", "total_amount"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        df = df.dropna(subset=["order_id", "date"])
+
+        return df
+
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        st.stop()
 
 
 # =========================================
 # KPI ENGINE
 # =========================================
 def compute_kpis(df):
-    total_sales = df["total_amount"].sum()
-    total_orders = df["order_id"].nunique()
-    total_discount = df["total_discount"].sum()
-    total_customers = df["customer_id"].nunique()
+    total_sales = float(df["total_amount"].sum())
+    total_orders = int(df["order_id"].nunique())
+    total_customers = int(df["customer_id"].nunique())
+    total_discount = float(df["total_discount"].sum()) if "total_discount" in df.columns else 0
 
     avg_order = total_sales / total_orders if total_orders else 0
 
     return {
-        "total_sales": total_sales,
-        "total_orders": total_orders,
-        "total_discount": total_discount,
-        "total_customers": total_customers,
+        "sales": total_sales,
+        "orders": total_orders,
+        "customers": total_customers,
+        "discount": total_discount,
         "avg_order": avg_order
     }
+
+
+# =========================================
+# FILTER ENGINE
+# =========================================
+def apply_filters(df):
+
+    with st.sidebar:
+        st.header("🔎 Filters")
+
+        branches = df["branch_name"].dropna().unique().tolist()
+        brands = df["brand_name"].dropna().unique().tolist()
+
+        selected_branch = st.multiselect("Branch", branches, default=branches)
+        selected_brand = st.multiselect("Brand", brands, default=brands)
+
+    df_f = df.copy()
+
+    if selected_branch:
+        df_f = df_f[df_f["branch_name"].isin(selected_branch)]
+
+    if selected_brand:
+        df_f = df_f[df_f["brand_name"].isin(selected_brand)]
+
+    return df_f
+
+
+# =========================================
+# DASHBOARD
+# =========================================
+def render_dashboard(df, kpis):
+
+    st.title("📊 Sales Dashboard")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("💰 Sales", f"{kpis['sales']:,.0f}")
+    col2.metric("🧾 Orders", kpis["orders"])
+    col3.metric("👥 Customers", kpis["customers"])
+    col4.metric("📊 Avg Order", f"{kpis['avg_order']:,.2f}")
+
+    # Branch Sales
+    branch = (
+        df.groupby("branch_name", as_index=False)
+        .agg(total_sales=("total_amount", "sum"))
+        .sort_values("total_sales", ascending=False)
+    )
+
+    fig = px.bar(branch, x="branch_name", y="total_sales")
+
+    fig.update_traces(
+        text=branch["total_sales"],
+        texttemplate='%{text:,.0f}',
+        textposition='outside'
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # =========================================
@@ -83,112 +137,70 @@ def compute_kpis(df):
 # =========================================
 def generate_ai_report(client, df, kpis):
 
+    top_branches = (
+        df.groupby("branch_name", as_index=False)
+        .agg(total_sales=("total_amount", "sum"))
+        .sort_values("total_sales", ascending=False)
+        .head(5)
+    )
+
     summary = f"""
-    Total Sales: {kpis['total_sales']}
-    Total Orders: {kpis['total_orders']}
-    Total Customers: {kpis['total_customers']}
-    Total Discount: {kpis['total_discount']}
+    Total Sales: {kpis['sales']}
+    Orders: {kpis['orders']}
+    Customers: {kpis['customers']}
     Avg Order: {kpis['avg_order']}
     """
 
     prompt = f"""
-    حلل بيانات المبيعات التالية وقدم تقرير إداري:
+    حلل بيانات المبيعات التالية:
 
     {summary}
+
+    أعلى الفروع:
+    {top_branches.to_string(index=False)}
+
+    المطلوب:
+    - تحليل الأداء
+    - أفضل وأسوأ الفروع
+    - توصيات واضحة
     """
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "أنت خبير BI"},
+            {"role": "system", "content": "أنت خبير تحليل مبيعات وBI"},
             {"role": "user", "content": prompt}
         ],
-        max_tokens=1000
+        max_tokens=1200
     )
 
     return response
 
 
 # =========================================
-# MAIN APP
+# MAIN SALES FLOW
 # =========================================
-def run():
+def run_sales(client):
 
-    # ---------------- CONFIG ----------------
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-    OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
-
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    client = OpenAI(api_key=OPENAI_KEY)
-
-    st.set_page_config(page_title="Sales Dashboard", layout="wide")
-
-    # ---------------- SESSION ----------------
-    if "report_html" not in st.session_state:
-        st.session_state.report_html = None
-
-    if "credits_sales" not in st.session_state:
-        st.session_state.credits_sales = 100
-
-    # ---------------- UI ----------------
-    st.title("📊 لوحة تحليل المبيعات")
-
-    uploaded = st.file_uploader("📂 ارفع ملف Excel", type=["xlsx"])
+    uploaded = st.file_uploader("📂 Upload Excel", type=["xlsx"])
 
     if not uploaded:
         st.stop()
 
     df = load_data(uploaded)
 
-    # ---------------- KPIs ----------------
-    kpis = compute_kpis(df)
+    df_f = apply_filters(df)
 
-    col1, col2, col3, col4 = st.columns(4)
+    kpis = compute_kpis(df_f)
 
-    col1.metric("💰 المبيعات", f"{kpis['total_sales']:,.0f}")
-    col2.metric("🧾 الأوردرات", f"{kpis['total_orders']:,.0f}")
-    col3.metric("👥 العملاء", f"{kpis['total_customers']:,.0f}")
-    col4.metric("📊 متوسط الفاتورة", f"{kpis['avg_order']:,.2f}")
+    render_dashboard(df_f, kpis)
 
-    # ---------------- CHART ----------------
-    branch_sales = (
-        df.groupby("branch_name", as_index=False)
-        .agg(total_sales=("total_amount", "sum"))
-        .sort_values("total_sales", ascending=False)
-    )
-
-    fig = px.bar(branch_sales, x="branch_name", y="total_sales")
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ---------------- AI ----------------
     if st.button("🤖 Generate AI Report"):
 
-        if st.session_state.credits_sales <= 0:
-            st.error("الرصيد انتهى")
-            st.stop()
-
-        with st.spinner("AI جاري التحليل..."):
-
-            response = generate_ai_report(client, df, kpis)
+        with st.spinner("Analyzing..."):
+            response = generate_ai_report(client, df_f, kpis)
 
             report = response.choices[0].message.content
 
-            tokens = calculate_tokens(response)
-            credit = tokens_to_credit(tokens)
-
-            st.session_state.credits_sales -= credit
-            st.session_state.report_html = report
-
-    # ---------------- SHOW REPORT ----------------
-    if st.session_state.report_html:
-        st.markdown("## 📑 AI Report")
-
-        st.markdown(
-            f"""
-            <div style='padding:20px;background:#f5f5f5;border-radius:10px'>
-            {st.session_state.report_html}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+            st.markdown("## 📑 AI Report")
+            st.write(report)
