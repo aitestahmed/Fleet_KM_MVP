@@ -208,6 +208,16 @@ def run():
         # ------------------------------
     
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+        # --------------------------------
+        # FIX: fill NaN in governorate so rows are never dropped by isin() filter
+        # --------------------------------
+        df["governorate"]    = df["governorate"].fillna("غير محدد")
+        df["city"]           = df["city"].fillna("غير محدد")
+        df["area"]           = df["area"].fillna("غير محدد")
+        df["branch_name"]    = df["branch_name"].fillna("غير محدد")
+        df["brand_name"]     = df["brand_name"].fillna("غير محدد")
+        df["sales_rep_name"] = df["sales_rep_name"].fillna("غير محدد")
     
         # ------------------------------
         # Numeric columns
@@ -517,19 +527,31 @@ def run():
     
     # فلترة الفروع
     if selected_branch:
-        df_f = df_f[df_f["branch_name"].isin(selected_branch)]
+        df_f = df_f[
+            df_f["branch_name"].isin(selected_branch) |
+            df_f["branch_name"].isna()
+        ]
     
     # فلترة البراند
     if selected_brand:
-        df_f = df_f[df_f["brand_name"].isin(selected_brand)]
+        df_f = df_f[
+            df_f["brand_name"].isin(selected_brand) |
+            df_f["brand_name"].isna()
+        ]
     
     # فلترة المندوب
     if selected_sales_rep:
-        df_f = df_f[df_f["sales_rep_name"].isin(selected_sales_rep)]
+        df_f = df_f[
+            df_f["sales_rep_name"].isin(selected_sales_rep) |
+            df_f["sales_rep_name"].isna()
+        ]
     
-    # فلترة المحافظة
+    # فلترة المحافظة — مع الاحتفاظ بالسطور التي لا تحتوي على محافظة
     if selected_governorate:
-        df_f = df_f[df_f["governorate"].isin(selected_governorate)]
+        df_f = df_f[
+            df_f["governorate"].isin(selected_governorate) |
+            df_f["governorate"].isna()
+        ]
     
     
     # فلترة التاريخ بشكل آمن
@@ -1475,5 +1497,3 @@ def run():
             
             except Exception as e:
                 st.error(f"خطأ أثناء تحليل السؤال: {e}")
-
-    
