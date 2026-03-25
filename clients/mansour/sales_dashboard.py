@@ -729,16 +729,16 @@ def run():
                 # AI CALL
                 # ---------------------------------
     
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
+                response = client.responses.create(
+                    model="gpt-5.4-mini",
+                    input=[
                         {"role": "system", "content": "أنت خبير تحليل بيانات مبيعات وBI"},
                         {"role": "user", "content": prompt}
                     ],
-                    max_tokens=1000
+                    max_output_tokens=3000
                 )
-    
-                report = response.choices[0].message.content
+                
+                report = response.output[0].content[0].text
     
                 # ---------------------------------
                 # خصم الكريديت
@@ -1437,9 +1437,10 @@ def run():
         with st.spinner("🤖 AI يحلل سؤالك..."):
     
             try:
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
+
+                response = client.responses.create(
+                    model="gpt-5.4-mini",
+                    input=[
                         {
                             "role": "system",
                             "content": "You are a professional sales data analyst using pandas. Return only one valid pandas expression and never use assignment."
@@ -1449,22 +1450,30 @@ def run():
                             "content": prompt
                         }
                     ],
-                    max_tokens=120
+                    max_output_tokens=120
                 )
-    
-                code = response.choices[0].message.content
+            
+                try:
+                    code = response.output[0].content[0].text
+                except:
+                    code = response.output_text
+            
                 code = code.replace("```python", "").replace("```", "").strip()
-    
+            
                 st.markdown("### 🔎 الكود الذي أنشأه AI")
                 st.code(code)
-    
+            
+                # حماية
+                if "import" in code or "=" in code:
+                    st.error("الكود غير مسموح")
+                    st.stop()
+            
                 result = eval(code, {"df_sample": df_sample, "pd": pd})
-    
+            
                 st.markdown("### 📊 النتيجة")
                 st.write(result)
-    
+            
             except Exception as e:
-                st.error("لم يتمكن النظام من تحليل السؤال.")
-
+                st.error(f"خطأ أثناء تحليل السؤال: {e}")
 
     
