@@ -267,106 +267,81 @@ def run():
     # =========================================
     
     def compute_kpis(df):
-
-        # ================================
-        # FIX: Deduplicate order-level data
-        # total_amount and total_discount are order-level values
-        # repeated on every product row → must deduplicate before summing.
-        # total_quantity is line-item level → sum all rows (correct as-is).
-        # total_orders: count order_id including NaN rows (use len after dropna=False logic).
-        # ================================
-        df_orders = df.dropna(subset=["order_id"]).drop_duplicates(subset=["order_id"])
-
+    
         # ================================
         # Daily Sales
         # ================================
-        daily_sales = (
-            df_orders.groupby(["date"], as_index=False)
+        daily = (
+            df.groupby(["date"], as_index=False)
               .agg(
                   total_sales=("total_amount","sum"),
+                  total_quantity=("quantity","sum"),
                   total_discount=("total_discount","sum"),
-                  total_orders=("order_id","count")
+                  total_orders=("order_id","nunique")
               )
         )
-        daily_qty = (
-            df.groupby(["date"], as_index=False)
-              .agg(total_quantity=("quantity","sum"))
-        )
-        daily = daily_sales.merge(daily_qty, on="date", how="left")
-
+    
         daily["avg_order_value"] = np.where(
             daily["total_orders"] > 0,
             daily["total_sales"] / daily["total_orders"],
             0
         )
-
-
+    
+    
         # ================================
         # Branch Performance
         # ================================
-        branch_sales = (
-            df_orders.groupby("branch_name", as_index=False)
+        branch = (
+            df.groupby("branch_name", as_index=False)
               .agg(
                   total_sales=("total_amount","sum"),
+                  total_quantity=("quantity","sum"),
                   total_discount=("total_discount","sum"),
-                  total_orders=("order_id","count")
+                  total_orders=("order_id","nunique")
               )
         )
-        branch_qty = (
-            df.groupby("branch_name", as_index=False)
-              .agg(total_quantity=("quantity","sum"))
-        )
-        branch = branch_sales.merge(branch_qty, on="branch_name", how="left")
-
+    
         branch["avg_order_value"] = np.where(
             branch["total_orders"] > 0,
             branch["total_sales"] / branch["total_orders"],
             0
         )
-
-
+    
+    
         # ================================
         # Brand Performance
         # ================================
-        brand_sales = (
-            df_orders.groupby("brand_name", as_index=False)
+        brand = (
+            df.groupby("brand_name", as_index=False)
               .agg(
                   total_sales=("total_amount","sum"),
-                  total_orders=("order_id","count")
+                  total_quantity=("quantity","sum"),
+                  total_orders=("order_id","nunique")
               )
         )
-        brand_qty = (
-            df.groupby("brand_name", as_index=False)
-              .agg(total_quantity=("quantity","sum"))
-        )
-        brand = brand_sales.merge(brand_qty, on="brand_name", how="left")
-
-
+    
+    
         # ================================
         # Governorate Performance
         # ================================
-        gov_sales = (
-            df_orders.groupby("governorate", as_index=False)
+        governorate = (
+            df.groupby("governorate", as_index=False)
               .agg(
                   total_sales=("total_amount","sum"),
-                  total_orders=("order_id","count")
+                  total_quantity=("quantity","sum"),
+                  total_orders=("order_id","nunique")
               )
         )
-        gov_qty = (
-            df.groupby("governorate", as_index=False)
-              .agg(total_quantity=("quantity","sum"))
-        )
-        governorate = gov_sales.merge(gov_qty, on="governorate", how="left")
-
-
+    
+    
         # ================================
         # Overall Sales KPIs
         # ================================
         sales = {
-            "total_sales": float(df_orders["total_amount"].sum()),
+            "total_sales": float(df["total_amount"].sum()),
             "total_quantity": float(df["quantity"].sum()),
-            "total_discount": float(df_orders["total_discount"].sum()),
-            "total_orders": int(df["order_id"].count())   # count() includes all non-NaN
+            "total_discount": float(df["total_discount"].sum()),
+            "total_orders": int(df["order_id"].nunique())
         }
     
         sales["avg_order_value"] = (
@@ -613,11 +588,10 @@ def run():
                 # تجهيز ملخص البيانات
                 # ---------------------------------
     
-                _df_f_orders = df_f.dropna(subset=["order_id"]).drop_duplicates(subset=["order_id"])
-                total_sales = float(_df_f_orders["total_amount"].sum())
-                total_orders = int(df_f["order_id"].count())
+                total_sales = float(df_f["total_amount"].sum())
+                total_orders = int(df_f["order_id"].nunique())
                 total_quantity = float(df_f["quantity"].sum())
-                total_discount = float(_df_f_orders["total_discount"].sum())
+                total_discount = float(df_f["total_discount"].sum())
     
                 avg_order_value = total_sales / total_orders if total_orders else 0
                 discount_ratio_pct = (total_discount / total_sales * 100) if total_sales else 0
@@ -628,47 +602,47 @@ def run():
                 governorates = int(df_f["governorate"].nunique())
     
                 # ---------------------------------
-                # Top Analysis (use deduped orders for total_sales)
+                # Top Analysis
                 # ---------------------------------
-
-                branch_top = _df_f_orders.groupby("branch_name", as_index=False)\
+    
+                branch_top = df_f.groupby("branch_name", as_index=False)\
                     .agg(total_sales=("total_amount", "sum"))\
                     .sort_values("total_sales", ascending=False).head(5)
-
-                branch_bottom = _df_f_orders.groupby("branch_name", as_index=False)\
+    
+                branch_bottom = df_f.groupby("branch_name", as_index=False)\
                     .agg(total_sales=("total_amount", "sum"))\
                     .sort_values("total_sales", ascending=True).head(5)
-
-                brand_top = _df_f_orders.groupby("brand_name", as_index=False)\
+    
+                brand_top = df_f.groupby("brand_name", as_index=False)\
                     .agg(total_sales=("total_amount", "sum"))\
                     .sort_values("total_sales", ascending=False).head(5)
-
-                sales_rep_top = _df_f_orders.groupby("sales_rep_name", as_index=False)\
+    
+                sales_rep_top = df_f.groupby("sales_rep_name", as_index=False)\
                     .agg(total_sales=("total_amount", "sum"))\
                     .sort_values("total_sales", ascending=False).head(5)
-
+    
                 product_top = df_f.groupby("product_name", as_index=False)\
                     .agg(total_qty=("quantity", "sum"))\
                     .sort_values("total_qty", ascending=False).head(5)
-
+    
                 # ---------------------------------
                 # Customer Analysis
                 # ---------------------------------
-
-                branch_customer = _df_f_orders.groupby("branch_name", as_index=False)\
+    
+                branch_customer = df_f.groupby("branch_name", as_index=False)\
                     .agg(
                         total_customers=("customer_id", "nunique"),
-                        total_orders=("order_id", "count"),
+                        total_orders=("order_id", "nunique"),
                         total_sales=("total_amount", "sum")
                     ).sort_values("total_sales", ascending=False).head(5)
     
-                sales_rep_invoices = _df_f_orders.groupby("sales_rep_name", as_index=False)\
+                sales_rep_invoices = df_f.groupby("sales_rep_name", as_index=False)\
                     .agg(
-                        total_invoices=("order_id", "count"),
+                        total_invoices=("order_id", "nunique"),
                         total_sales=("total_amount", "sum")
                     ).sort_values("total_invoices", ascending=False).head(5)
     
-                top_customers = _df_f_orders.groupby("customer_name", as_index=False)\
+                top_customers = df_f.groupby("customer_name", as_index=False)\
                     .agg(total_sales=("total_amount", "sum"))\
                     .sort_values("total_sales", ascending=False).head(10)
     
@@ -809,7 +783,7 @@ def run():
     with col1:
         if st.button("🏢 أعلى الفروع مبيعات"):
             top_branch = (
-                df_f_orders.groupby("branch_name", as_index=False)
+                df_f.groupby("branch_name", as_index=False)
                     .agg(total_sales=("total_amount","sum"))
                     .sort_values("total_sales", ascending=False)
                     .head(5)
@@ -823,7 +797,7 @@ def run():
     with col2:
         if st.button("🏷 أكثر البراندات مبيعًا"):
             top_brand = (
-                df_f_orders.groupby("brand_name", as_index=False)
+                df_f.groupby("brand_name", as_index=False)
                     .agg(total_sales=("total_amount","sum"))
                     .sort_values("total_sales", ascending=False)
                     .head(5)
@@ -837,7 +811,7 @@ def run():
     with col3:
         if st.button("👤 أفضل المندوبين مبيعات"):
             top_sales_rep = (
-                df_f_orders.groupby("sales_rep_name", as_index=False)
+                df_f.groupby("sales_rep_name", as_index=False)
                     .agg(total_sales=("total_amount","sum"))
                     .sort_values("total_sales", ascending=False)
                     .head(5)
@@ -851,7 +825,7 @@ def run():
     with col4:
         if st.button("📍 أعلى المحافظات مبيعات"):
             top_geo = (
-                df_f_orders.groupby("governorate", as_index=False)
+                df_f.groupby("governorate", as_index=False)
                     .agg(total_sales=("total_amount","sum"))
                     .sort_values("total_sales", ascending=False)
                     .head(5)
@@ -885,24 +859,14 @@ def run():
     # Branch-Customer KPIs
     # =========================================
 
-    # FIX: deduplicate per order_id before summing total_sales
-    df_f_orders = df_f.dropna(subset=["order_id"]).drop_duplicates(subset=["order_id"])
-
-    branch_sales_dedup = (
-        df_f_orders.groupby("branch_name", as_index=False)
+    branch_customer_kpis = (
+        df_f.groupby("branch_name", as_index=False)
             .agg(
                 total_sales=("total_amount", "sum"),
                 total_customers_served=("customer_id", "nunique"),
-                total_invoices=("order_id", "count")
+                total_invoices=("order_id", "nunique"),
+                total_quantity=("quantity", "sum")
             )
-    )
-    branch_qty_all = (
-        df_f.groupby("branch_name", as_index=False)
-            .agg(total_quantity=("quantity", "sum"))
-    )
-    branch_customer_kpis = (
-        branch_sales_dedup
-            .merge(branch_qty_all, on="branch_name", how="left")
             .sort_values("total_sales", ascending=False)
     )
 
@@ -923,25 +887,15 @@ def run():
     # Customer KPIs
     # =========================================
 
-    # FIX: customer_kpis - total_sales/discount deduped per order, quantity from all rows
-    df_f_cust_orders = df_f.dropna(subset=["order_id"]).drop_duplicates(subset=["branch_name", "customer_id", "order_id"])
-
-    customer_sales_dedup = (
-        df_f_cust_orders.groupby(["branch_name", "customer_id", "customer_name"], as_index=False)
+    customer_kpis = (
+        df_f.groupby(["branch_name", "customer_id", "customer_name"], as_index=False)
             .agg(
                 total_sales=("total_amount", "sum"),
-                total_invoices=("order_id", "count"),
+                total_invoices=("order_id", "nunique"),
+                total_quantity=("quantity", "sum"),
                 total_discount=("total_discount", "sum"),
                 active_days=("date", "nunique")
             )
-    )
-    customer_qty_all = (
-        df_f.groupby(["branch_name", "customer_id", "customer_name"], as_index=False)
-            .agg(total_quantity=("quantity", "sum"))
-    )
-    customer_kpis = (
-        customer_sales_dedup
-            .merge(customer_qty_all, on=["branch_name", "customer_id", "customer_name"], how="left")
             .sort_values("total_sales", ascending=False)
     )
 
@@ -1039,7 +993,7 @@ def run():
     # =========================================
     
     brand_sales = (
-        df_f_orders.groupby("brand_name", as_index=False)
+        df_f.groupby("brand_name", as_index=False)
             .agg(total_sales=("total_amount", "sum"))
             .sort_values("total_sales", ascending=False)
     )
@@ -1050,7 +1004,7 @@ def run():
     # =========================================
     
     branch_sales = (
-        df_f_orders.groupby("branch_name", as_index=False)
+        df_f.groupby("branch_name", as_index=False)
             .agg(total_sales=("total_amount", "sum"))
             .sort_values("total_sales", ascending=False)
     )
@@ -1061,7 +1015,7 @@ def run():
     # =========================================
     
     geo_sales = (
-        df_f_orders.groupby("governorate", as_index=False)
+        df_f.groupby("governorate", as_index=False)
             .agg(total_sales=("total_amount", "sum"))
             .sort_values("total_sales", ascending=False)
     )
@@ -1072,7 +1026,7 @@ def run():
     # =========================================
     
     discount_breakdown = (
-        df_f_orders.groupby("brand_name", as_index=False)
+        df_f.groupby("brand_name", as_index=False)
             .agg(total_discount=("total_discount", "sum"))
             .sort_values("total_discount", ascending=False)
     )
@@ -1133,7 +1087,7 @@ def run():
     # =========================================
     
     top_branches = (
-        df_f_orders.groupby("branch_name", as_index=False)
+        df_f.groupby("branch_name", as_index=False)
             .agg(total_sales=("total_amount","sum"))
             .sort_values("total_sales", ascending=False)
             .head(5)
@@ -1167,7 +1121,7 @@ def run():
     # =========================================
     
     top_brands = (
-        df_f_orders.groupby("brand_name", as_index=False)
+        df_f.groupby("brand_name", as_index=False)
             .agg(total_sales=("total_amount","sum"))
             .sort_values("total_sales", ascending=False)
             .head(5)
@@ -1208,7 +1162,7 @@ def run():
     # =========================================
     
     daily_sales = (
-        df_f_orders.groupby("date", as_index=False)
+        df_f.groupby("date", as_index=False)
             .agg(total_sales=("total_amount","sum"))
     )
     
@@ -1234,7 +1188,7 @@ def run():
     # =========================================
     
     geo_sales = (
-        df_f_orders.groupby("governorate", as_index=False)
+        df_f.groupby("governorate", as_index=False)
             .agg(total_sales=("total_amount","sum"))
             .sort_values("total_sales", ascending=False)
             .head(10)
@@ -1521,3 +1475,5 @@ def run():
             
             except Exception as e:
                 st.error(f"خطأ أثناء تحليل السؤال: {e}")
+
+    
