@@ -230,7 +230,7 @@ def run():
         # Clean data
         # ------------------------------
     
-        df = df.dropna(subset=["order_id", "date"])
+       
     
         # ------------------------------
         # Final columns
