@@ -1384,100 +1384,92 @@ def run():
             st.warning("لا توجد بيانات بعد تطبيق الفلاتر")
             st.stop()
     
-        # عينة من البيانات بعد الفلاتر
-        df_sample = df_f.sample(min(3000, len(df_f))) if len(df_f) > 0 else df_f
-    
-        allowed_operations = """
-    يسمح فقط باستخدام العمليات التالية في pandas:
-    
-    groupby
-    sum
-    mean
-    max
-    min
-    sort_values
-    head
-    tail
-    count
-    value_counts
-    nunique
-    reset_index
-    """
-    
-        filter_context = f"""
-    البيانات الحالية بعد الفلاتر:
-    
-    عدد الصفوف: {len(df_f)}
-    عدد الفروع: {df_f['branch_name'].nunique()}
-    عدد المحافظات: {df_f['governorate'].nunique()}
-    """
-    
-        prompt = f"""
-    أنت محلل بيانات مبيعات محترف.
-    
-    لديك dataframe اسمه df_sample
-    
-    الأعمدة المتاحة:
-    
-    {list(df_sample.columns)}
-    
-    {allowed_operations}
-    
-    {filter_context}
-    
-    اكتب Expression واحد فقط بصيغة pandas يعيد النتيجة مباشرة.
-    
-    شروط مهمة جدًا:
-    - استخدم df_sample فقط
-    - لا تستخدم import
-    - لا تستخدم مكتبات أخرى
-    - لا تكتب شرح
-    - لا تكتب أي متغيرات مثل x =
-    - لا تكتب أكثر من سطر
-    - يجب أن يكون الناتج النهائي expression واحد يمكن تشغيله بـ eval مباشرة
-    
-    السؤال:
-    {question}
-    """
-    
-        with st.spinner("🤖 AI يحلل سؤالك..."):
-    
-            try:
+        # -----------------------------------------------
+        # تجهيز ملخص البيانات للـ AI
+        # -----------------------------------------------
+        total_sales    = float(df_f["total_amount"].sum())
+        total_qty      = float(df_f["quantity"].sum())
+        total_orders   = int(df_f["order_id"].nunique())
+        total_discount = float(df_f["total_discount"].sum())
 
+        top_branch = (
+            df_f.groupby("branch_name")["total_amount"].sum()
+              .sort_values(ascending=False).head(5)
+        )
+        top_brand = (
+            df_f.groupby("brand_name")["total_amount"].sum()
+              .sort_values(ascending=False).head(5)
+        )
+        top_rep = (
+            df_f.groupby("sales_rep_name")["total_amount"].sum()
+              .sort_values(ascending=False).head(5)
+        )
+        top_gov = (
+            df_f.groupby("governorate")["total_amount"].sum()
+              .sort_values(ascending=False).head(5)
+        )
+        top_customer = (
+            df_f.groupby("customer_name")["total_amount"].sum()
+              .sort_values(ascending=False).head(5)
+        )
+
+        data_summary = f"""
+ملخص بيانات المبيعات:
+
+إجمالي المبيعات: {total_sales:,.0f}
+إجمالي الكمية: {total_qty:,.0f}
+عدد الأوردرات: {total_orders:,}
+إجمالي الخصومات: {total_discount:,.0f}
+
+أعلى 5 فروع مبيعات:
+{top_branch.to_string()}
+
+أكثر 5 براندات مبيعًا:
+{top_brand.to_string()}
+
+أفضل 5 مندوبين:
+{top_rep.to_string()}
+
+أعلى 5 محافظات:
+{top_gov.to_string()}
+
+أكبر 5 عملاء:
+{top_customer.to_string()}
+"""
+
+        prompt = f"""
+أنت محلل بيانات مبيعات محترف. أجب على السؤال التالي بشكل مباشر وواضح باللغة العربية.
+استخدم الأرقام الموجودة في الملخص فقط. لا تكتب أكثر من 3 جمل.
+
+{data_summary}
+
+السؤال: {question}
+"""
+
+        with st.spinner("🤖 AI يحلل سؤالك..."):
+            try:
                 response = client.responses.create(
-                    model="gpt-5.4-mini",
+                    model="gpt-4o-mini",
                     input=[
                         {
                             "role": "system",
-                            "content": "You are a professional sales data analyst using pandas. Return only one valid pandas expression and never use assignment."
+                            "content": "أنت محلل بيانات مبيعات. أجب بالعربية بشكل مباشر وموجز في 3 جمل كحد أقصى."
                         },
                         {
                             "role": "user",
                             "content": prompt
                         }
                     ],
-                    max_output_tokens=120
+                    max_output_tokens=300
                 )
-            
+
                 try:
-                    code = response.output[0].content[0].text
+                    answer = response.output[0].content[0].text
                 except:
-                    code = response.output_text
-            
-                code = code.replace("```python", "").replace("```", "").strip()
-            
-                st.markdown("### 🔎 الكود الذي أنشأه AI")
-                st.code(code)
-            
-                # حماية
-                if "import" in code or "=" in code:
-                    st.error("الكود غير مسموح")
-                    st.stop()
-            
-                result = eval(code, {"df_sample": df_sample, "pd": pd})
-            
-                st.markdown("### 📊 النتيجة")
-                st.write(result)
-            
+                    answer = response.output_text
+
+                st.markdown("### 💡 الإجابة")
+                st.success(answer)
+
             except Exception as e:
                 st.error(f"خطأ أثناء تحليل السؤال: {e}")
