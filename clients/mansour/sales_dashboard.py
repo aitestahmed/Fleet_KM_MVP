@@ -573,6 +573,10 @@ def run():
     # منع تشغيل AI أكثر من مرة
     if "ai_running" not in st.session_state:
         st.session_state.ai_running = False
+
+    # عداد الأسئلة السريعة (5 أسئلة كحد أقصى)
+    if "qa_count" not in st.session_state:
+        st.session_state.qa_count = 0
     
     
     # زر تشغيل التحليل
@@ -1348,17 +1352,25 @@ def run():
     
     • أعلى فرع مبيعات  
     • أكثر براند مبيعًا  
-    • أفضل مندوب مبيعات  
+    • أفضل مندوب في المنيا  
     • إجمالي المبيعات  
     • عدد الأوردرات  
     • المبيعات في القاهرة  
     
-    ⚠️ يفضل أن يكون السؤال قصيرًا (حتى 6 كلمات).
+    ⚠️ لديك 5 أسئلة لكل جلسة.
     """
     )
-    
+
+    # عرض عدد الأسئلة المتبقية
+    remaining = 5 - st.session_state.qa_count
+    st.markdown(
+        f"<div style='text-align:right; color:{'green' if remaining > 2 else 'orange' if remaining > 0 else 'red'};'>"
+        f"💬 الأسئلة المتبقية: <b>{remaining} / 5</b></div>",
+        unsafe_allow_html=True
+    )
+
     question = st.text_input(
-        "اكتب سؤال عن البيانات (حد أقصى 6 كلمات)",
+        "اكتب سؤالك عن البيانات",
         value=quick_question if quick_question else ""
     )
     
@@ -1373,11 +1385,13 @@ def run():
         if not question:
             st.warning("يرجى كتابة سؤال أولاً")
             st.stop()
-    
-        words = question.split()
-    
-        if len(words) > 6:
-            st.error("السؤال يجب ألا يزيد عن 6 كلمات")
+
+        if st.session_state.qa_count >= 5:
+            st.error("⛔ لقد استنفدت الأسئلة الخمسة المتاحة لهذه الجلسة.")
+            st.stop()
+
+        if st.session_state.credits_sales <= 0:
+            st.error("رصيدك انتهى. يرجى شحن الحساب.")
             st.stop()
     
         if len(df_f) == 0:
@@ -1385,61 +1399,85 @@ def run():
             st.stop()
     
         # -----------------------------------------------
-        # تجهيز ملخص البيانات للـ AI
+        # تجهيز ملخص البيانات الكامل للـ AI
         # -----------------------------------------------
         total_sales    = float(df_f["total_amount"].sum())
         total_qty      = float(df_f["quantity"].sum())
         total_orders   = int(df_f["order_id"].nunique())
         total_discount = float(df_f["total_discount"].sum())
 
-        top_branch = (
+        # كل الفروع
+        all_branches = (
             df_f.groupby("branch_name")["total_amount"].sum()
-              .sort_values(ascending=False).head(5)
+              .sort_values(ascending=False)
         )
-        top_brand = (
+        # كل البراندات
+        all_brands = (
             df_f.groupby("brand_name")["total_amount"].sum()
-              .sort_values(ascending=False).head(5)
+              .sort_values(ascending=False)
         )
-        top_rep = (
+        # كل المندوبين
+        all_reps = (
             df_f.groupby("sales_rep_name")["total_amount"].sum()
-              .sort_values(ascending=False).head(5)
+              .sort_values(ascending=False)
         )
-        top_gov = (
+        # كل المحافظات
+        all_gov = (
             df_f.groupby("governorate")["total_amount"].sum()
-              .sort_values(ascending=False).head(5)
+              .sort_values(ascending=False)
         )
+        # أكبر 10 عملاء
         top_customer = (
             df_f.groupby("customer_name")["total_amount"].sum()
-              .sort_values(ascending=False).head(5)
+              .sort_values(ascending=False).head(10)
+        )
+        # عدد الأوردرات لكل فرع
+        orders_per_branch = (
+            df_f.groupby("branch_name")["order_id"].nunique()
+              .sort_values(ascending=False)
+        )
+        # أفضل مندوب لكل محافظة
+        rep_per_gov = (
+            df_f.groupby(["governorate", "sales_rep_name"])["total_amount"].sum()
+              .reset_index()
+              .sort_values("total_amount", ascending=False)
+              .drop_duplicates(subset="governorate")
+              .set_index("governorate")
         )
 
         data_summary = f"""
-ملخص بيانات المبيعات:
+ملخص بيانات المبيعات الكامل:
 
 إجمالي المبيعات: {total_sales:,.0f}
 إجمالي الكمية: {total_qty:,.0f}
 عدد الأوردرات: {total_orders:,}
 إجمالي الخصومات: {total_discount:,.0f}
 
-أعلى 5 فروع مبيعات:
-{top_branch.to_string()}
+مبيعات كل الفروع:
+{all_branches.to_string()}
 
-أكثر 5 براندات مبيعًا:
-{top_brand.to_string()}
+عدد الأوردرات لكل فرع:
+{orders_per_branch.to_string()}
 
-أفضل 5 مندوبين:
-{top_rep.to_string()}
+مبيعات كل البراندات:
+{all_brands.to_string()}
 
-أعلى 5 محافظات:
-{top_gov.to_string()}
+مبيعات كل المندوبين:
+{all_reps.to_string()}
 
-أكبر 5 عملاء:
+مبيعات كل المحافظات:
+{all_gov.to_string()}
+
+أفضل مندوب لكل محافظة:
+{rep_per_gov[['sales_rep_name','total_amount']].to_string()}
+
+أكبر 10 عملاء:
 {top_customer.to_string()}
 """
 
         prompt = f"""
 أنت محلل بيانات مبيعات محترف. أجب على السؤال التالي بشكل مباشر وواضح باللغة العربية.
-استخدم الأرقام الموجودة في الملخص فقط. لا تكتب أكثر من 3 جمل.
+استخدم الأرقام الموجودة في الملخص فقط. لا تكتب أكثر من 4 جمل.
 
 {data_summary}
 
@@ -1453,14 +1491,14 @@ def run():
                     input=[
                         {
                             "role": "system",
-                            "content": "أنت محلل بيانات مبيعات. أجب بالعربية بشكل مباشر وموجز في 3 جمل كحد أقصى."
+                            "content": "أنت محلل بيانات مبيعات. أجب بالعربية بشكل مباشر وموجز في 4 جمل كحد أقصى. استخدم الأرقام من البيانات المقدمة."
                         },
                         {
                             "role": "user",
                             "content": prompt
                         }
                     ],
-                    max_output_tokens=300
+                    max_output_tokens=500
                 )
 
                 try:
@@ -1468,8 +1506,24 @@ def run():
                 except:
                     answer = response.output_text
 
+                # خصم الكريديت
+                tokens_used = calculate_tokens(response)
+                credit_used = max(tokens_to_credit(tokens_used), 0)
+                new_credit  = float(st.session_state.credits_sales) - float(credit_used)
+
+                supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+                supabase.table("company_credits").update({
+                    "credits": new_credit
+                }).eq("company_id", st.session_state.company_id)\
+                 .eq("feature", "sales")\
+                 .execute()
+
+                st.session_state.credits_sales = new_credit
+                st.session_state.qa_count += 1
+
                 st.markdown("### 💡 الإجابة")
                 st.success(answer)
+                st.caption(f"✅ سؤال {st.session_state.qa_count} / 5 — كريديت مستخدم: {credit_used:.3f}")
 
             except Exception as e:
                 st.error(f"خطأ أثناء تحليل السؤال: {e}")
