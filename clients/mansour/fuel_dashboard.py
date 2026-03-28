@@ -1189,12 +1189,28 @@ def run():
                 except Exception:
                     pass
 
+                # ── Save + display inside same run ──────────────────
                 st.session_state["fuel_report_html"]   = html_rep
                 st.session_state["fuel_report_tokens"] = tokens
-                # ✅ No rerun — continue in the same run so the report renders below
+
                 st.success(
                     f"✅ تم توليد التقرير | الرموز المستخدمة: **{tokens:,}** "
                     f"| الرصيد المتبقي: **{st.session_state.get('credits_fuel', 0):.2f}**"
+                )
+
+                # ── Render report immediately (same run, no rerun needed) ──
+                st.markdown(
+                    f"<h4 style='color:{TH['title']};margin:16px 0 8px;'>"
+                    f"📄 التقرير التحليلي</h4>",
+                    unsafe_allow_html=True,
+                )
+                st.components.v1.html(html_rep, height=950, scrolling=True)
+                st.download_button(
+                    label="⬇️ تحميل التقرير (HTML)",
+                    data=html_rep.encode("utf-8"),
+                    file_name="fuel_ai_report.html",
+                    mime="text/html",
+                    use_container_width=True,
                 )
 
             except Exception as e:
@@ -1205,9 +1221,13 @@ def run():
                 )
                 return
 
-    # ── Display report ─────────────────────
-    # Renders immediately after generation (same run) or on page revisit
-    if st.session_state.get("fuel_report_html"):
+    # ── Display saved report on page revisit (without pressing the button) ──
+    elif st.session_state.get("fuel_report_html"):
+        st.success(
+            f"✅ آخر تقرير مولَّد | الرموز: "
+            f"**{st.session_state.get('fuel_report_tokens', 0):,}** "
+            f"| الرصيد: **{st.session_state.get('credits_fuel', 0):.2f}**"
+        )
         st.markdown(
             f"<h4 style='color:{TH['title']};margin:16px 0 8px;'>"
             f"📄 التقرير التحليلي</h4>",
