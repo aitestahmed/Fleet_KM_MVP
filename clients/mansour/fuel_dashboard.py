@@ -1,5 +1,5 @@
 # =========================================
-# FUEL DASHBOARD MODULE — v2
+# FUEL DASHBOARD MODULE — v3
 # clients/{client}/fuel_dashboard.py
 # =========================================
 # ✔ run() entry point only
@@ -7,12 +7,11 @@
 # ✔ plug-and-play with app.py router
 # =========================================
 
-import re
 import io
+import json
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from supabase import create_client
@@ -20,15 +19,39 @@ from openai import OpenAI
 
 
 # =========================================
-# ARABIC MONTH PARSER
+# CONSTANTS
 # =========================================
 
 AR_MONTHS = {
-    "يناير": "01", "فبراير": "02", "مارس": "03",
-    "أبريل": "04", "مايو": "05", "يونيو": "06",
+    "يناير": "01", "فبراير": "02", "مارس":   "03",
+    "أبريل": "04", "مايو":   "05", "يونيو":  "06",
     "يوليو": "07", "أغسطس": "08", "سبتمبر": "09",
-    "أكتوبر": "10", "نوفمبر": "11", "ديسمبر": "12",
+    "أكتوبر":"10", "نوفمبر": "11", "ديسمبر": "12",
 }
+
+COLS = {
+    "date":           "التاريخ",
+    "plate":          "رقم اللوحة",
+    "vehicle_code":   "كود المركبة",
+    "driver_name":    "إسم السائق",
+    "station":        "المحطة",
+    "amount":         "المبلغ",
+    "liters":         "الكمية",
+    "distance":       "المسافه",
+    "consumption":    "معدل الإستهلاك",
+    "validity":       "صلاحية المسافه",
+    "invalid_reason": "سبب عدم صلاحية المسافه",
+    "potential_loss": "خسارة محتملة",
+    "odometer":       "عداد الكيلومترات",
+}
+
+def C(key):
+    return COLS.get(key, key)
+
+
+# =========================================
+# HELPERS
+# =========================================
 
 def parse_ar_date(s):
     if pd.isna(s):
@@ -42,502 +65,482 @@ def parse_ar_date(s):
         return pd.NaT
 
 
-# =========================================
-# COLUMN MAP (Arabic → internal keys)
-# =========================================
-
-COLUMN_MAP = {
-    "date":           "التاريخ",
-    "time":           "الوقت",
-    "vehicle_id":     "الرقم التعريفي للمركبة",
-    "plate":          "رقم اللوحة",
-    "vehicle_code":   "كود المركبة",
-    "vehicle_type":   "نوع المركبة",
-    "driver_code":    "كود السائق",
-    "driver_name":    "إسم السائق",
-    "station":        "المحطة",
-    "fuel_type":      "نوع الوقود",
-    "amount":         "المبلغ",
-    "liters":         "الكمية",
-    "distance":       "المسافه",
-    "consumption":    "معدل الإستهلاك",
-    "validity":       "صلاحية المسافه",
-    "invalid_reason": "سبب عدم صلاحية المسافه",
-    "potential_loss": "خسارة محتملة",
-    "odometer":       "عداد الكيلومترات",
-    "total_amount":   "المبلغ الكلي",
-}
-
-def col(key: str) -> str:
-    return COLUMN_MAP.get(key, key)
+def N(val, d=0, suf=""):
+    """Format number with Arabic suffix."""
+    if pd.isna(val):
+        return "—"
+    return f"{val:,.{d}f}{(' ' + suf) if suf else ''}"
 
 
 # =========================================
-# LOAD + CLEAN DATA
+# LOAD + CLEAN
 # =========================================
 
 @st.cache_data(show_spinner=False)
 def load_and_clean(file_bytes: bytes) -> pd.DataFrame:
     df = pd.read_excel(io.BytesIO(file_bytes))
 
-    # ── Numeric coercion ──────────────────
-    for key in ["amount", "liters", "distance", "consumption",
-                "total_amount", "potential_loss"]:
-        c = col(key)
+    # Numeric
+    for k in ["amount", "liters", "distance", "consumption", "potential_loss"]:
+        c = C(k)
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    # ── Odometer ─────────────────────────
-    if col("odometer") in df.columns:
-        df[col("odometer")] = pd.to_numeric(
-            df[col("odometer")].astype(str).str.replace(",", ""), errors="coerce"
+    # Odometer
+    if C("odometer") in df.columns:
+        df[C("odometer")] = pd.to_numeric(
+            df[C("odometer")].astype(str).str.replace(",", ""), errors="coerce"
         )
 
-    # ── Date parsing (Arabic month names) ─
-    if col("date") in df.columns:
-        df["_date"] = df[col("date")].apply(parse_ar_date)
+    # Date
+    if C("date") in df.columns:
+        df["_date"] = df[C("date")].apply(parse_ar_date)
 
-    # ── Strip whitespace from strings ────
+    # Strip whitespace
     for c in df.select_dtypes(include="object").columns:
         df[c] = df[c].astype(str).str.strip()
 
-    # ── Driver placeholder ───────────────
-    if col("driver_name") in df.columns:
-        df[col("driver_name")] = df[col("driver_name")].replace("-", "بدون سائق")
+    # Driver placeholder
+    if C("driver_name") in df.columns:
+        df[C("driver_name")] = df[C("driver_name")].replace("-", "بدون سائق")
 
-    # ─────────────────────────────────────
-    # DERIVED COLUMNS
-    # ─────────────────────────────────────
-
-    # نوع العربية ← آخر حرف عربي في رقم اللوحة
-    if col("plate") in df.columns:
+    # DERIVED: vehicle type from last Arabic letter in plate
+    if C("plate") in df.columns:
         df["_veh_type"] = (
-            df[col("plate")]
+            df[C("plate")]
             .str.extract(r"([ءاأإآبتثجحخدذرزسشصضطظعغفقكلمنهوي]+)$", expand=False)
             .fillna("غير محدد")
         )
 
-    # الفرع ← كود المركبة بعد حذف الأرقام والأقواس
-    if col("vehicle_code") in df.columns:
+    # DERIVED: branch = vehicle_code without trailing numbers/brackets
+    if C("vehicle_code") in df.columns:
         df["_branch"] = (
-            df[col("vehicle_code")]
+            df[C("vehicle_code")]
             .str.strip()
-            .str.replace(r"\s*\(\d+\)\s*", "", regex=True)
+            .str.replace(r"\s*\(\d+\)\s*$", "", regex=True)
             .str.strip()
+            .replace("", "غير محدد")
         )
-        df["_branch"] = df["_branch"].replace("", "غير محدد")
 
     return df
 
 
 # =========================================
-# FORMAT HELPERS
+# CHART ENGINE
 # =========================================
 
-def fmt(val, decimals=0, suffix=""):
-    if pd.isna(val):
-        return "—"
-    return f"{val:,.{decimals}f}{suffix}"
-
-
-# =========================================
-# CHART THEME + HELPERS
-# =========================================
-
-THEME = dict(
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(13,22,38,0.95)",
-    font=dict(color="#e0e6f0", family="Cairo, sans-serif", size=13),
-    xaxis=dict(
-        gridcolor="rgba(45,90,142,0.4)",
-        linecolor="#2d5a8e",
-        tickfont=dict(size=12, color="#90caf9"),
-        zeroline=False,
-    ),
-    yaxis=dict(
-        gridcolor="rgba(45,90,142,0.4)",
-        linecolor="#2d5a8e",
-        tickfont=dict(size=12, color="#e0e6f0"),
-        automargin=True,
-    ),
-    margin=dict(l=260, r=80, t=60, b=40),
-    hoverlabel=dict(
-        bgcolor="#1a2e4a",
-        bordercolor="#2d5a8e",
-        font=dict(color="white", family="Cairo, sans-serif", size=13),
-    ),
-)
-
-
-def hbar_chart(df_sorted, x_col, y_col, title,
-               colorscale="Blues", height=None, fmt_fn=None, unit=""):
+def hbar(data: pd.DataFrame, x: str, y: str, title: str,
+         scale="Blues", unit="", fmt_fn=None) -> go.Figure:
     """
-    Professional horizontal bar chart.
-    - y_col values are the labels (already sorted ascending for bottom→top display)
-    - Automatically calculates height based on number of bars
-    - Handles long Arabic text with automargin
+    Crisp professional horizontal bar chart.
+    - Labels truncated at 28 chars for display; full text in hover.
+    - Height auto-scales with row count.
+    - Right margin reserved for outside labels.
     """
-    n = len(df_sorted)
-    if height is None:
-        height = max(380, n * 46 + 100)
+    n = len(data)
+    if n == 0:
+        return go.Figure()
 
-    # Truncate very long labels for display, keep full for hover
-    labels_display = df_sorted[y_col].astype(str).str.slice(0, 30)
-    labels_full    = df_sorted[y_col].astype(str)
-    values         = df_sorted[x_col]
+    h = max(340, n * 50 + 90)
 
-    if fmt_fn is None:
-        text_vals = values.apply(lambda x: f"{x:,.0f}{(' ' + unit) if unit else ''}")
+    vals   = data[x].reset_index(drop=True)
+    labels = data[y].astype(str).reset_index(drop=True)
+    short  = labels.str.slice(0, 28)
+
+    vmin, vmax = vals.min(), vals.max()
+    norm = (vals - vmin) / (vmax - vmin + 1e-9)
+
+    if fmt_fn:
+        txt = vals.apply(fmt_fn)
     else:
-        text_vals = values.apply(fmt_fn)
+        txt = vals.apply(lambda v: N(v, 0, unit))
 
-    # Color intensity
-    vmin, vmax = values.min(), values.max()
-    norm = (values - vmin) / (vmax - vmin + 1e-9)
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=values,
-        y=labels_display,
+    fig = go.Figure(go.Bar(
+        x=vals,
+        y=short,
         orientation="h",
-        customdata=labels_full,
-        hovertemplate="<b>%{customdata}</b><br>" + (unit or "القيمة") + ": %{x:,.0f}<extra></extra>",
-        text=text_vals,
+        customdata=labels,
+        hovertemplate="<b>%{customdata}</b><br>%{x:,.0f}" +
+                      (f" {unit}" if unit else "") + "<extra></extra>",
+        text=txt,
         textposition="outside",
-        textfont=dict(color="#e0e6f0", size=11, family="Cairo, sans-serif"),
         cliponaxis=False,
+        textfont=dict(size=11, color="#dce8fa", family="Cairo, sans-serif"),
         marker=dict(
             color=norm,
-            colorscale=colorscale,
+            colorscale=scale,
             cmin=0, cmax=1,
             line=dict(width=0),
         ),
     ))
 
     fig.update_layout(
-        title=dict(text=title, font=dict(size=15, color="#90caf9"), x=0.01, xanchor="left"),
-        height=height,
-        bargap=0.28,
+        title=dict(text=title, font=dict(size=14, color="#90caf9"),
+                   x=0.01, xanchor="left"),
+        height=h,
+        bargap=0.30,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(11,20,35,1)",
+        font=dict(color="#dce8fa", family="Cairo, sans-serif"),
+        margin=dict(l=10, r=110, t=50, b=30),
         xaxis=dict(
-            gridcolor="rgba(45,90,142,0.35)",
-            linecolor="#2d5a8e",
-            tickfont=dict(size=11, color="#6b8cba"),
-            zeroline=True,
-            zerolinecolor="#2d5a8e",
-            zerolinewidth=1,
             showgrid=True,
+            gridcolor="rgba(50,90,150,0.25)",
+            zeroline=True, zerolinecolor="rgba(50,90,150,0.5)",
+            tickfont=dict(size=10, color="#6b8cba"),
+            linecolor="rgba(0,0,0,0)",
         ),
         yaxis=dict(
-            tickfont=dict(size=12, color="#c8d8f0", family="Cairo, sans-serif"),
             automargin=True,
+            tickfont=dict(size=12, color="#b8ccee", family="Cairo, sans-serif"),
             gridcolor="rgba(0,0,0,0)",
             linecolor="rgba(0,0,0,0)",
         ),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(13,22,38,0.95)",
-        font=dict(color="#e0e6f0", family="Cairo, sans-serif"),
-        margin=dict(l=20, r=100, t=55, b=30),
         hoverlabel=dict(
-            bgcolor="#1a2e4a",
-            bordercolor="#2d5a8e",
+            bgcolor="#0f1e35", bordercolor="#2d5a8e",
             font=dict(color="white", family="Cairo, sans-serif", size=13),
         ),
     )
     return fig
 
 
+def trend_chart(daily: pd.DataFrame) -> go.Figure:
+    """Dual-axis daily trend: cost + liters."""
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+    fig.add_trace(go.Scatter(
+        x=daily["_day"], y=daily["cost"],
+        name="التكلفة اليومية (ج.م)",
+        line=dict(color="#42a5f5", width=2.5),
+        fill="tozeroy",
+        fillcolor="rgba(66,165,245,0.08)",
+        hovertemplate="%{x}<br>التكلفة: %{y:,.0f} ج.م<extra></extra>",
+    ), secondary_y=False)
+
+    fig.add_trace(go.Scatter(
+        x=daily["_day"], y=daily["liters"],
+        name="اللترات اليومية",
+        line=dict(color="#66bb6a", width=2, dash="dot"),
+        hovertemplate="%{x}<br>اللترات: %{y:,.1f}<extra></extra>",
+    ), secondary_y=True)
+
+    fig.update_layout(
+        title=dict(text="📅 الاتجاه اليومي — التكلفة واللترات",
+                   font=dict(size=14, color="#90caf9"), x=0.01),
+        height=370,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(11,20,35,1)",
+        font=dict(color="#dce8fa", family="Cairo, sans-serif"),
+        margin=dict(l=20, r=60, t=55, b=40),
+        legend=dict(orientation="h", y=1.08, x=0,
+                    font=dict(color="#b8ccee", size=12),
+                    bgcolor="rgba(0,0,0,0)"),
+        hoverlabel=dict(bgcolor="#0f1e35", bordercolor="#2d5a8e",
+                        font=dict(color="white", family="Cairo, sans-serif")),
+    )
+    fig.update_xaxes(
+        gridcolor="rgba(50,90,150,0.2)",
+        tickfont=dict(size=10, color="#6b8cba"),
+        linecolor="rgba(0,0,0,0)",
+    )
+    fig.update_yaxes(
+        gridcolor="rgba(50,90,150,0.2)",
+        tickfont=dict(size=10, color="#6b8cba"),
+        linecolor="rgba(0,0,0,0)",
+        secondary_y=False,
+        title_text="ج.م",
+        title_font=dict(color="#42a5f5", size=11),
+    )
+    fig.update_yaxes(
+        gridcolor="rgba(0,0,0,0)",
+        tickfont=dict(size=10, color="#66bb6a"),
+        linecolor="rgba(0,0,0,0)",
+        secondary_y=True,
+        title_text="لتر",
+        title_font=dict(color="#66bb6a", size=11),
+    )
+    return fig
+
+
+def donut_chart(labels, values, title, colors=None) -> go.Figure:
+    if colors is None:
+        colors = ["#42a5f5", "#66bb6a", "#ffa726", "#ef5350", "#ab47bc"]
+    fig = go.Figure(go.Pie(
+        labels=labels,
+        values=values,
+        hole=0.50,
+        textinfo="label+percent",
+        textfont=dict(size=12, color="white", family="Cairo, sans-serif"),
+        marker=dict(colors=colors[:len(labels)], line=dict(color="#0d1b2a", width=2)),
+        hovertemplate="<b>%{label}</b><br>%{value:,.0f}<br>%{percent}<extra></extra>",
+    ))
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=14, color="#90caf9"), x=0.01),
+        height=340,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#dce8fa", family="Cairo, sans-serif"),
+        margin=dict(l=10, r=10, t=50, b=10),
+        legend=dict(font=dict(color="#b8ccee", size=11), bgcolor="rgba(0,0,0,0)"),
+        hoverlabel=dict(bgcolor="#0f1e35", bordercolor="#2d5a8e",
+                        font=dict(color="white", family="Cairo, sans-serif")),
+    )
+    return fig
+
+
 # =========================================
-# KPI ROW
+# KPI CARDS
 # =========================================
 
 def render_kpis(df: pd.DataFrame):
     st.markdown("""
     <style>
-    .kpi-box{background:linear-gradient(135deg,#1e3a5f,#1a2e4a);
-    border-radius:12px;padding:20px 14px;text-align:center;color:#fff;
-    border:1px solid #2d5a8e;box-shadow:0 4px 12px rgba(0,0,0,.3);}
-    .kpi-lbl{font-size:12px;color:#90caf9;margin-bottom:8px;font-weight:500;}
-    .kpi-val{font-size:24px;font-weight:700;color:#fff;direction:ltr;display:block;}
-    .kpi-unit{font-size:11px;color:#64b5f6;margin-top:4px;}
+    .qk{background:linear-gradient(145deg,#0f2034,#162d47);border-radius:14px;
+    padding:18px 12px;text-align:center;border:1px solid #1e3f6e;
+    box-shadow:0 4px 16px rgba(0,0,0,.45);}
+    .ql{font-size:11px;color:#7eb3e8;margin-bottom:8px;font-weight:600;
+    letter-spacing:.5px;text-transform:uppercase;}
+    .qv{font-size:22px;font-weight:800;color:#e8f4ff;direction:ltr;display:block;
+    letter-spacing:-.5px;}
+    .qu{font-size:10px;color:#4e90d0;margin-top:5px;}
     </style>""", unsafe_allow_html=True)
 
-    total_cost   = df[col("amount")].sum()
-    total_liters = df[col("liters")].sum()
-    total_km     = df[col("distance")].sum()
-    n_vehicles   = df[col("plate")].nunique()
-    n_branches   = df["_branch"].nunique()
-    cost_per_km  = total_cost / total_km if total_km else 0
-    km_per_liter = total_km / total_liters if total_liters else 0
-    cost_liter   = total_cost / total_liters if total_liters else 0
+    tc = df[C("amount")].sum()
+    tl = df[C("liters")].sum()
+    tk = df[C("distance")].sum()
+    nv = df[C("plate")].nunique()
+    nb = df["_branch"].nunique()
+    cpk = tc / tk if tk else 0
+    kpl = tk / tl if tl else 0
+    cpl = tc / tl if tl else 0
 
     kpis = [
-        ("إجمالي التكلفة",   fmt(total_cost, 0),   "ج.م"),
-        ("إجمالي الكيلومترات", fmt(total_km, 0),  "كيلومتر"),
-        ("إجمالي اللترات",   fmt(total_liters, 1), "لتر"),
-        ("تكلفة الكيلومتر",  fmt(cost_per_km, 3),  "ج.م / كم"),
-        ("كفاءة الوقود",     fmt(km_per_liter, 2), "كم / لتر"),
-        ("سعر اللتر الفعلي", fmt(cost_liter, 3),   "ج.م / لتر"),
-        ("عدد المركبات",     str(n_vehicles),      "مركبة"),
-        ("عدد الفروع",       str(n_branches),      "فرع"),
+        ("إجمالي التكلفة",     N(tc, 0),   "ج.م"),
+        ("إجمالي الكيلومترات", N(tk, 0),   "كم"),
+        ("إجمالي اللترات",     N(tl, 1),   "لتر"),
+        ("تكلفة الكيلومتر",    N(cpk, 3),  "ج.م / كم"),
+        ("كفاءة الوقود",       N(kpl, 2),  "كم / لتر"),
+        ("سعر اللتر الفعلي",   N(cpl, 3),  "ج.م / لتر"),
+        ("عدد المركبات",       str(nv),    "مركبة"),
+        ("عدد الفروع",         str(nb),    "فرع"),
     ]
 
-    cols = st.columns(len(kpis))
-    for c_obj, (lbl, val, unit) in zip(cols, kpis):
-        c_obj.markdown(f"""
-        <div class="kpi-box">
-          <div class="kpi-lbl">{lbl}</div>
-          <span class="kpi-val">{val}</span>
-          <div class="kpi-unit">{unit}</div>
-        </div>""", unsafe_allow_html=True)
+    for row_start in range(0, len(kpis), 4):
+        batch = kpis[row_start:row_start + 4]
+        cols = st.columns(len(batch))
+        for c_obj, (lbl, val, unit) in zip(cols, batch):
+            c_obj.markdown(
+                f'<div class="qk"><div class="ql">{lbl}</div>'
+                f'<span class="qv">{val}</span>'
+                f'<div class="qu">{unit}</div></div>',
+                unsafe_allow_html=True
+            )
+        st.markdown("<div style='margin-bottom:10px'></div>", unsafe_allow_html=True)
 
 
 # =========================================
-# FILTERS (date + branch + vehicle type + plate + validity)
+# FILTERS
 # =========================================
 
 def render_filters(df: pd.DataFrame) -> pd.DataFrame:
-    st.markdown("""
-    <div dir="rtl" style="background:#0d1b2a;border:1px solid #1e3a5f;
-    border-radius:10px;padding:16px 20px;margin-bottom:20px;">
-    <h4 style="color:#90caf9;margin:0 0 12px 0;">🔍 تصفية البيانات</h4>
-    """, unsafe_allow_html=True)
+    with st.expander("🔍 تصفية البيانات", expanded=True):
 
-    # ── Date filter ───────────────────────
-    if "_date" in df.columns and df["_date"].notna().any():
-        min_d = df["_date"].dropna().min().date()
-        max_d = df["_date"].dropna().max().date()
-        d1, d2 = st.columns(2)
-        with d1:
-            date_from = st.date_input("من تاريخ", value=min_d,
-                                      min_value=min_d, max_value=max_d,
-                                      key="fuel_date_from")
-        with d2:
-            date_to = st.date_input("إلى تاريخ", value=max_d,
-                                    min_value=min_d, max_value=max_d,
-                                    key="fuel_date_to")
-        df = df[
-            df["_date"].notna() &
-            (df["_date"].dt.date >= date_from) &
-            (df["_date"].dt.date <= date_to)
-        ]
+        # Date filter
+        if "_date" in df.columns and df["_date"].notna().any():
+            min_d = df["_date"].dropna().min().date()
+            max_d = df["_date"].dropna().max().date()
+            fc1, fc2 = st.columns(2)
+            with fc1:
+                d_from = st.date_input("من تاريخ", value=min_d,
+                                       min_value=min_d, max_value=max_d,
+                                       key="fuel_d_from")
+            with fc2:
+                d_to = st.date_input("إلى تاريخ", value=max_d,
+                                     min_value=min_d, max_value=max_d,
+                                     key="fuel_d_to")
+            df = df[
+                df["_date"].notna() &
+                (df["_date"].dt.date >= d_from) &
+                (df["_date"].dt.date <= d_to)
+            ]
 
-    row2 = st.columns(4)
+        fc3, fc4, fc5, fc6 = st.columns(4)
 
-    with row2[0]:
-        branches = ["الكل"] + sorted(df["_branch"].dropna().unique().tolist())
-        sel_branch = st.selectbox("الفرع", branches, key="fuel_branch")
-        if sel_branch != "الكل":
-            df = df[df["_branch"] == sel_branch]
+        with fc3:
+            opts = ["الكل"] + sorted(df["_branch"].dropna().unique().tolist())
+            sel = st.selectbox("الفرع", opts, key="fuel_branch")
+            if sel != "الكل":
+                df = df[df["_branch"] == sel]
 
-    with row2[1]:
-        vtypes = ["الكل"] + sorted(df["_veh_type"].dropna().unique().tolist())
-        sel_vtype = st.selectbox("نوع العربية", vtypes, key="fuel_vtype2")
-        if sel_vtype != "الكل":
-            df = df[df["_veh_type"] == sel_vtype]
+        with fc4:
+            opts = ["الكل"] + sorted(df["_veh_type"].dropna().unique().tolist())
+            sel = st.selectbox("نوع العربية", opts, key="fuel_vtype")
+            if sel != "الكل":
+                df = df[df["_veh_type"] == sel]
 
-    with row2[2]:
-        plates = ["الكل"] + sorted(df[col("plate")].dropna().unique().tolist())
-        sel_plate = st.selectbox("رقم اللوحة", plates, key="fuel_plate")
-        if sel_plate != "الكل":
-            df = df[df[col("plate")] == sel_plate]
+        with fc5:
+            opts = ["الكل"] + sorted(df[C("plate")].dropna().unique().tolist())
+            sel = st.selectbox("رقم اللوحة", opts, key="fuel_plate")
+            if sel != "الكل":
+                df = df[df[C("plate")] == sel]
 
-    with row2[3]:
-        if col("validity") in df.columns:
-            valid_opts = ["الكل"] + sorted(df[col("validity")].dropna().unique().tolist())
-            sel_valid = st.selectbox("صلاحية المسافة", valid_opts, key="fuel_valid")
-            if sel_valid != "الكل":
-                df = df[df[col("validity")] == sel_valid]
+        with fc6:
+            if C("validity") in df.columns:
+                opts = ["الكل"] + sorted(df[C("validity")].dropna().unique().tolist())
+                sel = st.selectbox("صلاحية المسافة", opts, key="fuel_valid")
+                if sel != "الكل":
+                    df = df[df[C("validity")] == sel]
 
-    st.markdown("</div>", unsafe_allow_html=True)
     return df
 
 
 # =========================================
-# STATION TABLE
-# =========================================
-
-def render_station_table(df: pd.DataFrame):
-    st.markdown("### ⛽ محطات الوقود — عدد الزيارات والإجماليات")
-
-    station_col = col("station")
-    if station_col not in df.columns:
-        st.warning("عمود المحطة غير متوفر.")
-        return
-
-    grp = (
-        df.groupby(station_col)
-        .agg(
-            عدد_المرات=(col("amount"), "count"),
-            إجمالي_التكلفة=(col("amount"), "sum"),
-            إجمالي_اللترات=(col("liters"), "sum"),
-        )
-        .reset_index()
-        .rename(columns={station_col: "المحطة"})
-        .sort_values("إجمالي_التكلفة", ascending=False)
-    )
-    grp["متوسط_تكلفة_الزيارة"] = grp["إجمالي_التكلفة"] / grp["عدد_المرات"]
-
-    disp = grp.copy()
-    disp["إجمالي_التكلفة"]      = disp["إجمالي_التكلفة"].apply(lambda x: f"{x:,.0f} ج.م")
-    disp["إجمالي_اللترات"]      = disp["إجمالي_اللترات"].apply(lambda x: f"{x:,.1f} لتر")
-    disp["متوسط_تكلفة_الزيارة"] = disp["متوسط_تكلفة_الزيارة"].apply(lambda x: f"{x:,.0f} ج.م")
-
-    st.dataframe(disp.reset_index(drop=True), use_container_width=True, hide_index=True)
-
-    # Chart top 15
-    top15 = grp.nlargest(15, "إجمالي_التكلفة").sort_values("إجمالي_التكلفة")
-    fig = hbar_chart(top15, "إجمالي_التكلفة", "المحطة",
-                     "🔝 أعلى 15 محطة — إجمالي التكلفة (ج.م)",
-                     colorscale="Blues", unit="ج.م")
-    st.plotly_chart(fig, use_container_width=True)
-
-
-# =========================================
-# BRANCH ANALYSIS  ← المحور الأساسي
+# BRANCH ANALYSIS  ← Primary axis
 # =========================================
 
 def render_branch_analysis(df: pd.DataFrame):
-    st.markdown("### 🏢 تحليل الفروع — التكلفة والكيلومترات")
+    st.markdown("### 🏢 تحليل الفروع")
 
-    branch_grp = (
+    grp = (
         df.groupby("_branch")
         .agg(
-            إجمالي_التكلفة=(col("amount"), "sum"),
-            إجمالي_الكيلومترات=(col("distance"), "sum"),
-            إجمالي_اللترات=(col("liters"), "sum"),
-            عدد_المعاملات=(col("amount"), "count"),
-            عدد_المركبات=(col("plate"), "nunique"),
+            cost=(C("amount"),   "sum"),
+            km=(C("distance"),   "sum"),
+            liters=(C("liters"), "sum"),
+            txn=(C("amount"),    "count"),
+            vehs=(C("plate"),    "nunique"),
         )
         .reset_index()
         .rename(columns={"_branch": "الفرع"})
-        .sort_values("إجمالي_التكلفة", ascending=False)
     )
-    branch_grp["تكلفة_الكيلومتر"] = (
-        branch_grp["إجمالي_التكلفة"] / branch_grp["إجمالي_الكيلومترات"].replace(0, np.nan)
-    )
-    branch_grp["كم_لكل_لتر"] = (
-        branch_grp["إجمالي_الكيلومترات"] / branch_grp["إجمالي_اللترات"].replace(0, np.nan)
-    )
+    grp["cost_per_km"] = grp["cost"] / grp["km"].replace(0, np.nan)
+    grp["km_per_liter"] = grp["km"] / grp["liters"].replace(0, np.nan)
+    grp = grp.sort_values("cost", ascending=False)
 
-    disp = branch_grp.copy()
-    disp["إجمالي_التكلفة"]      = disp["إجمالي_التكلفة"].apply(lambda x: f"{x:,.0f} ج.م")
-    disp["إجمالي_الكيلومترات"]  = disp["إجمالي_الكيلومترات"].apply(lambda x: f"{x:,.0f} كم")
-    disp["إجمالي_اللترات"]      = disp["إجمالي_اللترات"].apply(lambda x: f"{x:,.1f} لتر")
-    disp["تكلفة_الكيلومتر"]     = disp["تكلفة_الكيلومتر"].apply(lambda x: f"{x:.3f} ج.م" if pd.notna(x) else "—")
-    disp["كم_لكل_لتر"]          = disp["كم_لكل_لتر"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "—")
-
+    # ── Summary table ─────────────────────
+    disp = pd.DataFrame({
+        "الفرع":               grp["الفرع"],
+        "التكلفة (ج.م)":       grp["cost"].apply(lambda x: N(x, 0)),
+        "الكيلومترات":          grp["km"].apply(lambda x: N(x, 0)),
+        "اللترات":              grp["liters"].apply(lambda x: N(x, 1)),
+        "تكلفة/كم (ج.م)":      grp["cost_per_km"].apply(lambda x: N(x, 3) if pd.notna(x) else "—"),
+        "كم/لتر":               grp["km_per_liter"].apply(lambda x: N(x, 2) if pd.notna(x) else "—"),
+        "عدد المعاملات":        grp["txn"],
+        "عدد المركبات":         grp["vehs"],
+    })
     st.dataframe(disp.reset_index(drop=True), use_container_width=True, hide_index=True)
 
+    # ── Charts ────────────────────────────
     c1, c2 = st.columns(2)
-
     with c1:
-        sc = branch_grp.sort_values("إجمالي_التكلفة")
-        fig = hbar_chart(sc, "إجمالي_التكلفة", "الفرع",
-                         "💰 إجمالي التكلفة لكل فرع (ج.م)",
-                         colorscale="Blues", unit="ج.م")
-        st.plotly_chart(fig, use_container_width=True)
-
+        sc = grp.sort_values("cost")
+        st.plotly_chart(
+            hbar(sc, "cost", "الفرع", "💰 إجمالي التكلفة لكل فرع (ج.م)",
+                 scale="Blues", unit="ج.م"),
+            use_container_width=True
+        )
     with c2:
-        sk = branch_grp.sort_values("إجمالي_الكيلومترات")
-        fig = hbar_chart(sk, "إجمالي_الكيلومترات", "الفرع",
-                         "🛣️ إجمالي الكيلومترات لكل فرع",
-                         colorscale="Greens", unit="كم")
-        st.plotly_chart(fig, use_container_width=True)
+        sk = grp.sort_values("km")
+        st.plotly_chart(
+            hbar(sk, "km", "الفرع", "🛣️ إجمالي الكيلومترات لكل فرع",
+                 scale="Greens", unit="كم"),
+            use_container_width=True
+        )
 
-    # ── Drill-down: Branch → Vehicles ─────
+    # ── Drill-down: branch → vehicles ────
     st.markdown("#### 🔽 تفصيل الفرع — السيارات")
-    sel = st.selectbox(
-        "اختر فرع لعرض سياراته",
-        sorted(df["_branch"].dropna().unique().tolist()),
-        key="branch_drill"
-    )
+    branch_list = sorted(df["_branch"].dropna().unique().tolist())
+    sel = st.selectbox("اختر الفرع", branch_list, key="fuel_branch_drill")
 
     bdf = df[df["_branch"] == sel]
-    veh_grp = (
-        bdf.groupby(col("plate"))
+    vg = (
+        bdf.groupby(C("plate"))
         .agg(
             نوع_العربية=("_veh_type", "first"),
-            السائق=(col("driver_name"), lambda x: x.mode()[0] if len(x) > 0 else "—"),
-            إجمالي_التكلفة=(col("amount"), "sum"),
-            إجمالي_الكيلومترات=(col("distance"), "sum"),
-            إجمالي_اللترات=(col("liters"), "sum"),
-            عدد_المعاملات=(col("amount"), "count"),
+            السائق=(C("driver_name"), lambda x: x.mode()[0] if len(x) else "—"),
+            التكلفة=(C("amount"),  "sum"),
+            الكيلومترات=(C("distance"), "sum"),
+            اللترات=(C("liters"), "sum"),
+            المعاملات=(C("amount"), "count"),
         )
         .reset_index()
-        .rename(columns={col("plate"): "رقم_اللوحة"})
+        .rename(columns={C("plate"): "رقم_اللوحة"})
     )
-    veh_grp["تكلفة_الكيلومتر"] = (
-        veh_grp["إجمالي_التكلفة"] / veh_grp["إجمالي_الكيلومترات"].replace(0, np.nan)
-    )
-    veh_grp["كم_لكل_لتر"] = (
-        veh_grp["إجمالي_الكيلومترات"] / veh_grp["إجمالي_اللترات"].replace(0, np.nan)
-    )
-    veh_grp = veh_grp.sort_values("إجمالي_التكلفة", ascending=False)
-    st.dataframe(veh_grp.reset_index(drop=True), use_container_width=True, hide_index=True)
+    vg["تكلفة_كم"] = vg["التكلفة"] / vg["الكيلومترات"].replace(0, np.nan)
+    vg["كم_لتر"]   = vg["الكيلومترات"] / vg["اللترات"].replace(0, np.nan)
+    vg = vg.sort_values("التكلفة", ascending=False)
+
+    vg_disp = vg.copy()
+    vg_disp["التكلفة"]      = vg_disp["التكلفة"].apply(lambda x: N(x, 0, "ج.م"))
+    vg_disp["الكيلومترات"]  = vg_disp["الكيلومترات"].apply(lambda x: N(x, 0, "كم"))
+    vg_disp["اللترات"]      = vg_disp["اللترات"].apply(lambda x: N(x, 1, "لتر"))
+    vg_disp["تكلفة_كم"]     = vg_disp["تكلفة_كم"].apply(lambda x: N(x, 3) if pd.notna(x) else "—")
+    vg_disp["كم_لتر"]       = vg_disp["كم_لتر"].apply(lambda x: N(x, 2) if pd.notna(x) else "—")
+    st.dataframe(vg_disp.reset_index(drop=True), use_container_width=True, hide_index=True)
 
 
 # =========================================
-# DRIVER CONSUMPTION RANKING
+# DRIVER ANALYSIS
 # =========================================
 
 def render_driver_analysis(df: pd.DataFrame):
     st.markdown("### 🧑‍✈️ السائقون الأعلى استهلاكاً للوقود")
 
-    driver_col = col("driver_name")
-    if driver_col not in df.columns:
+    dc = C("driver_name")
+    if dc not in df.columns:
         st.warning("عمود السائق غير متوفر.")
         return
 
-    # Exclude no-driver rows
-    drv_df = df[df[driver_col] != "بدون سائق"].copy()
+    ddf = df[df[dc] != "بدون سائق"].copy()
 
-    drv_grp = (
-        drv_df.groupby(driver_col)
+    dg = (
+        ddf.groupby(dc)
         .agg(
-            الفرع=("_branch", lambda x: x.mode()[0] if len(x) > 0 else "—"),
-            إجمالي_اللترات=(col("liters"), "sum"),
-            إجمالي_التكلفة=(col("amount"), "sum"),
-            إجمالي_الكيلومترات=(col("distance"), "sum"),
-            عدد_الرحلات=(col("amount"), "count"),
+            الفرع=("_branch",    lambda x: x.mode()[0] if len(x) else "—"),
+            اللترات=(C("liters"), "sum"),
+            التكلفة=(C("amount"), "sum"),
+            الكيلومترات=(C("distance"), "sum"),
+            الرحلات=(C("amount"), "count"),
         )
         .reset_index()
-        .rename(columns={driver_col: "السائق"})
+        .rename(columns={dc: "السائق"})
     )
-    drv_grp["كم_لكل_لتر"] = (
-        drv_grp["إجمالي_الكيلومترات"] / drv_grp["إجمالي_اللترات"].replace(0, np.nan)
-    )
-    drv_grp["متوسط_لتر_لكل_رحلة"] = drv_grp["إجمالي_اللترات"] / drv_grp["عدد_الرحلات"]
-    drv_grp = drv_grp.sort_values("إجمالي_اللترات", ascending=False)
+    dg["كم_لتر"]      = dg["الكيلومترات"] / dg["اللترات"].replace(0, np.nan)
+    dg["لتر_رحلة"]    = dg["اللترات"] / dg["الرحلات"]
+    dg = dg.sort_values("اللترات", ascending=False)
 
-    # Display top 20
-    top20 = drv_grp.head(20).copy()
-    disp = top20.copy()
-    disp["إجمالي_اللترات"]     = disp["إجمالي_اللترات"].apply(lambda x: f"{x:,.1f} لتر")
-    disp["إجمالي_التكلفة"]     = disp["إجمالي_التكلفة"].apply(lambda x: f"{x:,.0f} ج.م")
-    disp["إجمالي_الكيلومترات"] = disp["إجمالي_الكيلومترات"].apply(lambda x: f"{x:,.0f} كم")
-    disp["كم_لكل_لتر"]         = disp["كم_لكل_لتر"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "—")
-    disp["متوسط_لتر_لكل_رحلة"] = disp["متوسط_لتر_لكل_رحلة"].apply(lambda x: f"{x:.1f} لتر")
-
+    top20 = dg.head(20).copy()
+    disp = pd.DataFrame({
+        "السائق":            top20["السائق"],
+        "الفرع":             top20["الفرع"],
+        "اللترات":           top20["اللترات"].apply(lambda x: N(x, 1, "لتر")),
+        "التكلفة (ج.م)":    top20["التكلفة"].apply(lambda x: N(x, 0)),
+        "الكيلومترات":       top20["الكيلومترات"].apply(lambda x: N(x, 0, "كم")),
+        "كم/لتر":            top20["كم_لتر"].apply(lambda x: N(x, 2) if pd.notna(x) else "—"),
+        "متوسط لتر/رحلة":   top20["لتر_رحلة"].apply(lambda x: N(x, 1, "لتر")),
+        "عدد الرحلات":       top20["الرحلات"],
+    })
     st.dataframe(disp.reset_index(drop=True), use_container_width=True, hide_index=True)
 
     c1, c2 = st.columns(2)
-
     with c1:
-        bar = top20.sort_values("إجمالي_اللترات")
-        fig = hbar_chart(bar, "إجمالي_اللترات", "السائق",
-                         "⛽ أعلى 20 سائق استهلاكاً (لترات)",
-                         colorscale="Reds", unit="لتر")
-        st.plotly_chart(fig, use_container_width=True)
-
+        bar = top20.sort_values("اللترات")
+        st.plotly_chart(
+            hbar(bar, "اللترات", "السائق",
+                 "⛽ أعلى 20 سائق استهلاكاً (لترات)",
+                 scale="Reds", unit="لتر"),
+            use_container_width=True
+        )
     with c2:
-        # Worst efficiency (min 5 trips)
-        eff = drv_grp[drv_grp["عدد_الرحلات"] >= 5].dropna(subset=["كم_لكل_لتر"])
-        worst = eff.nsmallest(15, "كم_لكل_لتر").sort_values("كم_لكل_لتر")
-        fig = hbar_chart(worst, "كم_لكل_لتر", "السائق",
-                         "📉 أسوأ كفاءة بين السائقين (كم/لتر)",
-                         colorscale="OrRd",
-                         fmt_fn=lambda x: f"{x:.2f} كم/لتر")
-        st.plotly_chart(fig, use_container_width=True)
+        eff = dg[dg["الرحلات"] >= 5].dropna(subset=["كم_لتر"])
+        worst = eff.nsmallest(15, "كم_لتر").sort_values("كم_لتر")
+        st.plotly_chart(
+            hbar(worst, "كم_لتر", "السائق",
+                 "📉 أسوأ كفاءة بين السائقين (كم/لتر)",
+                 scale="OrRd",
+                 fmt_fn=lambda x: f"{x:.2f} كم/لتر"),
+            use_container_width=True
+        )
 
 
 # =========================================
@@ -547,101 +550,56 @@ def render_driver_analysis(df: pd.DataFrame):
 def render_charts(df: pd.DataFrame):
     st.markdown("### 📈 الرسوم البيانية")
 
+    # ── Row 1: Donut + Top vehicles ───────
     c1, c2 = st.columns(2)
 
     with c1:
-        if "_veh_type" in df.columns:
-            vt = df.groupby("_veh_type")[col("amount")].sum().reset_index()
-            vt.columns = ["نوع العربية", "التكلفة"]
-            fig = go.Figure(go.Pie(
-                labels=vt["نوع العربية"],
-                values=vt["التكلفة"],
-                hole=0.45,
-                textinfo="label+percent",
-                textfont=dict(color="white"),
-                marker=dict(colors=["#2196f3", "#4caf50", "#ff9800"]),
-            ))
-            fig.update_layout(
-                title=dict(text="🚗 توزيع التكلفة حسب نوع العربية",
-                           font=dict(size=15, color="#90caf9"), x=0.01),
-                height=360,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(13,22,38,0.95)",
-                font=dict(color="#e0e6f0", family="Cairo, sans-serif"),
-                margin=dict(l=20, r=20, t=55, b=20),
-                legend=dict(font=dict(color="#c8d8f0", size=12)),
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-    with c2:
-        veh_cost = (
-            df.groupby(col("plate"))[col("amount")]
-            .sum().nlargest(15).reset_index().sort_values(col("amount"))
+        vt = df.groupby("_veh_type")[C("amount")].sum().reset_index()
+        fig = donut_chart(
+            vt["_veh_type"].tolist(),
+            vt[C("amount")].tolist(),
+            "🚗 توزيع التكلفة حسب نوع العربية",
         )
-        veh_cost.columns = ["المركبة", "التكلفة"]
-        fig = hbar_chart(veh_cost, "التكلفة", "المركبة",
-                         "🔝 أعلى 15 مركبة تكلفة (ج.م)",
-                         colorscale="Blues", unit="ج.م")
         st.plotly_chart(fig, use_container_width=True)
 
-    # Daily trend
+    with c2:
+        vc = (
+            df.groupby(C("plate"))[C("amount")]
+            .sum().nlargest(15).reset_index().sort_values(C("amount"))
+        )
+        vc.columns = ["المركبة", "التكلفة"]
+        st.plotly_chart(
+            hbar(vc, "التكلفة", "المركبة",
+                 "🔝 أعلى 15 مركبة تكلفة (ج.م)",
+                 scale="Blues", unit="ج.م"),
+            use_container_width=True
+        )
+
+    # ── Daily trend ───────────────────────
     if "_date" in df.columns and df["_date"].notna().any():
         daily = (
             df.dropna(subset=["_date"])
             .groupby(df["_date"].dt.date)
-            .agg(cost=(col("amount"), "sum"), liters=(col("liters"), "sum"))
+            .agg(cost=(C("amount"), "sum"), liters=(C("liters"), "sum"))
             .reset_index()
-            .rename(columns={"_date": "التاريخ"})
+            .rename(columns={"_date": "_day"})
         )
-        fig = make_subplots(specs=[[{"secondary_y": True}]])
-        fig.add_trace(go.Scatter(
-            x=daily["التاريخ"], y=daily["cost"],
-            name="التكلفة اليومية (ج.م)",
-            line=dict(color="#2196f3", width=2),
-            fill="tozeroy", fillcolor="rgba(33,150,243,0.1)",
-        ), secondary_y=False)
-        fig.add_trace(go.Scatter(
-            x=daily["التاريخ"], y=daily["liters"],
-            name="الكميات (لتر)",
-            line=dict(color="#4caf50", width=2, dash="dot"),
-        ), secondary_y=True)
-        fig.update_layout(
-            title=dict(text="📅 الاتجاه اليومي — التكلفة والكميات",
-                       font=dict(size=15, color="#90caf9"), x=0.01),
-            height=380,
-            legend=dict(orientation="h", y=1.08, x=0,
-                        font=dict(color="#c8d8f0", size=12)),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(13,22,38,0.95)",
-            font=dict(color="#e0e6f0", family="Cairo, sans-serif"),
-            margin=dict(l=20, r=40, t=60, b=40),
-            hoverlabel=dict(bgcolor="#1a2e4a", bordercolor="#2d5a8e",
-                            font=dict(color="white", family="Cairo, sans-serif")),
-        )
-        fig.update_yaxes(title_text="التكلفة (ج.م)", secondary_y=False,
-                         titlefont=dict(color="#90caf9"),
-                         tickfont=dict(color="#6b8cba"))
-        fig.update_yaxes(title_text="الكميات (لتر)", secondary_y=True,
-                         titlefont=dict(color="#81c784"),
-                         tickfont=dict(color="#6b8cba"))
-        fig.update_xaxes(gridcolor="rgba(45,90,142,0.3)",
-                         tickfont=dict(color="#6b8cba", size=11))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(trend_chart(daily), use_container_width=True)
 
-    # Worst vehicles by cost/km
-    veh_eff = (
-        df.groupby(col("plate"))
-        .agg(cost=(col("amount"), "sum"), km=(col("distance"), "sum"))
-        .reset_index()
+    # ── Worst vehicles: cost/km ───────────
+    ve = df.groupby(C("plate")).agg(
+        cost=(C("amount"), "sum"), km=(C("distance"), "sum")
+    ).reset_index()
+    ve["cpk"] = ve["cost"] / ve["km"].replace(0, np.nan)
+    worst = ve.dropna(subset=["cpk"]).nlargest(10, "cpk").sort_values("cpk")
+    worst = worst.rename(columns={C("plate"): "المركبة"})
+    st.plotly_chart(
+        hbar(worst, "cpk", "المركبة",
+             "⚠️ أعلى 10 مركبات تكلفة لكل كيلومتر (ج.م/كم)",
+             scale="OrRd",
+             fmt_fn=lambda x: f"{x:.3f} ج.م/كم"),
+        use_container_width=True
     )
-    veh_eff["تكلفة_كم"] = veh_eff["cost"] / veh_eff["km"].replace(0, np.nan)
-    worst = veh_eff.dropna(subset=["تكلفة_كم"]).nlargest(10, "تكلفة_كم").sort_values("تكلفة_كم")
-    worst = worst.rename(columns={col("plate"): "المركبة"})
-    fig = hbar_chart(worst, "تكلفة_كم", "المركبة",
-                     "⚠️ أعلى 10 مركبات تكلفة لكل كيلومتر (ج.م/كم)",
-                     colorscale="OrRd",
-                     fmt_fn=lambda x: f"{x:.3f} ج.م/كم")
-    st.plotly_chart(fig, use_container_width=True)
 
 
 # =========================================
@@ -650,52 +608,54 @@ def render_charts(df: pd.DataFrame):
 
 def render_diagnostics(df: pd.DataFrame):
     st.markdown("""
-    <div dir="rtl" style="background:linear-gradient(135deg,#1a0a0a,#2d1010);
-    border:1px solid #8b0000;border-radius:12px;padding:20px 24px;margin-bottom:20px;">
-    <h3 style="color:#ff6b6b;margin:0 0 6px 0;">🚨 التشخيص المتقدم</h3>
-    <p style="color:#ffaaaa;font-size:13px;margin:0;">
-    كشف تعبئة بدون حركة · مسافات غير صحيحة · استهلاك شاذ · خسائر محتملة
-    </p>
-    </div>""", unsafe_allow_html=True)
+    <div dir="rtl" style="background:linear-gradient(135deg,#1c0808,#2b0e0e);
+    border:1px solid #7b2020;border-radius:12px;padding:18px 22px;margin-bottom:18px;">
+    <h3 style="color:#f08080;margin:0 0 5px 0;">🚨 التشخيص المتقدم</h3>
+    <p style="color:#d4a0a0;font-size:12px;margin:0;">
+    تعبئة بدون حركة · مسافات غير صحيحة · استهلاك شاذ · خسائر محتملة
+    </p></div>""", unsafe_allow_html=True)
 
-    zero_km  = df[df[col("distance")] == 0] if col("distance") in df.columns else pd.DataFrame()
-    invalid  = df[df[col("validity")] == "غير صحيحة"] if col("validity") in df.columns else pd.DataFrame()
-    total_loss = df[col("potential_loss")].sum() if col("potential_loss") in df.columns else 0
+    # Compute
+    zero_km = df[df[C("distance")] == 0] if C("distance") in df.columns else pd.DataFrame()
+    invalid = df[df[C("validity")] == "غير صحيحة"] if C("validity") in df.columns else pd.DataFrame()
+    total_loss = df[C("potential_loss")].sum() if C("potential_loss") in df.columns else 0
 
-    cons_num = pd.to_numeric(df[col("consumption")], errors="coerce") if col("consumption") in df.columns else pd.Series(dtype=float)
     abnormal = pd.DataFrame()
-    if len(cons_num):
-        q1, q3 = cons_num.quantile(0.25), cons_num.quantile(0.75)
+    if C("consumption") in df.columns:
+        cs = pd.to_numeric(df[C("consumption")], errors="coerce")
+        q1, q3 = cs.quantile(0.25), cs.quantile(0.75)
         iqr = q3 - q1
-        abnormal = df[
-            (cons_num > q3 + 3 * iqr) |
-            ((cons_num < max(0, q1 - 3 * iqr)) & (cons_num > 0))
-        ]
+        mask = (cs > q3 + 3 * iqr) | ((cs < max(0, q1 - 3 * iqr)) & (cs > 0))
+        abnormal = df[mask]
 
+    # Metric cards
     d1, d2, d3, d4 = st.columns(4)
-    for d, label, val, clr in [
-        (d1, "⛽ تعبئة بدون حركة",   len(zero_km),           "#c0392b"),
-        (d2, "📍 مسافة غير صحيحة",   len(invalid),           "#e67e22"),
-        (d3, "💸 خسارة محتملة (ج.م)", f"{total_loss:,.0f}",  "#8e44ad"),
-        (d4, "📊 استهلاك شاذ",        len(abnormal),          "#27ae60"),
-    ]:
-        d.markdown(f"""
-        <div style="background:#111;border:1px solid {clr};border-radius:10px;
-        padding:14px;text-align:center">
-        <div style="color:{clr};font-size:12px;margin-bottom:6px">{label}</div>
-        <div style="color:white;font-size:26px;font-weight:700">{val}</div>
-        </div>""", unsafe_allow_html=True)
+    cards = [
+        (d1, "⛽ تعبئة بدون حركة",    len(zero_km),           "#d32f2f"),
+        (d2, "📍 مسافة غير صحيحة",    len(invalid),           "#e65100"),
+        (d3, "💸 خسارة محتملة (ج.م)", N(total_loss, 0),       "#6a1aad"),
+        (d4, "📊 استهلاك شاذ",         len(abnormal),          "#1b6b2e"),
+    ]
+    for d, lbl, val, clr in cards:
+        d.markdown(
+            f'<div style="background:#0d1520;border:1px solid {clr};border-radius:10px;'
+            f'padding:14px;text-align:center;margin-bottom:4px">'
+            f'<div style="color:{clr};font-size:11px;margin-bottom:6px;font-weight:600">{lbl}</div>'
+            f'<div style="color:#e8f0ff;font-size:26px;font-weight:800">{val}</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    base_cols = [c for c in [
-        col("plate"), "_branch", "_veh_type",
-        col("driver_name"), col("station"),
-        col("amount"), col("liters"), col("distance"), col("date"),
+    base = [c for c in [
+        C("plate"), "_branch", "_veh_type",
+        C("driver_name"), C("station"),
+        C("amount"), C("liters"), C("distance"), C("date"),
     ] if c in df.columns]
 
     tab1, tab2, tab3, tab4 = st.tabs([
-        "⛽ تعبئة بدون حركة",
+        "⛽ بدون حركة",
         "📍 مسافة غير صحيحة",
         "📊 استهلاك شاذ",
         "🏆 ترتيب المركبات",
@@ -703,64 +663,70 @@ def render_diagnostics(df: pd.DataFrame):
 
     with tab1:
         if len(zero_km):
-            st.dataframe(zero_km[base_cols], use_container_width=True, hide_index=True)
+            st.dataframe(zero_km[base], use_container_width=True, hide_index=True)
         else:
             st.success("✅ لا توجد معاملات بدون حركة")
 
     with tab2:
         if len(invalid):
-            inv_cols = base_cols + [c for c in [col("invalid_reason"), col("potential_loss")] if c in df.columns]
-            st.dataframe(invalid[list(dict.fromkeys(inv_cols))], use_container_width=True, hide_index=True)
+            ext = [c for c in [C("invalid_reason"), C("potential_loss")] if c in df.columns]
+            cols_inv = list(dict.fromkeys(base + ext))
+            st.dataframe(invalid[cols_inv], use_container_width=True, hide_index=True)
         else:
             st.success("✅ جميع المسافات صحيحة")
 
     with tab3:
         if len(abnormal):
-            st.dataframe(abnormal[base_cols], use_container_width=True, hide_index=True)
+            st.dataframe(abnormal[base], use_container_width=True, hide_index=True)
         else:
-            st.success("✅ لا استهلاك شاذ مكتشف")
+            st.success("✅ لا استهلاك شاذ")
 
     with tab4:
-        veh_grp = (
-            df.groupby(col("plate"))
+        vg = (
+            df.groupby(C("plate"))
             .agg(
                 الفرع=("_branch", "first"),
-                نوع_العربية=("_veh_type", "first"),
-                إجمالي_التكلفة=(col("amount"), "sum"),
-                إجمالي_كم=(col("distance"), "sum"),
-                إجمالي_لترات=(col("liters"), "sum"),
-                عدد_المعاملات=(col("amount"), "count"),
+                نوع=("_veh_type", "first"),
+                التكلفة=(C("amount"), "sum"),
+                الكيلومترات=(C("distance"), "sum"),
+                اللترات=(C("liters"), "sum"),
+                المعاملات=(C("amount"), "count"),
             )
             .reset_index()
+            .rename(columns={C("plate"): "رقم_اللوحة"})
         )
-        veh_grp["كم_لكل_لتر"] = veh_grp["إجمالي_كم"] / veh_grp["إجمالي_لترات"].replace(0, np.nan)
-        veh_grp = veh_grp.sort_values("كم_لكل_لتر")
-        veh_grp.rename(columns={col("plate"): "رقم_اللوحة"}, inplace=True)
-        st.dataframe(veh_grp.reset_index(drop=True), use_container_width=True, hide_index=True)
+        vg["كم/لتر"] = vg["الكيلومترات"] / vg["اللترات"].replace(0, np.nan)
+        vg = vg.sort_values("كم/لتر")
+        st.dataframe(vg.reset_index(drop=True), use_container_width=True, hide_index=True)
 
 
 # =========================================
 # CREDIT SYSTEM
 # =========================================
 
-def deduct_credit(supabase, feature: str, tokens_used: int) -> bool:
+def deduct_credit(supabase, feature: str, tokens: int) -> bool:
     try:
-        cost = round(tokens_used / 1000, 4)
-        res = supabase.table("company_credits") \
-            .select("credits") \
-            .eq("company_id", st.session_state.company_id) \
-            .eq("feature", feature) \
-            .single().execute()
+        cost = round(tokens / 1000, 4)
+        res = (
+            supabase.table("company_credits")
+            .select("credits")
+            .eq("company_id", st.session_state.company_id)
+            .eq("feature", feature)
+            .single()
+            .execute()
+        )
         if not res.data:
             return False
-        current = float(res.data["credits"])
-        if current < cost:
+        cur = float(res.data["credits"])
+        if cur < cost:
             return False
+        new_val = round(cur - cost, 4)
         supabase.table("company_credits") \
-            .update({"credits": round(current - cost, 4)}) \
+            .update({"credits": new_val}) \
             .eq("company_id", st.session_state.company_id) \
-            .eq("feature", feature).execute()
-        st.session_state.credits_fleet = round(current - cost, 4)
+            .eq("feature", feature) \
+            .execute()
+        st.session_state.credits_fleet = new_val
         return True
     except Exception as e:
         st.warning(f"⚠️ خطأ في خصم الكريدت: {e}")
@@ -771,71 +737,83 @@ def deduct_credit(supabase, feature: str, tokens_used: int) -> bool:
 # AI REPORT
 # =========================================
 
-def build_summary(df: pd.DataFrame) -> dict:
-    total_cost   = df[col("amount")].sum()
-    total_liters = df[col("liters")].sum()
-    total_km     = df[col("distance")].sum()
-    total_loss   = df[col("potential_loss")].sum() if col("potential_loss") in df.columns else 0
+def build_summary(df: pd.DataFrame) -> str:
+    """Return a plain-text summary suitable for GPT."""
+    tc = df[C("amount")].sum()
+    tl = df[C("liters")].sum()
+    tk = df[C("distance")].sum()
+    loss = df[C("potential_loss")].sum() if C("potential_loss") in df.columns else 0
 
-    zero_km = df[df[col("distance")] == 0]
-    invalid = df[df[col("validity")] == "غير صحيحة"] if col("validity") in df.columns else pd.DataFrame()
+    zero_km = int((df[C("distance")] == 0).sum()) if C("distance") in df.columns else 0
+    invalid = int((df[C("validity")] == "غير صحيحة").sum()) if C("validity") in df.columns else 0
 
-    branch_summary = (
+    branch_lines = []
+    for _, r in (
         df.groupby("_branch")
-        .agg(cost=(col("amount"), "sum"), km=(col("distance"), "sum"))
+        .agg(cost=(C("amount"), "sum"), km=(C("distance"), "sum"), liters=(C("liters"), "sum"))
         .reset_index()
-        .rename(columns={"_branch": "branch"})
-        .to_dict(orient="records")
+        .sort_values("cost", ascending=False)
+        .iterrows()
+    ):
+        branch_lines.append(
+            f"  - {r['_branch']}: تكلفة {r['cost']:,.0f} ج.م | {r['km']:,.0f} كم | {r['liters']:,.0f} لتر"
+        )
+
+    driver_lines = []
+    for _, r in (
+        df[df[C("driver_name")] != "بدون سائق"]
+        .groupby(C("driver_name"))[C("liters")]
+        .sum().nlargest(5).reset_index().iterrows()
+    ):
+        driver_lines.append(f"  - {r[C('driver_name')]}: {r[C('liters')]:,.1f} لتر")
+
+    return f"""ملخص بيانات الوقود:
+- إجمالي التكلفة: {tc:,.0f} ج.م
+- إجمالي الكيلومترات: {tk:,.0f} كم
+- إجمالي اللترات: {tl:,.1f} لتر
+- تكلفة الكيلومتر: {(tc/tk if tk else 0):.3f} ج.م/كم
+- كفاءة الوقود: {(tk/tl if tl else 0):.2f} كم/لتر
+- عدد المركبات: {df[C('plate')].nunique()}
+- عدد الفروع: {df['_branch'].nunique()}
+- الخسارة المحتملة: {loss:,.0f} ج.م
+- معاملات بدون حركة: {zero_km}
+- مسافات غير صحيحة: {invalid}
+- إجمالي المعاملات: {len(df):,}
+
+الفروع (مرتبة تنازلياً بالتكلفة):
+{chr(10).join(branch_lines)}
+
+أعلى 5 سائقين استهلاكاً:
+{chr(10).join(driver_lines)}
+"""
+
+
+def call_ai_report(summary_text: str) -> tuple[str, int]:
+    api_key = st.secrets.get("OPENAI_API_KEY", "")
+    if not api_key:
+        raise ValueError("مفتاح OPENAI_API_KEY غير موجود في secrets.")
+
+    client_ai = OpenAI(api_key=api_key)
+
+    system_prompt = (
+        "أنت خبير تحليل بيانات تشغيلية لشركات النقل والأساطيل. "
+        "مهمتك إنتاج تقرير تحليلي احترافي باللغة العربية الفصحى، "
+        "بالجنيه المصري (ج.م) حصراً. "
+        "الإخراج: HTML كامل (DOCTYPE + html + head + body) مع inline CSS، "
+        "RTL، خلفية #0d1b2a، نص أبيض، بدون Bootstrap أو أي مكتبة خارجية. "
+        "أعد HTML فقط — لا أي نص قبله أو بعده."
     )
 
-    top_drivers = (
-        df[df[col("driver_name")] != "بدون سائق"]
-        .groupby(col("driver_name"))[col("liters")]
-        .sum().nlargest(5).reset_index()
-        .rename(columns={col("driver_name"): "driver", col("liters"): "liters"})
-        .to_dict(orient="records")
+    user_prompt = (
+        f"{summary_text}\n\n"
+        "أنشئ تقرير HTML كامل يشمل:\n"
+        "١. ملخص تنفيذي (أبرز الأرقام بالجنيه المصري)\n"
+        "٢. تحليل الفروع (تكلفة وكيلومترات ومقارنة)\n"
+        "٣. السائقون الأعلى استهلاكاً\n"
+        "٤. المشاكل المكتشفة (معاملات بدون حركة، مسافات غير صحيحة، خسارة محتملة)\n"
+        "٥. توصيات تشغيلية قابلة للتطبيق فوراً\n"
+        "٦. مؤشر خطر بصري (🟢 جيد / 🟡 تحذير / 🔴 خطر) لكل فرع"
     )
-
-    top_stations = (
-        df.groupby(col("station"))[col("amount")]
-        .sum().nlargest(5).reset_index()
-        .to_dict(orient="records")
-    )
-
-    return {
-        "total_cost_egp": round(total_cost, 2),
-        "total_liters": round(total_liters, 2),
-        "total_km": round(total_km, 2),
-        "cost_per_km_egp": round(total_cost / total_km, 4) if total_km else 0,
-        "km_per_liter": round(total_km / total_liters, 4) if total_liters else 0,
-        "n_vehicles": df[col("plate")].nunique(),
-        "n_branches": df["_branch"].nunique(),
-        "total_potential_loss_egp": round(total_loss, 2),
-        "zero_km_transactions": len(zero_km),
-        "invalid_distance_transactions": len(invalid),
-        "n_transactions": len(df),
-        "branch_summary": branch_summary,
-        "top_drivers_by_liters": top_drivers,
-        "top_stations_by_cost": top_stations,
-    }
-
-
-def call_ai_report(summary: dict) -> tuple[str, int]:
-    client_ai = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-    system_prompt = """أنت خبير تحليل بيانات تشغيلية لشركات النقل والأساطيل.
-مهمتك: تحليل بيانات وقود الأسطول وإنتاج تقرير احترافي باللغة العربية.
-العملة: الجنيه المصري (ج.م) في كل الأرقام.
-التقرير: HTML جاهز · inline CSS · RTL · لا Bootstrap · أعد HTML فقط."""
-
-    user_prompt = f"""البيانات:\n{summary}\n
-أنشئ تقرير HTML يشمل:
-1. ملخص تنفيذي (بالجنيه المصري)
-2. تحليل الفروع (تكلفة وكيلومترات)
-3. أعلى السائقين استهلاكاً
-4. تحليل محطات الوقود
-5. المشاكل المكتشفة (تعبئة بدون حركة، خسائر محتملة)
-6. توصيات تشغيلية قابلة للتطبيق"""
 
     resp = client_ai.chat.completions.create(
         model="gpt-4o-mini",
@@ -843,12 +821,21 @@ def call_ai_report(summary: dict) -> tuple[str, int]:
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},
         ],
-        max_tokens=2500,
-        temperature=0.3,
+        max_tokens=3000,
+        temperature=0.25,
     )
-    html   = resp.choices[0].message.content.strip()
-    tokens = resp.usage.total_tokens if resp.usage else 1000
-    return html, tokens
+
+    raw = resp.choices[0].message.content.strip()
+
+    # Strip markdown code fences if model wraps in ```html ... ```
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[-1]
+        if raw.startswith("html"):
+            raw = raw[4:]
+        raw = raw.rsplit("```", 1)[0].strip()
+
+    tokens = resp.usage.total_tokens if resp.usage else 1500
+    return raw, tokens
 
 
 # =========================================
@@ -857,22 +844,34 @@ def call_ai_report(summary: dict) -> tuple[str, int]:
 
 def run():
 
-    # ── Global RTL ───────────────────────
+    # ── Global styles ────────────────────
     st.markdown("""
     <style>
+    section.main > div { padding-top: 1rem; }
     * { direction: rtl; }
     [data-testid="stSidebar"] * { direction: rtl; }
-    .stTabs [data-baseweb="tab"] { direction: rtl; }
-    .stDataFrame { direction: ltr; }
+    .stTabs [data-baseweb="tab"]  { direction: rtl; }
+    .stDataFrame  { direction: ltr; }
+    /* Print-friendly: force dark bg on print */
+    @media print {
+        body { background: #0d1b2a !important; color: #e8f4ff !important; }
+        .stApp { background: #0d1b2a !important; }
+        [data-testid="stSidebar"] { display: none !important; }
+        header { display: none !important; }
+        .stDeployButton { display: none !important; }
+    }
     </style>""", unsafe_allow_html=True)
 
     # ── Header ───────────────────────────
     st.markdown("""
-    <div dir="rtl" style="background:linear-gradient(135deg,#0d1b2a,#1a2e4a);
-    border-radius:16px;padding:24px 32px;margin-bottom:24px;border:1px solid #1e3a5f;">
-      <h2 style="color:#64b5f6;margin:0;font-size:28px;">⛽ لوحة تحكم الوقود</h2>
-      <p style="color:#90caf9;margin:8px 0 0 0;font-size:15px;">
-        تحليل معاملات الوقود · الفروع والسيارات · محطات التعبئة · السائقون · كشف الأنماط المشبوهة
+    <div dir="rtl" style="background:linear-gradient(135deg,#0b1929,#152a45);
+    border-radius:14px;padding:22px 28px;margin-bottom:22px;
+    border:1px solid #1a3a60;box-shadow:0 6px 20px rgba(0,0,0,.5);">
+      <h2 style="color:#5aadff;margin:0;font-size:26px;font-weight:800;">
+        ⛽ لوحة تحكم الوقود
+      </h2>
+      <p style="color:#7ab8e8;margin:8px 0 0;font-size:14px;">
+        تحليل معاملات الوقود · الفروع والسيارات · السائقون · كشف الأنماط المشبوهة · تقرير ذكاء اصطناعي
       </p>
     </div>""", unsafe_allow_html=True)
 
@@ -882,54 +881,56 @@ def run():
         type=["xlsx", "xls"],
         key="fuel_file_upload",
     )
-
     if not uploaded:
         st.info("📋 الرجاء رفع ملف Excel يحتوي على معاملات الوقود.")
         return
 
-    with st.spinner("⏳ جاري تحليل البيانات..."):
-        df_raw = load_and_clean(uploaded.read())
+    with st.spinner("⏳ جاري تحميل وتنظيف البيانات..."):
+        raw_bytes = uploaded.read()
+        df_raw = load_and_clean(raw_bytes)
 
-    st.success(f"✅ تم تحميل {len(df_raw):,} معاملة بنجاح")
+    st.success(f"✅ تم تحميل **{len(df_raw):,}** معاملة بنجاح")
 
     # ── Filters ──────────────────────────
     df = render_filters(df_raw)
+
     st.markdown(
-        f'<div dir="rtl" style="color:#64b5f6;font-size:13px;margin-bottom:12px;">'
-        f'📌 عدد السجلات بعد التصفية: <strong>{len(df):,}</strong></div>',
+        f'<p style="color:#5aadff;font-size:12px;margin:4px 0 16px;">'
+        f'📌 السجلات بعد التصفية: <strong>{len(df):,}</strong></p>',
         unsafe_allow_html=True
     )
 
     if len(df) == 0:
-        st.warning("⚠️ لا توجد بيانات مطابقة للفلاتر.")
+        st.warning("⚠️ لا توجد بيانات مطابقة للفلاتر المحددة.")
         return
 
     # ── KPIs ─────────────────────────────
     st.markdown("### 📊 المؤشرات الرئيسية")
     render_kpis(df)
-    st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Station Table ─────────────────────
-    render_station_table(df)
     st.markdown("---")
 
-    # ── Branch Analysis (primary axis) ───
+    # ── Branch Analysis ───────────────────
     render_branch_analysis(df)
+
     st.markdown("---")
 
-    # ── Driver Ranking ───────────────────
+    # ── Driver Analysis ───────────────────
     render_driver_analysis(df)
+
     st.markdown("---")
 
-    # ── General Charts ───────────────────
+    # ── General Charts ────────────────────
     render_charts(df)
+
     st.markdown("---")
 
-    # ── Diagnostics ──────────────────────
+    # ── Diagnostics ───────────────────────
     render_diagnostics(df)
+
     st.markdown("---")
 
-    # ── Raw Data ─────────────────────────
+    # ── Raw Data ──────────────────────────
     with st.expander("📋 عرض البيانات الخام", expanded=False):
         st.dataframe(df, use_container_width=True, hide_index=True)
 
@@ -937,47 +938,66 @@ def run():
 
     # ── AI Report ────────────────────────
     st.markdown("""
-    <div dir="rtl" style="background:linear-gradient(135deg,#0a1628,#152238);
-    border:1px solid #1565c0;border-radius:12px;padding:20px 24px;margin-bottom:16px;">
-    <h3 style="color:#64b5f6;margin:0 0 8px 0;">🤖 تقرير الذكاء الاصطناعي</h3>
-    <p style="color:#90caf9;font-size:13px;margin:0;">
-      تحليل شامل بالجنيه المصري مع توصيات تشغيلية بناءً على بيانات الفروع والسائقين والمحطات
-    </p>
-    </div>""", unsafe_allow_html=True)
+    <div dir="rtl" style="background:linear-gradient(135deg,#080f1e,#101e35);
+    border:1px solid #1a4080;border-radius:12px;padding:18px 22px;margin-bottom:14px;">
+    <h3 style="color:#5aadff;margin:0 0 7px;">🤖 تقرير الذكاء الاصطناعي</h3>
+    <p style="color:#7ab8e8;font-size:12px;margin:0;">
+      تحليل شامل بالجنيه المصري · تقييم خطر الفروع · توصيات تشغيلية فورية
+    </p></div>""", unsafe_allow_html=True)
 
-    fleet_credits = st.session_state.get("credits_fleet", 0)
-    ai1, ai2 = st.columns([2, 1])
+    credits = st.session_state.get("credits_fleet", 0)
+    ai1, ai2 = st.columns([3, 1])
     with ai1:
-        st.info(f"💳 رصيد Fleet Credit المتاح: **{fleet_credits:.2f}**")
+        st.info(f"💳 رصيد Fleet Credit المتاح: **{credits:.2f}**")
     with ai2:
-        gen_btn = st.button("🚀 توليد التقرير الذكي", use_container_width=True)
+        gen_btn = st.button("🚀 توليد التقرير", use_container_width=True,
+                            type="primary")
 
     if gen_btn:
-        if fleet_credits <= 0:
+        if credits <= 0:
             st.error("❌ رصيد Fleet Credit غير كافٍ.")
             return
-        with st.spinner("🧠 الذكاء الاصطناعي يحلل البيانات..."):
+
+        with st.spinner("🧠 الذكاء الاصطناعي يحلل البيانات... قد يستغرق 15-30 ثانية"):
             try:
-                summary  = build_summary(df)
-                html_rep, tokens = call_ai_report(summary)
+                summary_text = build_summary(df)
+                html_rep, tokens = call_ai_report(summary_text)
+
+                # Deduct credits (non-blocking)
                 try:
-                    supa = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+                    supa = create_client(
+                        st.secrets["SUPABASE_URL"],
+                        st.secrets["SUPABASE_KEY"]
+                    )
                     deduct_credit(supa, "fleet", tokens)
                 except Exception:
                     pass
-                st.session_state.report_html = html_rep
-                st.success(f"✅ تم توليد التقرير — الرموز المستخدمة: {tokens:,}")
+
+                st.session_state["fuel_report_html"] = html_rep
+                st.session_state["fuel_report_tokens"] = tokens
+                st.success(f"✅ تم توليد التقرير | الرموز المستخدمة: **{tokens:,}**")
+
             except Exception as e:
-                st.error(f"❌ خطأ: {e}")
+                st.error(f"❌ فشل توليد التقرير: {e}")
+                st.info("💡 تأكد من صحة OPENAI_API_KEY في secrets وأن الرصيد كافٍ لدى OpenAI.")
                 return
 
-    if st.session_state.get("report_html"):
+    # Display stored report
+    if st.session_state.get("fuel_report_html"):
         st.markdown("---")
-        st.markdown("<h4 style='color:#64b5f6;'>📄 التقرير التحليلي</h4>", unsafe_allow_html=True)
-        st.components.v1.html(st.session_state.report_html, height=900, scrolling=True)
+        st.markdown(
+            "<h4 style='color:#5aadff;margin-bottom:10px;'>📄 التقرير التحليلي</h4>",
+            unsafe_allow_html=True
+        )
+        st.components.v1.html(
+            st.session_state["fuel_report_html"],
+            height=950,
+            scrolling=True,
+        )
         st.download_button(
-            "⬇️ تحميل التقرير (HTML)",
-            data=st.session_state.report_html.encode("utf-8"),
+            label="⬇️ تحميل التقرير (HTML)",
+            data=st.session_state["fuel_report_html"].encode("utf-8"),
             file_name="fuel_ai_report.html",
             mime="text/html",
+            use_container_width=True,
         )
