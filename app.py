@@ -1,4 +1,4 @@
-# =========================================
+ =========================================
 # MAIN APP ROUTER
 # =========================================
 
@@ -261,7 +261,7 @@ with st.sidebar:
         "Navigation",
         [
             "📊 Sales Dashboard",
-            "🚚 Fleet Dashboard"
+            "🚚 Fleet Dashboard",
             "⛽ Fuel Dashboard"
         ]
     )
