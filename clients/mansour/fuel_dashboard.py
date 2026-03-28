@@ -850,33 +850,64 @@ def render_diagnostics(df: pd.DataFrame):
 # CREDIT SYSTEM
 # =========================================
 
-def deduct_credit(supabase, feature: str, tokens: int) -> bool:
+def load_credits(supabase) -> None:
+    """
+    Fetch all credit rows for the current company from company_credits
+    and store them in session state.
+    Features: sales | fleet | fuel
+    """
     try:
-        cost = round(tokens / 1000, 4)
         res = (
             supabase.table("company_credits")
-            .select("credits")
+            .select("feature, credits")
             .eq("company_id", st.session_state.company_id)
-            .eq("feature", feature)
-            .single()
             .execute()
         )
-        if not res.data:
-            return False
-        cur = float(res.data["credits"])
+        # Defaults (safe fallback if row is missing)
+        sales_cr = 0.0
+        fleet_cr = 0.0
+        fuel_cr  = 0.0
+
+        if res.data:
+            for row in res.data:
+                feature = (row.get("feature") or "").strip().lower()
+                credit  = float(row.get("credits") or 0)
+                if feature == "sales":
+                    sales_cr = credit
+                elif feature == "fleet":
+                    fleet_cr = credit
+                elif feature == "fuel":
+                    fuel_cr  = credit
+
+        st.session_state.credits_sales = sales_cr
+        st.session_state.credits_fleet = fleet_cr
+        st.session_state.credits_fuel  = fuel_cr
+
+    except Exception as e:
+        st.warning(f"⚠️ تعذّر تحميل الكريدت: {e}")
+
+
+def deduct_fuel_credit(supabase, tokens: int) -> tuple[bool, float]:
+    """
+    Deduct tokens/1000 credits from the 'fuel' feature row.
+    Returns (success, new_balance).
+    """
+    try:
+        cost    = round(tokens / 1000, 4)
+        cur     = float(st.session_state.get("credits_fuel", 0))
         if cur < cost:
-            return False
+            return False, cur
         new_val = round(cur - cost, 4)
         supabase.table("company_credits") \
             .update({"credits": new_val}) \
             .eq("company_id", st.session_state.company_id) \
-            .eq("feature", feature) \
+            .eq("feature", "fuel") \
             .execute()
-        st.session_state.credits_fleet = new_val
-        return True
+        st.session_state.credits_fuel = new_val
+        return True, new_val
     except Exception as e:
         st.warning(f"⚠️ خطأ في خصم الكريدت: {e}")
-        return False
+        return False, float(st.session_state.get("credits_fuel", 0))
 
 
 # =========================================
@@ -1025,6 +1056,31 @@ def run():
     }}
     </style>""", unsafe_allow_html=True)
 
+    # ── Session state defaults ─────────────
+    for _k, _v in [
+        ("credits_fuel",  0.0),
+        ("credits_fleet", 0.0),
+        ("credits_sales", 0.0),
+    ]:
+        if _k not in st.session_state:
+            st.session_state[_k] = _v
+
+    # ── Load credits from Supabase once ────
+    # Triggered on first load OR after a full deduction resets balance to 0
+    if st.session_state.get("company_id") and (
+        st.session_state.credits_fuel  == 0.0 and
+        st.session_state.credits_fleet == 0.0 and
+        st.session_state.credits_sales == 0.0
+    ):
+        try:
+            _supa_tmp = create_client(
+                st.secrets["SUPABASE_URL"],
+                st.secrets["SUPABASE_KEY"],
+            )
+            load_credits(_supa_tmp)
+        except Exception:
+            pass  # fail silently — displayed as 0
+
     # ── Dashboard header ──────────────────
     st.markdown(f"""
     <div dir="rtl" style="
@@ -1098,10 +1154,11 @@ def run():
     section_header("🤖", "تقرير الذكاء الاصطناعي",
                    "تحليل شامل بالجنيه المصري · تقييم خطر الفروع · توصيات تشغيلية")
 
-    credits = st.session_state.get("credits_fleet", 0)
+    fuel_credits = st.session_state.get("credits_fuel", 0.0)
+
     ai1, ai2 = st.columns([3, 1])
     with ai1:
-        st.info(f"💳 رصيد Fleet Credit المتاح: **{credits:.2f}**")
+        st.info(f"💳 رصيد Fuel Credit المتاح: **{fuel_credits:.2f}**")
     with ai2:
         gen_btn = st.button(
             "🚀 توليد التقرير",
@@ -1109,29 +1166,34 @@ def run():
             type="primary",
         )
 
+    # ── Guard: check fuel credit before any AI logic ──
     if gen_btn:
-        if credits <= 0:
-            st.error("❌ رصيد Fleet Credit غير كافٍ.")
-            return
+        if fuel_credits <= 0:
+            st.error("❌ رصيدك انتهى. يرجى شحن الحساب.")
+            st.stop()
 
         with st.spinner("🧠 الذكاء الاصطناعي يحلل البيانات... (15-30 ثانية)"):
             try:
                 summary_text     = build_summary(df)
                 html_rep, tokens = call_ai_report(summary_text)
 
+                # ── Deduct from fuel feature ──
                 try:
                     supa = create_client(
                         st.secrets["SUPABASE_URL"],
                         st.secrets["SUPABASE_KEY"],
                     )
-                    deduct_credit(supa, "fleet", tokens)
+                    deducted, new_balance = deduct_fuel_credit(supa, tokens)
+                    if not deducted:
+                        st.warning("⚠️ تعذّر خصم الكريدت — تحقق من الرصيد.")
                 except Exception:
                     pass
 
                 st.session_state["fuel_report_html"]   = html_rep
                 st.session_state["fuel_report_tokens"] = tokens
                 st.success(
-                    f"✅ تم توليد التقرير | الرموز المستخدمة: **{tokens:,}**"
+                    f"✅ تم توليد التقرير | الرموز المستخدمة: **{tokens:,}** "
+                    f"| الرصيد المتبقي: **{st.session_state.get('credits_fuel', 0):.2f}**"
                 )
 
             except Exception as e:
