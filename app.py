@@ -262,6 +262,7 @@ with st.sidebar:
         [
             "📊 Sales Dashboard",
             "🚚 Fleet Dashboard"
+            "⛽ Fuel Dashboard"
         ]
     )
 
@@ -348,6 +349,14 @@ try:
 
         module = importlib.import_module(
             f"clients.{client}.fleet_dashboard"
+        )
+
+        module.run()
+        
+    elif page == "⛽ Fuel Dashboard":
+
+        module = importlib.import_module(
+            f"clients.{client}.fuel_dashboard"
         )
 
         module.run()
