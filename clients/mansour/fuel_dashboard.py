@@ -1191,10 +1191,8 @@ def run():
 
                 st.session_state["fuel_report_html"]   = html_rep
                 st.session_state["fuel_report_tokens"] = tokens
-                st.success(
-                    f"✅ تم توليد التقرير | الرموز المستخدمة: **{tokens:,}** "
-                    f"| الرصيد المتبقي: **{st.session_state.get('credits_fuel', 0):.2f}**"
-                )
+                # rerun so the display block below renders immediately
+                st.rerun()
 
             except Exception as e:
                 st.error(f"❌ فشل توليد التقرير: {e}")
@@ -1204,7 +1202,13 @@ def run():
                 )
                 return
 
+    # ── Display report (rendered after rerun) ─
     if st.session_state.get("fuel_report_html"):
+        st.success(
+            f"✅ تم توليد التقرير | الرموز المستخدمة: "
+            f"**{st.session_state.get('fuel_report_tokens', 0):,}** "
+            f"| الرصيد المتبقي: **{st.session_state.get('credits_fuel', 0):.2f}**"
+        )
         st.markdown(
             f"<h4 style='color:{TH['title']};margin:16px 0 8px;'>"
             f"📄 التقرير التحليلي</h4>",
@@ -1215,10 +1219,16 @@ def run():
             height=950,
             scrolling=True,
         )
-        st.download_button(
-            label="⬇️ تحميل التقرير (HTML)",
-            data=st.session_state["fuel_report_html"].encode("utf-8"),
-            file_name="fuel_ai_report.html",
-            mime="text/html",
-            use_container_width=True,
-        )
+        col_dl, col_clr = st.columns([3, 1])
+        with col_dl:
+            st.download_button(
+                label="⬇️ تحميل التقرير (HTML)",
+                data=st.session_state["fuel_report_html"].encode("utf-8"),
+                file_name="fuel_ai_report.html",
+                mime="text/html",
+                use_container_width=True,
+            )
+        with col_clr:
+            if st.button("🗑️ مسح التقرير", use_container_width=True):
+                del st.session_state["fuel_report_html"]
+                st.rerun()
