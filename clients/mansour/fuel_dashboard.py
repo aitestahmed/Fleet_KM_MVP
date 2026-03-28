@@ -981,11 +981,10 @@ def call_ai_report(summary_text: str) -> tuple[str, int]:
 
     system_prompt = (
         "أنت خبير تحليل بيانات تشغيلية لشركات النقل. "
-        "أنتج تقرير احترافي عربي فصيح، بالجنيه المصري حصراً. "
-        "الإخراج: HTML كامل (DOCTYPE+html+head+body) مع inline CSS فقط، "
-        "خلفية بيضاء #ffffff، نص داكن #1a1a2e، ألوان زرق للعناوين، "
-        "RTL كامل، بدون مكتبات خارجية. "
-        "أعد HTML فقط — لا نص قبله ولا بعده."
+        "أنتج تقريراً احترافياً عربياً فصيحاً بالجنيه المصري حصراً. "
+        "الإخراج: نص Markdown فقط (عناوين، جداول، نقاط، تقييمات). "
+        "استخدم رموز 🟢🟡🔴 لتقييم الفروع. "
+        "لا HTML، لا CSS، لا مقدمة، لا شرح — Markdown مباشرة فقط."
     )
 
     user_prompt = (
@@ -1009,13 +1008,14 @@ def call_ai_report(summary_text: str) -> tuple[str, int]:
     )
 
     raw = resp.choices[0].message.content.strip()
-    # Strip markdown fences if model wraps output
+    # Strip any accidental markdown fences
     if raw.startswith("```"):
-        parts = raw.split("```", 2)
-        raw = parts[-1]
-        if raw.lower().startswith("html"):
-            raw = raw[4:]
-        raw = raw.rsplit("```", 1)[0].strip()
+        parts = raw.split("```")
+        raw = parts[1] if len(parts) > 1 else parts[0]
+        raw = raw.strip()
+        # Remove language tag line if present
+        if raw and not raw.split("\n", 1)[0].strip().startswith("#"):
+            raw = raw.split("\n", 1)[-1].strip()
 
     tokens = resp.usage.total_tokens if resp.usage else 1500
     return raw, tokens
@@ -1199,17 +1199,18 @@ def run():
                 )
 
                 # ── Render report immediately (same run, no rerun needed) ──
+                st.markdown("---")
                 st.markdown(
                     f"<h4 style='color:{TH['title']};margin:16px 0 8px;'>"
                     f"📄 التقرير التحليلي</h4>",
                     unsafe_allow_html=True,
                 )
-                st.components.v1.html(html_rep, height=950, scrolling=True)
+                st.markdown(html_rep)
                 st.download_button(
-                    label="⬇️ تحميل التقرير (HTML)",
+                    label="⬇️ تحميل التقرير (Markdown)",
                     data=html_rep.encode("utf-8"),
-                    file_name="fuel_ai_report.html",
-                    mime="text/html",
+                    file_name="fuel_ai_report.md",
+                    mime="text/markdown",
                     use_container_width=True,
                 )
 
@@ -1233,18 +1234,14 @@ def run():
             f"📄 التقرير التحليلي</h4>",
             unsafe_allow_html=True,
         )
-        st.components.v1.html(
-            st.session_state["fuel_report_html"],
-            height=950,
-            scrolling=True,
-        )
+        st.markdown(st.session_state["fuel_report_html"])
         col_dl, col_clr = st.columns([3, 1])
         with col_dl:
             st.download_button(
-                label="⬇️ تحميل التقرير (HTML)",
+                label="⬇️ تحميل التقرير (Markdown)",
                 data=st.session_state["fuel_report_html"].encode("utf-8"),
-                file_name="fuel_ai_report.html",
-                mime="text/html",
+                file_name="fuel_ai_report.md",
+                mime="text/markdown",
                 use_container_width=True,
             )
         with col_clr:
