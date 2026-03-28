@@ -51,6 +51,9 @@ if "credits_sales" not in st.session_state:
 if "credits_fleet" not in st.session_state:
     st.session_state.credits_fleet = 100
 
+if "credits_fuel" not in st.session_state:
+    st.session_state.credits_fuel = 100
+
 
 # =========================================
 # =========================================
@@ -66,24 +69,28 @@ def load_credits(supabase):
 
     sales_credit = 0.0
     fleet_credit = 0.0
+    fuel_credit  = 0.0
 
     if res.data:
         for row in res.data:
             feature = (row.get("feature") or "").strip().lower()
             credit = float(row.get("credits") or 0)
-    
+
             if feature == "sales":
                 sales_credit = credit
             elif feature == "fleet":
                 fleet_credit = credit
-    
+            elif feature == "fuel":
+                fuel_credit  = credit
+
         st.session_state.credits_sales = sales_credit
         st.session_state.credits_fleet = fleet_credit
+        st.session_state.credits_fuel  = fuel_credit
 
     else:
-        # 👇 مهم جدًا
         st.session_state.credits_sales = 100
         st.session_state.credits_fleet = 100
+        st.session_state.credits_fuel  = 100
 
 
 # =========================================
@@ -189,8 +196,9 @@ if not st.session_state.logged_in:
 if st.session_state.logged_in:
 
     if st.session_state.company_id and (
-        st.session_state.credits_sales == 0 and 
-        st.session_state.credits_fleet == 0
+        st.session_state.credits_sales == 0 and
+        st.session_state.credits_fleet == 0 and
+        st.session_state.credits_fuel  == 0
     ):
 
         SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -254,6 +262,11 @@ with st.sidebar:
         f"{st.session_state.get('credits_fleet', 0):.2f}"
     )
 
+    st.metric(
+        "⛽ Fuel Credit",
+        f"{st.session_state.get('credits_fuel', 0):.2f}"
+    )
+
     st.divider()
 
     # Navigation
@@ -276,6 +289,7 @@ with st.sidebar:
         st.session_state.company_name = None
         st.session_state.credits_sales = 0
         st.session_state.credits_fleet = 0
+        st.session_state.credits_fuel  = 0
 
 
         st.rerun()
