@@ -1191,8 +1191,11 @@ def run():
 
                 st.session_state["fuel_report_html"]   = html_rep
                 st.session_state["fuel_report_tokens"] = tokens
-                # rerun so the display block below renders immediately
-                st.rerun()
+                # ✅ No rerun — continue in the same run so the report renders below
+                st.success(
+                    f"✅ تم توليد التقرير | الرموز المستخدمة: **{tokens:,}** "
+                    f"| الرصيد المتبقي: **{st.session_state.get('credits_fuel', 0):.2f}**"
+                )
 
             except Exception as e:
                 st.error(f"❌ فشل توليد التقرير: {e}")
@@ -1202,13 +1205,9 @@ def run():
                 )
                 return
 
-    # ── Display report (rendered after rerun) ─
+    # ── Display report ─────────────────────
+    # Renders immediately after generation (same run) or on page revisit
     if st.session_state.get("fuel_report_html"):
-        st.success(
-            f"✅ تم توليد التقرير | الرموز المستخدمة: "
-            f"**{st.session_state.get('fuel_report_tokens', 0):,}** "
-            f"| الرصيد المتبقي: **{st.session_state.get('credits_fuel', 0):.2f}**"
-        )
         st.markdown(
             f"<h4 style='color:{TH['title']};margin:16px 0 8px;'>"
             f"📄 التقرير التحليلي</h4>",
@@ -1231,4 +1230,5 @@ def run():
         with col_clr:
             if st.button("🗑️ مسح التقرير", use_container_width=True):
                 del st.session_state["fuel_report_html"]
+                del st.session_state["fuel_report_tokens"]
                 st.rerun()
