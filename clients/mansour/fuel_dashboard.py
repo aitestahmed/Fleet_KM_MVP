@@ -141,16 +141,109 @@ def fmt(val, decimals=0, suffix=""):
 
 
 # =========================================
-# CHART THEME
+# CHART THEME + HELPERS
 # =========================================
 
 THEME = dict(
     paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(15,25,40,0.85)",
-    font=dict(color="white", family="Cairo, sans-serif"),
-    xaxis=dict(gridcolor="#1e3a5f", linecolor="#2d5a8e"),
-    yaxis=dict(gridcolor="#1e3a5f", linecolor="#2d5a8e"),
+    plot_bgcolor="rgba(13,22,38,0.95)",
+    font=dict(color="#e0e6f0", family="Cairo, sans-serif", size=13),
+    xaxis=dict(
+        gridcolor="rgba(45,90,142,0.4)",
+        linecolor="#2d5a8e",
+        tickfont=dict(size=12, color="#90caf9"),
+        zeroline=False,
+    ),
+    yaxis=dict(
+        gridcolor="rgba(45,90,142,0.4)",
+        linecolor="#2d5a8e",
+        tickfont=dict(size=12, color="#e0e6f0"),
+        automargin=True,
+    ),
+    margin=dict(l=260, r=80, t=60, b=40),
+    hoverlabel=dict(
+        bgcolor="#1a2e4a",
+        bordercolor="#2d5a8e",
+        font=dict(color="white", family="Cairo, sans-serif", size=13),
+    ),
 )
+
+
+def hbar_chart(df_sorted, x_col, y_col, title,
+               colorscale="Blues", height=None, fmt_fn=None, unit=""):
+    """
+    Professional horizontal bar chart.
+    - y_col values are the labels (already sorted ascending for bottom→top display)
+    - Automatically calculates height based on number of bars
+    - Handles long Arabic text with automargin
+    """
+    n = len(df_sorted)
+    if height is None:
+        height = max(380, n * 46 + 100)
+
+    # Truncate very long labels for display, keep full for hover
+    labels_display = df_sorted[y_col].astype(str).str.slice(0, 30)
+    labels_full    = df_sorted[y_col].astype(str)
+    values         = df_sorted[x_col]
+
+    if fmt_fn is None:
+        text_vals = values.apply(lambda x: f"{x:,.0f}{(' ' + unit) if unit else ''}")
+    else:
+        text_vals = values.apply(fmt_fn)
+
+    # Color intensity
+    vmin, vmax = values.min(), values.max()
+    norm = (values - vmin) / (vmax - vmin + 1e-9)
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=values,
+        y=labels_display,
+        orientation="h",
+        customdata=labels_full,
+        hovertemplate="<b>%{customdata}</b><br>" + (unit or "القيمة") + ": %{x:,.0f}<extra></extra>",
+        text=text_vals,
+        textposition="outside",
+        textfont=dict(color="#e0e6f0", size=11, family="Cairo, sans-serif"),
+        cliponaxis=False,
+        marker=dict(
+            color=norm,
+            colorscale=colorscale,
+            cmin=0, cmax=1,
+            line=dict(width=0),
+        ),
+    ))
+
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=15, color="#90caf9"), x=0.01, xanchor="left"),
+        height=height,
+        bargap=0.28,
+        xaxis=dict(
+            gridcolor="rgba(45,90,142,0.35)",
+            linecolor="#2d5a8e",
+            tickfont=dict(size=11, color="#6b8cba"),
+            zeroline=True,
+            zerolinecolor="#2d5a8e",
+            zerolinewidth=1,
+            showgrid=True,
+        ),
+        yaxis=dict(
+            tickfont=dict(size=12, color="#c8d8f0", family="Cairo, sans-serif"),
+            automargin=True,
+            gridcolor="rgba(0,0,0,0)",
+            linecolor="rgba(0,0,0,0)",
+        ),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(13,22,38,0.95)",
+        font=dict(color="#e0e6f0", family="Cairo, sans-serif"),
+        margin=dict(l=20, r=100, t=55, b=30),
+        hoverlabel=dict(
+            bgcolor="#1a2e4a",
+            bordercolor="#2d5a8e",
+            font=dict(color="white", family="Cairo, sans-serif", size=13),
+        ),
+    )
+    return fig
 
 
 # =========================================
@@ -293,16 +386,9 @@ def render_station_table(df: pd.DataFrame):
 
     # Chart top 15
     top15 = grp.nlargest(15, "إجمالي_التكلفة").sort_values("إجمالي_التكلفة")
-    fig = go.Figure(go.Bar(
-        x=top15["إجمالي_التكلفة"],
-        y=top15["المحطة"],
-        orientation="h",
-        marker=dict(color=top15["إجمالي_التكلفة"], colorscale="Blues"),
-        text=top15["إجمالي_التكلفة"].apply(lambda x: f"{x:,.0f}"),
-        textposition="outside",
-        textfont=dict(color="white", size=10),
-    ))
-    fig.update_layout(title="🔝 أعلى 15 محطة إجمالي تكلفة (ج.م)", height=460, **THEME)
+    fig = hbar_chart(top15, "إجمالي_التكلفة", "المحطة",
+                     "🔝 أعلى 15 محطة — إجمالي التكلفة (ج.م)",
+                     colorscale="Blues", unit="ج.م")
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -346,28 +432,16 @@ def render_branch_analysis(df: pd.DataFrame):
 
     with c1:
         sc = branch_grp.sort_values("إجمالي_التكلفة")
-        fig = go.Figure(go.Bar(
-            x=sc["إجمالي_التكلفة"], y=sc["الفرع"],
-            orientation="h",
-            marker=dict(color=sc["إجمالي_التكلفة"], colorscale="Blues"),
-            text=sc["إجمالي_التكلفة"].apply(lambda x: f"{x:,.0f}"),
-            textposition="outside",
-            textfont=dict(color="white", size=10),
-        ))
-        fig.update_layout(title="💰 إجمالي التكلفة لكل فرع (ج.م)", height=380, **THEME)
+        fig = hbar_chart(sc, "إجمالي_التكلفة", "الفرع",
+                         "💰 إجمالي التكلفة لكل فرع (ج.م)",
+                         colorscale="Blues", unit="ج.م")
         st.plotly_chart(fig, use_container_width=True)
 
     with c2:
         sk = branch_grp.sort_values("إجمالي_الكيلومترات")
-        fig = go.Figure(go.Bar(
-            x=sk["إجمالي_الكيلومترات"], y=sk["الفرع"],
-            orientation="h",
-            marker=dict(color=sk["إجمالي_الكيلومترات"], colorscale="Greens"),
-            text=sk["إجمالي_الكيلومترات"].apply(lambda x: f"{x:,.0f}"),
-            textposition="outside",
-            textfont=dict(color="white", size=10),
-        ))
-        fig.update_layout(title="🛣️ إجمالي الكيلومترات لكل فرع", height=380, **THEME)
+        fig = hbar_chart(sk, "إجمالي_الكيلومترات", "الفرع",
+                         "🛣️ إجمالي الكيلومترات لكل فرع",
+                         colorscale="Greens", unit="كم")
         st.plotly_chart(fig, use_container_width=True)
 
     # ── Drill-down: Branch → Vehicles ─────
@@ -450,30 +524,19 @@ def render_driver_analysis(df: pd.DataFrame):
 
     with c1:
         bar = top20.sort_values("إجمالي_اللترات")
-        fig = go.Figure(go.Bar(
-            x=bar["إجمالي_اللترات"], y=bar["السائق"],
-            orientation="h",
-            marker=dict(color=bar["إجمالي_اللترات"], colorscale="Reds"),
-            text=bar["إجمالي_اللترات"].apply(lambda x: f"{x:,.0f}"),
-            textposition="outside",
-            textfont=dict(color="white", size=9),
-        ))
-        fig.update_layout(title="⛽ أعلى 20 سائق استهلاكاً (لترات)", height=520, **THEME)
+        fig = hbar_chart(bar, "إجمالي_اللترات", "السائق",
+                         "⛽ أعلى 20 سائق استهلاكاً (لترات)",
+                         colorscale="Reds", unit="لتر")
         st.plotly_chart(fig, use_container_width=True)
 
     with c2:
         # Worst efficiency (min 5 trips)
         eff = drv_grp[drv_grp["عدد_الرحلات"] >= 5].dropna(subset=["كم_لكل_لتر"])
         worst = eff.nsmallest(15, "كم_لكل_لتر").sort_values("كم_لكل_لتر")
-        fig = go.Figure(go.Bar(
-            x=worst["كم_لكل_لتر"], y=worst["السائق"],
-            orientation="h",
-            marker=dict(color=worst["كم_لكل_لتر"], colorscale="OrRd"),
-            text=worst["كم_لكل_لتر"].apply(lambda x: f"{x:.2f}"),
-            textposition="outside",
-            textfont=dict(color="white", size=9),
-        ))
-        fig.update_layout(title="📉 أسوأ كفاءة بين السائقين (كم/لتر)", height=520, **THEME)
+        fig = hbar_chart(worst, "كم_لكل_لتر", "السائق",
+                         "📉 أسوأ كفاءة بين السائقين (كم/لتر)",
+                         colorscale="OrRd",
+                         fmt_fn=lambda x: f"{x:.2f} كم/لتر")
         st.plotly_chart(fig, use_container_width=True)
 
 
@@ -498,7 +561,16 @@ def render_charts(df: pd.DataFrame):
                 textfont=dict(color="white"),
                 marker=dict(colors=["#2196f3", "#4caf50", "#ff9800"]),
             ))
-            fig.update_layout(title="🚗 توزيع التكلفة حسب نوع العربية", height=340, **THEME)
+            fig.update_layout(
+                title=dict(text="🚗 توزيع التكلفة حسب نوع العربية",
+                           font=dict(size=15, color="#90caf9"), x=0.01),
+                height=360,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(13,22,38,0.95)",
+                font=dict(color="#e0e6f0", family="Cairo, sans-serif"),
+                margin=dict(l=20, r=20, t=55, b=20),
+                legend=dict(font=dict(color="#c8d8f0", size=12)),
+            )
             st.plotly_chart(fig, use_container_width=True)
 
     with c2:
@@ -507,15 +579,9 @@ def render_charts(df: pd.DataFrame):
             .sum().nlargest(15).reset_index().sort_values(col("amount"))
         )
         veh_cost.columns = ["المركبة", "التكلفة"]
-        fig = go.Figure(go.Bar(
-            x=veh_cost["التكلفة"], y=veh_cost["المركبة"],
-            orientation="h",
-            marker=dict(color=veh_cost["التكلفة"], colorscale="Blues"),
-            text=veh_cost["التكلفة"].apply(lambda x: f"{x:,.0f}"),
-            textposition="outside",
-            textfont=dict(color="white", size=10),
-        ))
-        fig.update_layout(title="🔝 أعلى 15 مركبة تكلفة (ج.م)", height=340, **THEME)
+        fig = hbar_chart(veh_cost, "التكلفة", "المركبة",
+                         "🔝 أعلى 15 مركبة تكلفة (ج.م)",
+                         colorscale="Blues", unit="ج.م")
         st.plotly_chart(fig, use_container_width=True)
 
     # Daily trend
@@ -540,13 +606,26 @@ def render_charts(df: pd.DataFrame):
             line=dict(color="#4caf50", width=2, dash="dot"),
         ), secondary_y=True)
         fig.update_layout(
-            title="📅 الاتجاه اليومي — التكلفة والكميات",
-            height=360,
-            legend=dict(orientation="h", y=1.1, x=0),
-            **THEME,
+            title=dict(text="📅 الاتجاه اليومي — التكلفة والكميات",
+                       font=dict(size=15, color="#90caf9"), x=0.01),
+            height=380,
+            legend=dict(orientation="h", y=1.08, x=0,
+                        font=dict(color="#c8d8f0", size=12)),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(13,22,38,0.95)",
+            font=dict(color="#e0e6f0", family="Cairo, sans-serif"),
+            margin=dict(l=20, r=40, t=60, b=40),
+            hoverlabel=dict(bgcolor="#1a2e4a", bordercolor="#2d5a8e",
+                            font=dict(color="white", family="Cairo, sans-serif")),
         )
-        fig.update_yaxes(title_text="التكلفة (ج.م)", secondary_y=False)
-        fig.update_yaxes(title_text="الكميات (لتر)", secondary_y=True)
+        fig.update_yaxes(title_text="التكلفة (ج.م)", secondary_y=False,
+                         titlefont=dict(color="#90caf9"),
+                         tickfont=dict(color="#6b8cba"))
+        fig.update_yaxes(title_text="الكميات (لتر)", secondary_y=True,
+                         titlefont=dict(color="#81c784"),
+                         tickfont=dict(color="#6b8cba"))
+        fig.update_xaxes(gridcolor="rgba(45,90,142,0.3)",
+                         tickfont=dict(color="#6b8cba", size=11))
         st.plotly_chart(fig, use_container_width=True)
 
     # Worst vehicles by cost/km
@@ -557,15 +636,11 @@ def render_charts(df: pd.DataFrame):
     )
     veh_eff["تكلفة_كم"] = veh_eff["cost"] / veh_eff["km"].replace(0, np.nan)
     worst = veh_eff.dropna(subset=["تكلفة_كم"]).nlargest(10, "تكلفة_كم").sort_values("تكلفة_كم")
-    fig = go.Figure(go.Bar(
-        x=worst["تكلفة_كم"], y=worst[col("plate")],
-        orientation="h",
-        marker=dict(color=worst["تكلفة_كم"], colorscale="OrRd"),
-        text=worst["تكلفة_كم"].apply(lambda x: f"{x:.3f}"),
-        textposition="outside",
-        textfont=dict(color="white", size=10),
-    ))
-    fig.update_layout(title="⚠️ أعلى 10 مركبات تكلفة لكل كيلومتر (ج.م)", height=360, **THEME)
+    worst = worst.rename(columns={col("plate"): "المركبة"})
+    fig = hbar_chart(worst, "تكلفة_كم", "المركبة",
+                     "⚠️ أعلى 10 مركبات تكلفة لكل كيلومتر (ج.م/كم)",
+                     colorscale="OrRd",
+                     fmt_fn=lambda x: f"{x:.3f} ج.م/كم")
     st.plotly_chart(fig, use_container_width=True)
 
 
