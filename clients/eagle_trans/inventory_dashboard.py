@@ -232,19 +232,22 @@ def render_filters(data: dict) -> dict:
         fc3, fc4, fc5 = st.columns(3)
         with fc3:
             veh_types = ["الكل"] + sorted(
-                sarf["نوع_جهة_الصرف"].dropna().unique().tolist()
+                [str(v) for v in sarf["نوع_جهة_الصرف"].dropna().unique()
+                 if str(v).strip() not in ("", "0", "nan")]
             )
             sel_vtype = st.selectbox("🚗 نوع المركبة", veh_types, key="inv_vtype")
 
         with fc4:
             sections = ["الكل"] + sorted(
-                inv["القسم"].dropna().unique().tolist()
+                [str(v) for v in inv["القسم"].dropna().unique()
+                 if str(v).strip() not in ("", "nan")]
             )
             sel_section = st.selectbox("📦 قسم المخزن", sections, key="inv_section")
 
         with fc5:
             repair_locs = ["الكل"] + sorted(
-                maint["مكان الاصلاح"].dropna().unique().tolist()
+                [str(v) for v in maint["مكان الاصلاح"].dropna().unique()
+                 if str(v).strip() not in ("", "nan")]
             )
             sel_loc = st.selectbox("🔧 مكان الإصلاح", repair_locs, key="inv_loc")
 
@@ -608,7 +611,7 @@ def render_inventory_table(fd: dict):
         inv = inv[inv["اسم_الصنف"].astype(str).str.contains(search, na=False)]
 
     disp = pd.DataFrame({
-        "م":           inv["م"].astype(int) if inv["م"].dtype != object else inv["م"],
+        "م":           pd.to_numeric(inv["م"], errors="coerce").fillna(0).astype(int),
         "كود الصنف":   inv["كود_الصنف"],
         "اسم الصنف":   inv["اسم_الصنف"],
         "القسم":        inv["القسم"],
