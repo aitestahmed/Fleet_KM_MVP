@@ -271,6 +271,64 @@ if (
 
 
 # =========================================
+# DYNAMIC DASHBOARD DETECTION
+# =========================================
+# Must run BEFORE the sidebar so the radio has options on first render.
+
+import os
+
+# ── ICON MAP ─────────────────────────────
+_ICON_MAP = {
+    "sales":     ("📊", "Sales Dashboard"),
+    "fleet":     ("🚚", "Fleet Dashboard"),
+    "fuel":      ("⛽", "Fuel Dashboard"),
+    "inventory": ("📦", "Inventory Dashboard"),
+    "trip":      ("🗺️", "Trip Dashboard"),
+    "finance":   ("💰", "Finance Dashboard"),
+    "hr":        ("👥", "HR Dashboard"),
+    "ops":       ("⚙️", "Ops Dashboard"),
+}
+
+def _make_label(module_name: str) -> str:
+    """Convert filename → pretty label. e.g. sales_dashboard → 📊 Sales Dashboard"""
+    base = module_name.replace("_dashboard", "").replace("_", " ")
+    for keyword, (icon, label) in _ICON_MAP.items():
+        if keyword in module_name.lower():
+            return f"{icon} {label}"
+    return f"🔧 {base.title()} Dashboard"
+
+_client_dir = os.path.join("clients", client)
+
+if not os.path.isdir(_client_dir):
+    st.error(
+        f"❌ لم يتم العثور على مجلد الداشبورد للعميل `{client}`. "
+        f"تأكد من وجود المجلد: `{_client_dir}/`"
+    )
+    st.stop()
+
+_dashboard_files = sorted(
+    f[:-3]                                          # strip ".py"
+    for f in os.listdir(_client_dir)
+    if f.endswith("_dashboard.py") and not f.startswith("__")
+)
+
+if not _dashboard_files:
+    st.warning(
+        f"⚠️ لا توجد لوحات تحكم للعميل `{client}`. "
+        f"أضف ملفات تنتهي بـ `_dashboard.py` داخل `{_client_dir}/`"
+    )
+    st.stop()
+
+# label → module_name  (e.g. "📊 Sales Dashboard" → "sales_dashboard")
+_dashboards: dict[str, str]     = {_make_label(m): m for m in _dashboard_files}
+_dashboard_labels: list[str]    = list(_dashboards.keys())
+
+# Persist so sidebar radio always has options, even on rerun
+st.session_state["_dashboards"]       = _dashboards
+st.session_state["_dashboard_labels"] = _dashboard_labels
+
+
+# =========================================
 # SIDEBAR
 # =========================================
 
@@ -362,75 +420,9 @@ st.subheader(f"Client: {client}")
 
 
 # =========================================
-# DYNAMIC DASHBOARD LOADER
+# LOAD SELECTED DASHBOARD
 # =========================================
 
-# ── ICON MAP ─────────────────────────────
-# Maps keyword in filename → sidebar icon + display label.
-# Add entries here as new dashboard types are introduced.
-_ICON_MAP = {
-    "sales":     ("📊", "Sales Dashboard"),
-    "fleet":     ("🚚", "Fleet Dashboard"),
-    "fuel":      ("⛽", "Fuel Dashboard"),
-    "inventory": ("📦", "Inventory Dashboard"),
-    "trip":      ("🗺️", "Trip Dashboard"),
-    "finance":   ("💰", "Finance Dashboard"),
-    "hr":        ("👥", "HR Dashboard"),
-    "ops":       ("⚙️", "Ops Dashboard"),
-}
-
-def _make_label(module_name: str) -> str:
-    """
-    Convert a module filename to a pretty sidebar label.
-    e.g.  sales_dashboard  →  📊 Sales Dashboard
-          trip_dashboard   →  🗺️ Trip Dashboard
-          custom_xyz_dashboard → 🔧 Custom Xyz Dashboard  (fallback)
-    """
-    base = module_name.replace("_dashboard", "").replace("_", " ")
-    for keyword, (icon, label) in _ICON_MAP.items():
-        if keyword in module_name.lower():
-            return f"{icon} {label}"
-    # Fallback: title-case the base name
-    return f"🔧 {base.title()} Dashboard"
-
-
-# ── DETECT DASHBOARDS FOR THIS CLIENT ─────
-import os
-
-_client_dir = os.path.join("clients", client)
-
-if not os.path.isdir(_client_dir):
-    st.error(
-        f"❌ لم يتم العثور على مجلد الداشبورد للعميل `{client}`. "
-        f"تأكد من وجود المجلد: `{_client_dir}/`"
-    )
-    st.stop()
-
-# Scan for *_dashboard.py files (sorted alphabetically)
-_dashboard_files = sorted(
-    f[:-3]  # strip ".py"
-    for f in os.listdir(_client_dir)
-    if f.endswith("_dashboard.py") and not f.startswith("__")
-)
-
-if not _dashboard_files:
-    st.warning(
-        f"⚠️ لا توجد لوحات تحكم للعميل `{client}`. "
-        f"أضف ملفات تنتهي بـ `_dashboard.py` داخل `{_client_dir}/`"
-    )
-    st.stop()
-
-# Build label ↔ module_name mapping (order preserved)
-_dashboards: dict[str, str] = {
-    _make_label(m): m for m in _dashboard_files
-}
-_dashboard_labels: list[str] = list(_dashboards.keys())
-
-# Store in session so the sidebar radio can read them
-st.session_state["_dashboards"]       = _dashboards
-st.session_state["_dashboard_labels"] = _dashboard_labels
-
-# ── LOAD SELECTED DASHBOARD ────────────────
 _selected_label  = st.session_state.get("nav_radio", _dashboard_labels[0])
 _selected_module = _dashboards.get(_selected_label)
 
