@@ -311,14 +311,11 @@ with st.sidebar:
 
     st.divider()
 
-    # ── Navigation ───────────────────────
+    # ── Navigation (dynamic) ─────────────
     page = st.radio(
         "Navigation",
-        [
-            "📊 Sales Dashboard",
-            "🚚 Fleet Dashboard",
-            "⛽ Fuel Dashboard",
-        ],
+        options=st.session_state.get("_dashboard_labels", ["—"]),
+        key="nav_radio",
     )
 
     st.divider()
@@ -327,8 +324,8 @@ with st.sidebar:
     if st.button("Logout"):
         for _k in _session_defaults:
             st.session_state[_k] = _session_defaults[_k]
-        # Also clear any cached report data
-        for _k in ["fuel_report_html", "fuel_report_tokens"]:
+        for _k in ["fuel_report_html", "fuel_report_tokens",
+                   "_dashboards", "_dashboard_labels"]:
             st.session_state.pop(_k, None)
         st.rerun()
 
@@ -365,23 +362,97 @@ st.subheader(f"Client: {client}")
 
 
 # =========================================
-# LOAD DASHBOARD
+# DYNAMIC DASHBOARD LOADER
 # =========================================
 
+# ── ICON MAP ─────────────────────────────
+# Maps keyword in filename → sidebar icon + display label.
+# Add entries here as new dashboard types are introduced.
+_ICON_MAP = {
+    "sales":     ("📊", "Sales Dashboard"),
+    "fleet":     ("🚚", "Fleet Dashboard"),
+    "fuel":      ("⛽", "Fuel Dashboard"),
+    "inventory": ("📦", "Inventory Dashboard"),
+    "trip":      ("🗺️", "Trip Dashboard"),
+    "finance":   ("💰", "Finance Dashboard"),
+    "hr":        ("👥", "HR Dashboard"),
+    "ops":       ("⚙️", "Ops Dashboard"),
+}
+
+def _make_label(module_name: str) -> str:
+    """
+    Convert a module filename to a pretty sidebar label.
+    e.g.  sales_dashboard  →  📊 Sales Dashboard
+          trip_dashboard   →  🗺️ Trip Dashboard
+          custom_xyz_dashboard → 🔧 Custom Xyz Dashboard  (fallback)
+    """
+    base = module_name.replace("_dashboard", "").replace("_", " ")
+    for keyword, (icon, label) in _ICON_MAP.items():
+        if keyword in module_name.lower():
+            return f"{icon} {label}"
+    # Fallback: title-case the base name
+    return f"🔧 {base.title()} Dashboard"
+
+
+# ── DETECT DASHBOARDS FOR THIS CLIENT ─────
+import os
+
+_client_dir = os.path.join("clients", client)
+
+if not os.path.isdir(_client_dir):
+    st.error(
+        f"❌ لم يتم العثور على مجلد الداشبورد للعميل `{client}`. "
+        f"تأكد من وجود المجلد: `{_client_dir}/`"
+    )
+    st.stop()
+
+# Scan for *_dashboard.py files (sorted alphabetically)
+_dashboard_files = sorted(
+    f[:-3]  # strip ".py"
+    for f in os.listdir(_client_dir)
+    if f.endswith("_dashboard.py") and not f.startswith("__")
+)
+
+if not _dashboard_files:
+    st.warning(
+        f"⚠️ لا توجد لوحات تحكم للعميل `{client}`. "
+        f"أضف ملفات تنتهي بـ `_dashboard.py` داخل `{_client_dir}/`"
+    )
+    st.stop()
+
+# Build label ↔ module_name mapping (order preserved)
+_dashboards: dict[str, str] = {
+    _make_label(m): m for m in _dashboard_files
+}
+_dashboard_labels: list[str] = list(_dashboards.keys())
+
+# Store in session so the sidebar radio can read them
+st.session_state["_dashboards"]       = _dashboards
+st.session_state["_dashboard_labels"] = _dashboard_labels
+
+# ── LOAD SELECTED DASHBOARD ────────────────
+_selected_label  = st.session_state.get("nav_radio", _dashboard_labels[0])
+_selected_module = _dashboards.get(_selected_label)
+
+if not _selected_module:
+    st.error(f"❌ الداشبورد المختار غير موجود: `{_selected_label}`")
+    st.stop()
+
 try:
+    module = importlib.import_module(f"clients.{client}.{_selected_module}")
+    module.run()
 
-    if page == "📊 Sales Dashboard":
-        module = importlib.import_module(f"clients.{client}.sales_dashboard")
-        module.run()
+except ModuleNotFoundError:
+    st.error(
+        f"❌ تعذّر تحميل الداشبورد: `clients/{client}/{_selected_module}.py` غير موجود."
+    )
 
-    elif page == "🚚 Fleet Dashboard":
-        module = importlib.import_module(f"clients.{client}.fleet_dashboard")
-        module.run()
-
-    elif page == "⛽ Fuel Dashboard":
-        module = importlib.import_module(f"clients.{client}.fuel_dashboard")
-        module.run()
+except AttributeError:
+    st.error(
+        f"❌ الداشبورد `{_selected_module}` لا يحتوي على دالة `run()`. "
+        f"تأكد من تعريف `def run():` داخل الملف."
+    )
 
 except Exception as e:
-    st.error("حدث خطأ أثناء تشغيل الداشبورد")
+    st.error("❌ حدث خطأ أثناء تشغيل الداشبورد")
     st.exception(e)
