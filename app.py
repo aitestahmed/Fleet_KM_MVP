@@ -351,21 +351,32 @@ with st.sidebar:
 
     st.divider()
 
-    # ── Credits ──────────────────────────
-    st.markdown("### 💳 Credits")
+    # ── Credits (dynamic — only show credits for this client's dashboards) ──
+    # Map: dashboard filename keyword → (credit session key, display label, icon)
+    _CREDIT_MAP = {
+        "sales":     ("credits_sales", "Sales Credit",  "📊"),
+        "fleet":     ("credits_fleet", "Fleet Credit",  "🚚"),
+        "fuel":      ("credits_fuel",  "Fuel Credit",   "⛽"),
+        "inventory": ("credits_inv",   "Inv Credit",    "📦"),
+        "trip":      ("credits_trip",  "Trip Credit",   "🗺️"),
+        "finance":   ("credits_fin",   "Finance Credit","💰"),
+    }
 
-    st.metric(
-        "📊 Sales Credit",
-        f"{st.session_state.get('credits_sales', 0):.2f}",
-    )
-    st.metric(
-        "🚚 Fleet Credit",
-        f"{st.session_state.get('credits_fleet', 0):.2f}",
-    )
-    st.metric(
-        "⛽ Fuel Credit",
-        f"{st.session_state.get('credits_fuel', 0):.2f}",
-    )
+    # Collect credits relevant to this client's actual dashboards
+    _visible_credits = []
+    for _mod_name in _dashboard_files:
+        for _keyword, (_sess_key, _lbl, _icon) in _CREDIT_MAP.items():
+            if _keyword in _mod_name.lower():
+                if (_sess_key, _lbl, _icon) not in _visible_credits:
+                    _visible_credits.append((_sess_key, _lbl, _icon))
+
+    if _visible_credits:
+        st.markdown("### 💳 Credits")
+        for _sess_key, _lbl, _icon in _visible_credits:
+            st.metric(
+                f"{_icon} {_lbl}",
+                f"{st.session_state.get(_sess_key, 0):.2f}",
+            )
 
     st.divider()
 
