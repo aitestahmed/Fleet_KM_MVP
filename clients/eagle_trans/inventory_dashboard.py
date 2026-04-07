@@ -81,13 +81,15 @@ def _base(title: str, h: int = 420) -> dict:
         paper_bgcolor=TH["bg"],
         plot_bgcolor=TH["plot_bg"],
         font=dict(color="#1a1a2e", family="Cairo, sans-serif", size=11),
-        margin=dict(l=10, r=10, t=58, b=140),
+        # Large bottom margin — x labels are fully vertical (-90°) and untruncated
+        margin=dict(l=10, r=10, t=58, b=180),
         xaxis=dict(
-            tickfont=dict(size=11, color="#1a1a2e", family="Cairo, sans-serif"),
+            # Full label, vertical, readable font
+            tickfont=dict(size=11, color="#1a237e", family="Cairo, sans-serif"),
             showgrid=False,
-            linecolor="rgba(0,0,0,0.1)",
-            tickangle=-40,
-            automargin=True,
+            linecolor="rgba(0,0,0,0.12)",
+            tickangle=-90,          # fully vertical — no truncation needed
+            automargin=False,       # we control margin manually
         ),
         yaxis=dict(
             tickfont=dict(size=10, color=TH["grey"]),
@@ -96,7 +98,7 @@ def _base(title: str, h: int = 420) -> dict:
             zeroline=True, zerolinecolor="rgba(0,0,0,0.12)",
             linecolor="rgba(0,0,0,0)",
         ),
-        bargap=0.25,
+        bargap=0.28,
         hoverlabel=dict(
             bgcolor=TH["hover"], bordercolor=TH["hover"],
             font=dict(color="white", family="Cairo, sans-serif", size=12),
@@ -113,17 +115,17 @@ def _fmt(v: float) -> str:
 def vbar(labels, values, title: str, colors=None,
          unit: str = "", h: int = 420, fmt_fn=None) -> go.Figure:
     """
-    Vertical bar — bold x-axis labels, value inside bar top, full name in hover.
+    Vertical bar chart — professional solution for label visibility:
+    - X-axis: FULL label, vertical (-90°), no truncation
+    - Value label: annotation ABOVE each bar (always visible regardless of height)
+    - Hover: full name + exact value
     """
     if not labels:
         return go.Figure()
 
-    vals  = list(values)
-    labs  = [str(l) for l in labels]
-    # Short label for x-axis (max 12 chars + ellipsis)
-    short = [l[:12] + "…" if len(l) > 12 else l for l in labs]
-    # Value text inside bar
-    bar_text = [fmt_fn(v) for v in vals] if fmt_fn else [_fmt(v) for v in vals]
+    vals = list(values)
+    labs = [str(l) for l in labels]
+    val_text = [fmt_fn(v) for v in vals] if fmt_fn else [_fmt(v) for v in vals]
 
     if colors is None:
         vmax = max(abs(v) for v in vals) or 1
@@ -140,18 +142,38 @@ def vbar(labels, values, title: str, colors=None,
         for l, v in zip(labs, vals)
     ]
 
-    fig = go.Figure(go.Bar(
-        x=short, y=vals, orientation="v",
-        text=bar_text,
-        textposition="inside",
-        insidetextanchor="end",
-        textfont=dict(size=11, color="white", family="Cairo, sans-serif"),
+    fig = go.Figure()
+
+    # ── Bars (no internal text — annotations handle labels) ──
+    fig.add_trace(go.Bar(
+        x=labs,          # FULL label on x-axis
+        y=vals,
+        orientation="v",
         marker=dict(color=colors, line=dict(width=0)),
         customdata=hover,
         hovertemplate="%{customdata}<extra></extra>",
+        showlegend=False,
+        text=None,       # No text on bars
     ))
 
+    # ── Value annotations ABOVE each bar — always visible ──
+    vmax = max(abs(v) for v in vals) or 1
+    annotations = []
+    for i, (lab, v, txt) in enumerate(zip(labs, vals, val_text)):
+        annotations.append(dict(
+            x=lab,
+            y=v + vmax * 0.02,       # slightly above bar top
+            text=f"<b>{txt}</b>",
+            showarrow=False,
+            font=dict(size=11, color="#1a237e", family="Cairo, sans-serif"),
+            xanchor="center",
+            yanchor="bottom",
+        ))
+
     lay = _base(title, h)
+    lay["annotations"] = annotations
+    # Extra top padding for annotation labels
+    lay["yaxis"]["range"] = [0, vmax * 1.18]
     fig.update_layout(**lay)
     return fig
 
