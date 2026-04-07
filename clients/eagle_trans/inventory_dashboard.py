@@ -1,15 +1,18 @@
 # =========================================
-# INVENTORY DASHBOARD — Eagle Trans  v2
+# INVENTORY DASHBOARD — Eagle Trans  v3
 # clients/eagle_trans/inventory_dashboard.py
 # =========================================
 # ✔ run() entry point only
 # ✔ NO login / NO set_page_config
 # ✔ plug-and-play with app.py router
-# ✔ Vertical bar charts — no text overlap
-# ✔ AI analysis + suggested questions
+# ✔ Vertical bars — bold labels at bottom
+# ✔ Outside-garage → pivot table
+# ✔ AI: period filter relative to data max-date
+# ✔ Structured AI answers + TTS audio
 # =========================================
 
 import io
+import re
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -38,62 +41,49 @@ TH = dict(
     hover   = "#1a237e",
 )
 
-# Section → color mapping
 SEC_COLOR = {
-    "الميكانيكا":       "#3949ab",
-    "ميكانيكا":         "#3949ab",
-    "الإطارات":         "#f57c00",
-    "الاطارات":         "#f57c00",
-    "الزيوت":           "#388e3c",
-    "السمكرة":          "#8e24aa",
-    "المعدات":          "#00838f",
-    "الحدادة":          "#6d4c41",
-    "الكهرباء":         "#ffa000",
-    "عدد و أدوات":      "#546e7a",
-    "الدوكو":           "#00897b",
-    "السيور":           "#c62828",
-    "العدد والأدوات":   "#546e7a",
+    "الميكانيكا": "#3949ab", "ميكانيكا":     "#3949ab",
+    "الإطارات":   "#f57c00", "الاطارات":     "#f57c00",
+    "الزيوت":     "#388e3c", "السمكرة":      "#8e24aa",
+    "المعدات":    "#00838f", "الحدادة":      "#6d4c41",
+    "الكهرباء":   "#ffa000", "عدد و أدوات":  "#546e7a",
+    "الدوكو":     "#00897b", "السيور":       "#c62828",
+    "العدد والأدوات": "#546e7a",
 }
 
 WS_COLOR = {
-    "ميكانيكا":  "#3949ab",
-    "كهرباء":   "#ffa000",
-    "غيار زيت": "#388e3c",
-    "حدادة":    "#6d4c41",
-    "سمكرة":    "#8e24aa",
-    "سروجى":    "#00838f",
+    "ميكانيكا":      "#3949ab", "عمرة ميكانيكا": "#5c6bc0",
+    "كهرباء":        "#ffa000", "بطاريات ":      "#ffca28",
+    "غيار زيت":      "#388e3c", "حدادة":         "#6d4c41",
+    "عمرة حدادة ":   "#8d6e63", "سمكرة":         "#8e24aa",
+    "دوكو و دهانات": "#00897b", "سروجى":         "#00838f",
 }
 
 MONTH_AR = {
-    "2026-01": "يناير",
-    "2026-02": "فبراير",
-    "2026-03": "مارس",
-    "2026-04": "أبريل",
-    "2026-05": "مايو",
-    "2026-06": "يونيو",
+    "2026-01": "يناير", "2026-02": "فبراير",
+    "2026-03": "مارس",  "2026-04": "أبريل",
+    "2026-05": "مايو",  "2026-06": "يونيو",
 }
 
 
 # =========================================
-# CHART FACTORY — vertical bars, clean labels
+# CHART HELPERS
 # =========================================
 
-def _base(title: str, h: int = 400) -> dict:
-    """Shared layout — clean, professional, no clutter."""
+def _base(title: str, h: int = 420) -> dict:
     return dict(
         title=dict(
-            text=title,
+            text=f"<b>{title}</b>",
             font=dict(size=14, color=TH["title"], family="Cairo, sans-serif"),
             x=0.5, xanchor="center", y=0.97, yanchor="top",
         ),
         height=h,
         paper_bgcolor=TH["bg"],
         plot_bgcolor=TH["plot_bg"],
-        font=dict(color="#2c2c2c", family="Cairo, sans-serif", size=11),
-        margin=dict(l=10, r=10, t=56, b=130),   # bottom space for bold x labels
+        font=dict(color="#1a1a2e", family="Cairo, sans-serif", size=11),
+        margin=dict(l=10, r=10, t=58, b=140),
         xaxis=dict(
-            tickfont=dict(size=11, color="#1a1a2e", family="Cairo, sans-serif",
-                          weight="bold" if False else None),  # bold via CSS override
+            tickfont=dict(size=11, color="#1a1a2e", family="Cairo, sans-serif"),
             showgrid=False,
             linecolor="rgba(0,0,0,0.1)",
             tickangle=-40,
@@ -103,62 +93,55 @@ def _base(title: str, h: int = 400) -> dict:
             tickfont=dict(size=10, color=TH["grey"]),
             gridcolor=TH["grid"],
             showgrid=True,
-            zeroline=True, zerolinecolor="rgba(0,0,0,0.1)",
+            zeroline=True, zerolinecolor="rgba(0,0,0,0.12)",
             linecolor="rgba(0,0,0,0)",
         ),
         bargap=0.25,
         hoverlabel=dict(
-            bgcolor=TH["hover"],
-            bordercolor=TH["hover"],
+            bgcolor=TH["hover"], bordercolor=TH["hover"],
             font=dict(color="white", family="Cairo, sans-serif", size=12),
         ),
     )
 
 
-def vbar(labels, values, title: str,
-         colors=None, unit: str = "",
-         h: int = 400, fmt_fn=None) -> go.Figure:
+def _fmt(v: float) -> str:
+    if abs(v) >= 1e6: return f"{v/1e6:.1f}M"
+    if abs(v) >= 1e3: return f"{v/1e3:.0f}K"
+    return f"{v:,.0f}"
+
+
+def vbar(labels, values, title: str, colors=None,
+         unit: str = "", h: int = 420, fmt_fn=None) -> go.Figure:
     """
-    Vertical bar chart — professional & clutter-free.
-    - Labels truncated to 14 chars max; full label in hover.
-    - Value annotations inside top of bar (avoids overlap).
-    - Gradient color if no explicit colors given.
+    Vertical bar — bold x-axis labels, value inside bar top, full name in hover.
     """
-    n = len(labels)
-    if n == 0:
+    if not labels:
         return go.Figure()
 
     vals  = list(values)
     labs  = [str(l) for l in labels]
-    short = [l[:14] + "…" if len(l) > 14 else l for l in labs]
-
-    # Text inside bar (no outside clipping issues)
-    if fmt_fn:
-        bar_text = [fmt_fn(v) for v in vals]
-    else:
-        bar_text = [
-            f"{v/1e6:.1f}M" if abs(v) >= 1e6
-            else f"{v/1e3:.0f}K" if abs(v) >= 1e3
-            else f"{v:,.0f}"
-            for v in vals
-        ]
+    # Short label for x-axis (max 12 chars + ellipsis)
+    short = [l[:12] + "…" if len(l) > 12 else l for l in labs]
+    # Value text inside bar
+    bar_text = [fmt_fn(v) for v in vals] if fmt_fn else [_fmt(v) for v in vals]
 
     if colors is None:
-        vmax = max(vals) if max(vals) != 0 else 1
-        norm = [v / vmax for v in vals]
-        r1, g1, b1 = 197, 202, 233   # blue_lt
-        r2, g2, b2 = 26,  35,  126   # blue_dark
+        vmax = max(abs(v) for v in vals) or 1
+        norm = [abs(v) / vmax for v in vals]
+        r1, g1, b1 = 197, 202, 233
+        r2, g2, b2 = 26,  35,  126
         colors = [
-            f"rgb({int(r1+(r2-r1)*n_)},{int(g1+(g2-g1)*n_)},{int(b1+(b2-b1)*n_)})"
-            for n_ in norm
+            f"rgb({int(r1+(r2-r1)*n)},{int(g1+(g2-g1)*n)},{int(b1+(b2-b1)*n)})"
+            for n in norm
         ]
 
-    hover = [f"<b>{l}</b><br>{v:,.0f}{' '+unit if unit else ''}" for l, v in zip(labs, vals)]
+    hover = [
+        f"<b>{l}</b><br>{v:,.0f}{' '+unit if unit else ''}"
+        for l, v in zip(labs, vals)
+    ]
 
     fig = go.Figure(go.Bar(
-        x=short,
-        y=vals,
-        orientation="v",
+        x=short, y=vals, orientation="v",
         text=bar_text,
         textposition="inside",
         insidetextanchor="end",
@@ -173,69 +156,26 @@ def vbar(labels, values, title: str,
     return fig
 
 
-def donut(labels, values, title: str,
-          colors=None, h: int = 380) -> go.Figure:
-    """Clean donut chart with legend below."""
-    if colors is None:
-        palette = ["#3949ab","#43a047","#f57c00","#8e24aa",
-                   "#00838f","#6d4c41","#ffa000","#c62828","#00897b","#546e7a"]
-        colors = palette[:len(labels)]
-
-    fig = go.Figure(go.Pie(
-        labels=labels,
-        values=values,
-        hole=0.52,
-        textinfo="percent",
-        textfont=dict(size=11, color="white"),
-        marker=dict(colors=colors, line=dict(color="white", width=2)),
-        hovertemplate="<b>%{label}</b><br>%{value:,}<br>%{percent}<extra></extra>",
-        pull=[0.04 if i == 0 else 0 for i in range(len(labels))],
-    ))
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=14, color=TH["title"]),
-                   x=0.5, xanchor="center"),
-        height=h,
-        paper_bgcolor=TH["bg"],
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Cairo, sans-serif"),
-        margin=dict(l=10, r=10, t=55, b=10),
-        legend=dict(
-            orientation="v", x=1.02, y=0.5,
-            font=dict(size=10, color="#2c2c2c"),
-            bgcolor="rgba(0,0,0,0)",
-        ),
-        hoverlabel=dict(bgcolor=TH["hover"], font=dict(color="white")),
-        annotations=[dict(
-            text=f"<b>{sum(values):,}</b>",
-            x=0.5, y=0.5, font=dict(size=14, color=TH["title"]),
-            showarrow=False
-        )],
-    )
-    return fig
-
-
-def grouped_bar(month_labels, sarf_vals, add_vals, title: str) -> go.Figure:
-    """Grouped bar — monthly trend."""
+def grouped_bar(x_labels, series: list, title: str, h=420) -> go.Figure:
+    """Grouped vertical bars — monthly trend."""
+    bar_colors = [TH["blue"], TH["green2"], "#f57c00", "#8e24aa"]
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=month_labels, y=sarf_vals, name="الصرف",
-        marker=dict(color=TH["blue"], line=dict(width=0)),
-        text=[f"{v/1e6:.1f}M" for v in sarf_vals],
-        textposition="inside", insidetextanchor="end",
-        textfont=dict(size=11, color="white"),
-        hovertemplate="الصرف: %{y:,.0f} ج.م<extra></extra>",
-    ))
-    fig.add_trace(go.Bar(
-        x=month_labels, y=add_vals, name="الإضافة",
-        marker=dict(color=TH["green2"], line=dict(width=0)),
-        text=[f"{v/1e6:.1f}M" for v in add_vals],
-        textposition="inside", insidetextanchor="end",
-        textfont=dict(size=11, color="white"),
-        hovertemplate="الإضافة: %{y:,.0f} ج.م<extra></extra>",
-    ))
-    lay = _base(title, 400)
+    for i, (name, vals, color) in enumerate(zip(
+        [s[0] for s in series],
+        [s[1] for s in series],
+        bar_colors,
+    )):
+        fig.add_trace(go.Bar(
+            x=x_labels, y=vals, name=name,
+            marker=dict(color=color, line=dict(width=0)),
+            text=[_fmt(v) for v in vals],
+            textposition="inside", insidetextanchor="end",
+            textfont=dict(size=11, color="white"),
+            hovertemplate=f"{name}: %{{y:,.0f}}<extra></extra>",
+        ))
+    lay = _base(title, h)
     lay["barmode"] = "group"
-    lay["margin"]  = dict(l=10, r=10, t=56, b=50)
+    lay["margin"]  = dict(l=10, r=10, t=58, b=60)
     lay["xaxis"]["tickangle"] = 0
     lay["legend"] = dict(
         orientation="h", x=0.5, xanchor="center", y=1.06,
@@ -249,31 +189,34 @@ def grouped_bar(month_labels, sarf_vals, add_vals, title: str) -> go.Figure:
 # KPI CARD
 # =========================================
 
-def kpi(col_obj, label: str, value: str, sub: str = "",
-        color: str = "#3949ab", bg: str = "#e8eaf6"):
-    col_obj.markdown(f"""
-    <div style="background:{bg};border-radius:12px;padding:18px 14px;
-    text-align:center;border:1px solid {color}22;
-    box-shadow:0 2px 8px rgba(0,0,0,.07);">
-      <div style="font-size:10px;color:{TH['grey']};font-weight:700;
-      letter-spacing:.5px;margin-bottom:8px;text-transform:uppercase;">{label}</div>
-      <div style="font-size:24px;font-weight:800;color:{color};
-      direction:ltr;letter-spacing:-.5px;">{value}</div>
-      <div style="font-size:10px;color:{TH['grey']};margin-top:6px;">{sub}</div>
-    </div>""", unsafe_allow_html=True)
+def kpi(col_obj, label, value, sub="", color="#3949ab", bg="#e8eaf6"):
+    col_obj.markdown(
+        f'<div style="background:{bg};border-radius:12px;padding:18px 14px;'
+        f'text-align:center;border:1px solid {color}22;'
+        f'box-shadow:0 2px 8px rgba(0,0,0,.07);">'
+        f'<div style="font-size:10px;color:{TH["grey"]};font-weight:700;'
+        f'letter-spacing:.5px;margin-bottom:8px;">{label}</div>'
+        f'<div style="font-size:24px;font-weight:800;color:{color};">{value}</div>'
+        f'<div style="font-size:10px;color:{TH["grey"]};margin-top:6px;">{sub}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
 
-def section_hdr(icon: str, title: str, sub: str = ""):
-    st.markdown(f"""
-    <div dir="rtl" style="border-right:4px solid {TH['blue']};
-    padding:10px 16px;margin:28px 0 16px;
-    background:linear-gradient(90deg,rgba(57,73,171,.05),transparent);
-    border-radius:0 8px 8px 0;">
-      <h3 style="color:{TH['title']};margin:0;font-size:18px;font-weight:700;">
-        {icon} {title}
-      </h3>
-      {"" if not sub else f'<p style="color:{TH["grey"]};font-size:12px;margin:4px 0 0;">{sub}</p>'}
-    </div>""", unsafe_allow_html=True)
+def section_hdr(icon, title, sub=""):
+    sub_html = (
+        f'<p style="color:{TH["grey"]};font-size:12px;margin:4px 0 0;">{sub}</p>'
+        if sub else ""
+    )
+    st.markdown(
+        f'<div dir="rtl" style="border-right:4px solid {TH["blue"]};'
+        f'padding:10px 16px;margin:28px 0 16px;'
+        f'background:linear-gradient(90deg,rgba(57,73,171,.05),transparent);'
+        f'border-radius:0 8px 8px 0;">'
+        f'<h3 style="color:{TH["title"]};margin:0;font-size:18px;font-weight:700;">'
+        f'{icon} {title}</h3>{sub_html}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 # =========================================
@@ -289,23 +232,21 @@ def load_all(file_bytes: bytes) -> dict:
     df = xls.parse("حركة الصرف", header=0)
     df.columns = [str(c).strip().replace("\n", "") for c in df.columns]
     df.rename(columns={
-        df.columns[0]:  "التاريخ",
-        df.columns[1]:  "نوع_جهة_الصرف",
-        df.columns[2]:  "كود_جهة_الصرف",
-        df.columns[3]:  "رقم_جهة_الصرف",
-        df.columns[4]:  "رقم_امر_الشغل",
-        df.columns[5]:  "كود_الصنف",
-        df.columns[6]:  "اسم_الصنف",
-        df.columns[7]:  "الكمية",
-        df.columns[8]:  "السعر",
-        df.columns[9]:  "القيمة",
-        df.columns[18]: "نوع_الصيانة",
-        df.columns[20]: "مكان_الاصلاح",
+        df.columns[0]: "التاريخ",
+        df.columns[1]: "نوع_جهة_الصرف",
+        df.columns[2]: "كود_جهة_الصرف",
+        df.columns[3]: "رقم_جهة_الصرف",
+        df.columns[4]: "رقم_امر_الشغل",
+        df.columns[5]: "كود_الصنف",
+        df.columns[6]: "اسم_الصنف",
+        df.columns[7]: "الكمية",
+        df.columns[8]: "السعر",
+        df.columns[9]: "القيمة",
     }, inplace=True)
     df["التاريخ"] = pd.to_datetime(df["التاريخ"], errors="coerce")
     df["القيمة"]  = pd.to_numeric(df["القيمة"],  errors="coerce").fillna(0)
     df["الكمية"]  = pd.to_numeric(df["الكمية"],  errors="coerce").fillna(0)
-    df = df[df["التاريخ"].notna()]
+    df = df[df["التاريخ"].notna()].copy()
     out["sarf"] = df
 
     # ── حركة الاضافة ─────────────────────
@@ -314,7 +255,7 @@ def load_all(file_bytes: bytes) -> dict:
     df2["قيمة"]    = pd.to_numeric(df2["قيمة"],    errors="coerce").fillna(0)
     df2["كمية"]    = pd.to_numeric(df2["كمية"],    errors="coerce").fillna(0)
     df2["التاريخ"] = pd.to_datetime(df2["التاريخ"], errors="coerce")
-    df2 = df2[df2["التاريخ"].notna()]
+    df2 = df2[df2["التاريخ"].notna()].copy()
     out["add"] = df2
 
     # ── ارصدة المخزن ─────────────────────
@@ -334,13 +275,18 @@ def load_all(file_bytes: bytes) -> dict:
     df4 = xls.parse("بيان الصيانة اليومى ", header=0)
     df4.columns = [str(c).strip().replace("\n","") for c in df4.columns]
     df4["التاريخ"] = pd.to_datetime(df4["التاريخ"], errors="coerce")
-    df4 = df4[df4["التاريخ"].notna()]
+    df4 = df4[df4["التاريخ"].notna()].copy()
     out["maint"] = df4
 
     # ── الاسطول - الموردين ───────────────
     df5 = xls.parse("الاسطول - الموردين", header=0)
     df5.columns = [str(c).strip().replace("\n","") for c in df5.columns]
     out["fleet"] = df5
+
+    # Store max date for period filter
+    all_dates = pd.concat([df["التاريخ"], df2["التاريخ"], df4["التاريخ"]]).dropna()
+    out["max_date"] = all_dates.max()
+    out["min_date"] = all_dates.min()
 
     return out
 
@@ -356,8 +302,8 @@ def render_filters(data: dict) -> dict:
     inv   = data["inv"]
 
     with st.expander("🔍 تصفية البيانات", expanded=True):
-        all_dates = pd.concat([sarf["التاريخ"], add["التاريخ"]]).dropna()
-        min_d, max_d = all_dates.min().date(), all_dates.max().date()
+        min_d = data["min_date"].date()
+        max_d = data["max_date"].date()
 
         fc1, fc2 = st.columns(2)
         with fc1:
@@ -388,18 +334,28 @@ def render_filters(data: dict) -> dict:
             sel_loc = st.selectbox("🔧 مكان الإصلاح", loc_opts, key="inv_loc")
 
     def dt_f(df, col="التاريخ"):
-        return df[(df[col].dt.date >= d_from) & (df[col].dt.date <= d_to)]
+        return df[
+            (df[col].dt.date >= d_from) & (df[col].dt.date <= d_to)
+        ].copy()
 
     sarf_f  = dt_f(sarf)
     add_f   = dt_f(add)
     maint_f = dt_f(maint)
-    if sel_vtype   != "الكل": sarf_f  = sarf_f[sarf_f["نوع_جهة_الصرف"] == sel_vtype]
-    if sel_loc     != "الكل": maint_f = maint_f[maint_f["مكان الاصلاح"] == sel_loc]
-    inv_f = inv.copy()
-    if sel_section != "الكل": inv_f   = inv_f[inv_f["القسم"] == sel_section]
 
-    return {"sarf": sarf_f, "add": add_f, "maint": maint_f,
-            "inv": inv_f, "fleet": data["fleet"], "inv_full": inv}
+    if sel_vtype   != "الكل":
+        sarf_f  = sarf_f[sarf_f["نوع_جهة_الصرف"].astype(str) == sel_vtype]
+    if sel_loc     != "الكل":
+        maint_f = maint_f[maint_f["مكان الاصلاح"].astype(str) == sel_loc]
+
+    inv_f = inv.copy()
+    if sel_section != "الكل":
+        inv_f = inv_f[inv_f["القسم"] == sel_section]
+
+    return {
+        "sarf": sarf_f, "add": add_f, "maint": maint_f,
+        "inv": inv_f, "fleet": data["fleet"], "inv_full": inv,
+        "max_date": data["max_date"], "min_date": data["min_date"],
+    }
 
 
 # =========================================
@@ -438,37 +394,32 @@ def render_sarf(fd: dict):
     c1, c2 = st.columns(2)
 
     with c1:
-        grp = (sarf.groupby("نوع_جهة_الصرف")["القيمة"].sum()
-               .reset_index()
-               .sort_values("القيمة", ascending=False)
-               .head(7))
-        grp = grp[grp["نوع_جهة_الصرف"].astype(str).str.strip().isin(
-            [v for v in grp["نوع_جهة_الصرف"] if str(v).strip() not in ("0","nan","")]
-        )]
-        veh_colors = ["#3949ab","#5c6bc0","#7986cb","#9fa8da","#f57c00","#00838f","#388e3c"]
-        fig = vbar(
-            grp["نوع_جهة_الصرف"].tolist(),
-            grp["القيمة"].tolist(),
-            "💸 الصرف حسب نوع المركبة",
-            colors=veh_colors[:len(grp)],
-            unit="ج.م", h=400,
+        grp = (
+            sarf.groupby("نوع_جهة_الصرف")["القيمة"].sum()
+            .reset_index()
         )
-        st.plotly_chart(fig, use_container_width=True)
+        grp = grp[grp["نوع_جهة_الصرف"].astype(str).str.strip()
+                  .isin([v for v in grp["نوع_جهة_الصرف"] if str(v).strip() not in ("0","nan","")])]
+        grp = grp.sort_values("القيمة", ascending=False).head(7)
+        veh_colors = ["#3949ab","#5c6bc0","#7986cb","#9fa8da","#f57c00","#00838f","#388e3c"]
+        st.plotly_chart(
+            vbar(grp["نوع_جهة_الصرف"].tolist(), grp["القيمة"].tolist(),
+                 "💸 الصرف حسب نوع المركبة",
+                 colors=veh_colors[:len(grp)], unit="ج.م"),
+            use_container_width=True,
+        )
 
     with c2:
         sup = (add.groupby("اسم المورد")["قيمة"].sum()
                .nlargest(7).reset_index()
                .sort_values("قيمة", ascending=False))
-        sup_colors = ["#1b5e20","#2e7d32","#388e3c","#43a047",
-                      "#66bb6a","#a5d6a7","#c8e6c9"]
-        fig2 = vbar(
-            sup["اسم المورد"].tolist(),
-            sup["قيمة"].tolist(),
-            "🏭 أعلى الموردين بالمشتريات",
-            colors=sup_colors[:len(sup)],
-            unit="ج.م", h=400,
+        sup_colors = ["#1b5e20","#2e7d32","#388e3c","#43a047","#66bb6a","#a5d6a7","#c8e6c9"]
+        st.plotly_chart(
+            vbar(sup["اسم المورد"].tolist(), sup["قيمة"].tolist(),
+                 "🏭 أعلى الموردين بالمشتريات",
+                 colors=sup_colors[:len(sup)], unit="ج.م"),
+            use_container_width=True,
         )
-        st.plotly_chart(fig2, use_container_width=True)
 
 
 # =========================================
@@ -486,28 +437,24 @@ def render_items(fd: dict):
                .sort_values("القيمة", ascending=False))
         item_colors = ["#b71c1c","#c62828","#d32f2f","#e53935",
                        "#ef5350","#ef9a9a","#ffcdd2","#fff3e0"]
-        fig = vbar(
-            top["اسم_الصنف"].tolist(),
-            top["القيمة"].tolist(),
-            "🔧 أعلى الأصناف المصروفة بالقيمة",
-            colors=item_colors[:len(top)],
-            unit="ج.م", h=420,
+        st.plotly_chart(
+            vbar(top["اسم_الصنف"].tolist(), top["القيمة"].tolist(),
+                 "🔧 أعلى الأصناف المصروفة بالقيمة",
+                 colors=item_colors[:len(top)], unit="ج.م", h=440),
+            use_container_width=True,
         )
-        st.plotly_chart(fig, use_container_width=True)
 
     with c2:
         sec = (inv_all.groupby("القسم")["قيمة_مخزون"].sum()
                .nlargest(8).reset_index()
                .sort_values("قيمة_مخزون", ascending=False))
         sec_colors = [SEC_COLOR.get(s, "#546e7a") for s in sec["القسم"]]
-        fig2 = vbar(
-            sec["القسم"].tolist(),
-            sec["قيمة_مخزون"].tolist(),
-            "📦 قيمة المخزن حسب القسم",
-            colors=sec_colors,
-            unit="ج.م", h=420,
+        st.plotly_chart(
+            vbar(sec["القسم"].tolist(), sec["قيمة_مخزون"].tolist(),
+                 "📦 قيمة المخزن حسب القسم",
+                 colors=sec_colors, unit="ج.م", h=440),
+            use_container_width=True,
         )
-        st.plotly_chart(fig2, use_container_width=True)
 
 
 # =========================================
@@ -518,53 +465,60 @@ def render_maintenance(fd: dict):
     maint = fd["maint"]
     c1, c2 = st.columns(2)
 
+    # ── Workshop bar chart ────────────────
     with c1:
-        ws = (maint["الورشة"].value_counts()
-              .reset_index()
+        ws = (maint["الورشة"].dropna()
+              .value_counts().reset_index()
               .rename(columns={"الورشة":"ورشة","count":"عدد"}))
         ws = ws.sort_values("عدد", ascending=False)
-        ws_colors = [WS_COLOR.get(w, TH["blue"]) for w in ws["ورشة"]]
-        in_g = (maint["مكان الاصلاح"] == "الجراج").sum()
-        pct  = in_g / len(maint) * 100 if len(maint) else 0
-        fig = vbar(
-            ws["ورشة"].tolist(),
-            ws["عدد"].tolist(),
-            f"🔩 الصيانة حسب نوع الورشة — {pct:.0f}% في الجراج",
-            colors=ws_colors,
-            fmt_fn=lambda v: f"{v:,} أمر",
-            h=400,
+        ws_colors = [WS_COLOR.get(str(w).strip(), TH["blue"]) for w in ws["ورشة"]]
+        in_g  = (maint["مكان الاصلاح"] == "الجراج").sum()
+        pct   = in_g / len(maint) * 100 if len(maint) else 0
+        st.plotly_chart(
+            vbar(ws["ورشة"].tolist(), ws["عدد"].tolist(),
+                 f"🔩 الصيانة حسب نوع الورشة — {pct:.0f}% في الجراج",
+                 colors=ws_colors,
+                 fmt_fn=lambda v: f"{int(v):,}"),
+            use_container_width=True,
         )
-        st.plotly_chart(fig, use_container_width=True)
 
+    # ── Outside-garage pivot table ────────
     with c2:
-        outside = maint[maint["مكان الاصلاح"] != "الجراج"].copy()
         st.markdown(
             f'<div dir="rtl" style="font-weight:700;color:{TH["title"]};'
-            f'font-size:14px;margin-bottom:10px;">🚧 أعطال خارج الجراج</div>',
+            f'font-size:14px;margin-bottom:10px;margin-top:8px;">'
+            f'🚧 أعطال خارج الجراج</div>',
             unsafe_allow_html=True,
         )
+        outside = maint[maint["مكان الاصلاح"] != "الجراج"].copy()
         if len(outside):
-            # Pivot table: مكان × نوع الورشة → عدد الأوامر
             pivot = (
                 outside.groupby(["مكان الاصلاح", "الورشة"])
                 .size()
-                .reset_index(name="عدد_الأوامر")
-                .pivot_table(index="مكان الاصلاح", columns="الورشة",
-                             values="عدد_الأوامر", aggfunc="sum", fill_value=0)
+                .reset_index(name="عدد")
+                .pivot_table(
+                    index="مكان الاصلاح",
+                    columns="الورشة",
+                    values="عدد",
+                    aggfunc="sum",
+                    fill_value=0,
+                )
                 .reset_index()
             )
             pivot.columns.name = None
             pivot["الإجمالي"] = pivot.iloc[:, 1:].sum(axis=1)
             pivot = pivot.sort_values("الإجمالي", ascending=False)
-            st.dataframe(pivot, use_container_width=True, hide_index=True, height=320)
 
-            # Summary cards
-            total_out = len(outside)
-            unique_locs = outside["مكان الاصلاح"].nunique()
+            st.dataframe(
+                pivot.reset_index(drop=True),
+                use_container_width=True,
+                hide_index=True,
+                height=320,
+            )
             st.markdown(
-                f'<div dir="rtl" style="font-size:12px;color:{TH["grey"]};margin-top:6px;">'
-                f'📍 <strong>{total_out}</strong> أمر خارج الجراج '
-                f'في <strong>{unique_locs}</strong> موقع مختلف</div>',
+                f'<div dir="rtl" style="font-size:11px;color:{TH["grey"]};margin-top:4px;">'
+                f'📍 <b>{len(outside)}</b> أمر خارج الجراج في '
+                f'<b>{outside["مكان الاصلاح"].nunique()}</b> موقع</div>',
                 unsafe_allow_html=True,
             )
         else:
@@ -586,59 +540,61 @@ def render_trend(fd: dict):
     ma = add.groupby("م")["قيمة"].sum()
     months = sorted(set(ms.index.tolist() + ma.index.tolist()))
 
-    labels    = [MONTH_AR.get(m, m) for m in months]
+    x_labels  = [MONTH_AR.get(m, m) for m in months]
     sarf_vals = [float(ms.get(m, 0)) for m in months]
     add_vals  = [float(ma.get(m, 0)) for m in months]
 
-    fig = grouped_bar(labels, sarf_vals, add_vals,
-                      "📅 الاتجاه الشهري — الصرف مقابل الإضافة")
+    fig = grouped_bar(
+        x_labels,
+        [("الصرف", sarf_vals, TH["blue"]), ("الإضافة", add_vals, TH["green2"])],
+        "📅 الاتجاه الشهري — الصرف مقابل الإضافة",
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 
 # =========================================
-# OPERATIONAL INSIGHTS (cards)
+# OPERATIONAL INSIGHTS
 # =========================================
 
 def render_insights(fd: dict):
-    inv_all  = fd["inv_full"]
-    maint    = fd["maint"]
+    inv_all = fd["inv_full"]
+    maint   = fd["maint"]
 
     total_stock = inv_all["قيمة_مخزون"].sum()
     zero_items  = (inv_all["رصيد_اخر"] <= 0).sum()
     total_items = len(inv_all)
-
-    tire_val = inv_all[inv_all["القسم"].str.contains("طار|جنط", na=False)]["قيمة_مخزون"].sum()
-    tire_pct = tire_val / total_stock * 100 if total_stock else 0
-
+    tire_val    = inv_all[inv_all["القسم"].str.contains("طار|جنط", na=False)]["قيمة_مخزون"].sum()
+    tire_pct    = tire_val / total_stock * 100 if total_stock else 0
     top_sec     = inv_all.groupby("القسم")["قيمة_مخزون"].sum().idxmax()
     top_sec_pct = inv_all.groupby("القسم")["قيمة_مخزون"].sum().max() / total_stock * 100
-
-    in_g_pct = (maint["مكان الاصلاح"] == "الجراج").sum() / len(maint) * 100 if len(maint) else 0
+    in_g_pct    = (maint["مكان الاصلاح"] == "الجراج").sum() / len(maint) * 100 if len(maint) else 0
 
     insights = [
         {"type":"تنبيه",  "c":"#e65100","bg":"#fff3e0",
-         "text":f"صنف رصيده صفر — {zero_items:,} من إجمالي {total_items:,} صنف ({zero_items/total_items*100:.0f}%)"},
+         "text":f"صنف رصيده صفر — {zero_items:,} من {total_items:,} ({zero_items/total_items*100:.0f}%)"},
         {"type":"تنبيه",  "c":"#e65100","bg":"#fff3e0",
-         "text":f"الإطارات {tire_pct:.0f}% من قيمة المخزن — مخزون مرتفع نسبياً يستدعي المراجعة"},
+         "text":f"الإطارات {tire_pct:.0f}% من قيمة المخزن — مخزون مرتفع يستدعي المراجعة"},
         {"type":"تحليل",  "c":"#1565c0","bg":"#e3f2fd",
-         "text":"الدبرياج والإطارات الأعلى تكلفة — فرصة تفاوض مع الموردين لتقليل التكلفة"},
+         "text":"الدبرياج والإطارات الأعلى تكلفة — فرصة تفاوض مع الموردين"},
         {"type":"إيجابي", "c":"#2e7d32","bg":"#e8f5e9",
-         "text":f"ورشة داخلية قوية — {in_g_pct:.0f}% من أوامر الصيانة تُنفَّذ داخل الجراج"},
+         "text":f"ورشة داخلية قوية — {in_g_pct:.0f}% من الصيانة تُنفَّذ في الجراج"},
         {"type":"تحليل",  "c":"#1565c0","bg":"#e3f2fd",
-         "text":f"القسم الأعلى قيمة في المخزن: {top_sec} ({top_sec_pct:.0f}%) — هل التخصيص مناسب؟"},
+         "text":f"القسم الأعلى: {top_sec} ({top_sec_pct:.0f}%) — هل التخصيص مناسب؟"},
     ]
 
     c1, c2 = st.columns(2)
     for i, ins in enumerate(insights):
         col = c1 if i % 2 == 0 else c2
-        col.markdown(f"""
-        <div dir="rtl" style="background:{ins['bg']};border-radius:8px;
-        padding:12px 14px;margin-bottom:10px;border-right:4px solid {ins['c']};">
-          <span style="background:{ins['c']};color:white;font-size:10px;
-          font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px;">
-            {ins['type']}</span>
-          <span style="font-size:13px;color:#1a1a2e;">{ins['text']}</span>
-        </div>""", unsafe_allow_html=True)
+        col.markdown(
+            f'<div dir="rtl" style="background:{ins["bg"]};border-radius:8px;'
+            f'padding:12px 14px;margin-bottom:10px;border-right:4px solid {ins["c"]};">'
+            f'<span style="background:{ins["c"]};color:white;font-size:10px;'
+            f'font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px;">'
+            f'{ins["type"]}</span>'
+            f'<span style="font-size:13px;color:#1a1a2e;">{ins["text"]}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
 
 # =========================================
@@ -649,13 +605,13 @@ def render_inventory_table(fd: dict):
     inv = fd["inv"].copy()
 
     st.markdown(
-        f'<div dir="rtl" style="color:{TH["grey"]};font-size:12px;'
-        f'margin-bottom:10px;">'
-        f'📦 {len(inv):,} صنف · إجمالي قيمة: '
-        f'<strong style="color:{TH["title"]};">'
-        f'{inv["قيمة_مخزون"].sum():,.0f} ج.م</strong></div>',
+        f'<div dir="rtl" style="color:{TH["grey"]};font-size:12px;margin-bottom:10px;">'
+        f'📦 {len(inv):,} صنف · قيمة: '
+        f'<strong style="color:{TH["title"]};">{inv["قيمة_مخزون"].sum():,.0f} ج.م</strong>'
+        f'</div>',
         unsafe_allow_html=True,
     )
+
     search = st.text_input("🔍 بحث في الأصناف", key="inv_search",
                            placeholder="اكتب اسم الصنف...")
     if search:
@@ -677,10 +633,79 @@ def render_inventory_table(fd: dict):
 
 
 # =========================================
-# AI ANALYSIS + SUGGESTED QUESTIONS
+# AI — helpers
 # =========================================
 
-def build_context(fd: dict, period_label: str = "كل الفترة") -> str:
+def _md_to_html(txt: str) -> str:
+    """Convert basic markdown to styled HTML for display."""
+    # Bold **text**
+    txt = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", txt)
+    # ## Header
+    txt = re.sub(
+        r"^#{1,3}\s+(.+)$",
+        r'<div style="font-weight:800;color:#1a237e;font-size:14px;'
+        r'margin:14px 0 6px;">\1</div>',
+        txt, flags=re.MULTILINE,
+    )
+    # Bullet -
+    txt = re.sub(
+        r"^[-•]\s+(.+)$",
+        r'<div style="padding:3px 0 3px 10px;border-right:3px solid #3949ab;'
+        r'margin:3px 0;">\1</div>',
+        txt, flags=re.MULTILINE,
+    )
+    # Numbered list 1. / ١.
+    txt = re.sub(
+        r"^[١٢٣٤٥\d][.)]\s+(.+)$",
+        r'<div style="padding:3px 0 3px 10px;border-right:3px solid #43a047;'
+        r'margin:3px 0;">\1</div>',
+        txt, flags=re.MULTILINE,
+    )
+    txt = txt.replace(chr(10), "<br>")
+    return txt
+
+
+def _answer_card(answer: str, question: str, card_key: str):
+    """Display structured AI answer with TTS button."""
+    formatted = _md_to_html(answer)
+    st.markdown(
+        f'<div dir="rtl" style="background:#f0f4ff;border:1px solid #c5cae9;'
+        f'border-radius:12px;padding:18px 20px;margin-top:12px;">'
+        f'<div style="font-size:11px;color:{TH["grey"]};margin-bottom:10px;'
+        f'font-weight:700;">📌 {question}</div>'
+        f'<div style="font-size:14px;color:#1a1a2e;line-height:1.9;">'
+        f'{formatted}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    # TTS button
+    tc1, tc2 = st.columns([1, 6])
+    with tc1:
+        if st.button("🔊 استمع", key=f"tts_{card_key}", use_container_width=True):
+            with st.spinner("🎙️ جاري توليد الصوت..."):
+                try:
+                    audio_bytes = _tts(answer)
+                    st.session_state[f"aud_{card_key}"] = audio_bytes
+                except Exception as e:
+                    st.error(f"❌ خطأ في الصوت: {e}")
+
+    if st.session_state.get(f"aud_{card_key}"):
+        st.audio(st.session_state[f"aud_{card_key}"], format="audio/mp3")
+
+
+def _tts(text: str) -> bytes:
+    """Convert Arabic text to MP3 using OpenAI TTS."""
+    api_key = st.secrets.get("OPENAI_API_KEY", "")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY غير موجود في secrets")
+    client = OpenAI(api_key=api_key)
+    clean  = re.sub(r"[#*\-•]", "", text).strip()[:4000]
+    resp   = client.audio.speech.create(model="tts-1", voice="alloy", input=clean)
+    return resp.content
+
+
+def _build_ctx(fd: dict, period_label: str = "كل الفترة") -> str:
+    """Build text context for GPT from filtered data."""
     inv_all = fd["inv_full"]
     sarf    = fd["sarf"]
     add     = fd["add"]
@@ -689,68 +714,61 @@ def build_context(fd: dict, period_label: str = "كل الفترة") -> str:
 
     total_stock = inv_all["قيمة_مخزون"].sum()
     zero_items  = (inv_all["رصيد_اخر"] <= 0).sum()
+    in_g_pct    = (maint["مكان الاصلاح"] == "الجراج").sum() / len(maint) * 100 if len(maint) else 0
 
-    top_items = (sarf.groupby("اسم_الصنف")["القيمة"].sum()
-                 .nlargest(5).reset_index())
-    top_sup   = (add.groupby("اسم المورد")["قيمة"].sum()
-                 .nlargest(5).reset_index())
-    sec_val   = (inv_all.groupby("القسم")["قيمة_مخزون"].sum()
-                 .sort_values(ascending=False).head(6))
-    ws_cnt    = maint["الورشة"].value_counts().head(5)
-    in_g_pct  = (maint["مكان الاصلاح"] == "الجراج").sum() / len(maint) * 100
+    top_items = sarf.groupby("اسم_الصنف")["القيمة"].sum().nlargest(5).reset_index()
+    top_sup   = add.groupby("اسم المورد")["قيمة"].sum().nlargest(5).reset_index()
+    sec_val   = inv_all.groupby("القسم")["قيمة_مخزون"].sum().sort_values(ascending=False).head(6)
+    ws_cnt    = maint["الورشة"].dropna().value_counts().head(6)
 
     lines = [
         f"بيانات مخازن وصيانة شركة Eagle Trans — الفترة: {period_label}",
         f"- إجمالي الصرف: {sarf['القيمة'].sum():,.0f} ج.م ({len(sarf):,} سطر)",
         f"- إجمالي المشتريات: {add['قيمة'].sum():,.0f} ج.م ({len(add):,} إضافة)",
         f"- قيمة المخزن: {total_stock:,.0f} ج.م ({len(inv_all):,} صنف، {zero_items:,} بدون رصيد)",
-        f"- أوامر الصيانة: {len(maint):,} (الجراج: {in_g_pct:.0f}%)",
+        f"- أوامر الصيانة: {len(maint):,} ({in_g_pct:.0f}% في الجراج)",
         f"- الأسطول: {len(fleet):,} مركبة",
         "",
         "أعلى الأصناف المصروفة:",
-    ] + [f"  {r['اسم_الصنف'][:40]}: {r['القيمة']:,.0f} ج.م"
-         for _, r in top_items.iterrows()] + [
-        "",
-        "أعلى الموردين:",
-    ] + [f"  {r['اسم المورد'][:30]}: {r['قيمة']:,.0f} ج.م"
-         for _, r in top_sup.iterrows()] + [
-        "",
-        "قيمة المخزن حسب القسم:",
-    ] + [f"  {s}: {v:,.0f} ج.م" for s, v in sec_val.items()] + [
-        "",
-        "أوامر الصيانة حسب الورشة:",
-    ] + [f"  {w}: {c:,}" for w, c in ws_cnt.items()]
+    ] + [f"  - {r['اسم_الصنف'][:40]}: {r['القيمة']:,.0f} ج.م" for _, r in top_items.iterrows()] + [
+        "", "أعلى الموردين:",
+    ] + [f"  - {r['اسم المورد'][:30]}: {r['قيمة']:,.0f} ج.م" for _, r in top_sup.iterrows()] + [
+        "", "قيمة المخزن حسب القسم:",
+    ] + [f"  - {s}: {v:,.0f} ج.م" for s, v in sec_val.items()] + [
+        "", "الصيانة حسب الورشة:",
+    ] + [f"  - {w}: {c:,}" for w, c in ws_cnt.items()]
 
     return "\n".join(lines)
 
 
-def call_ai(ctx: str, question: str = "") -> str:
+def _call_ai(ctx: str, question: str = "") -> str:
     api_key = st.secrets.get("OPENAI_API_KEY", "")
     if not api_key:
         raise ValueError("OPENAI_API_KEY غير موجود في secrets")
-
     client = OpenAI(api_key=api_key)
 
     if question:
         prompt = (
             f"{ctx}\n\n"
             f"السؤال: {question}\n\n"
-            "أجب بالعربية الفصحى بصيغة منظمة كالتالي:\n"
-            "**الإجابة المباشرة:** [جملة أو جملتان]\n"
+            "أجب بالعربية الفصحى بالصيغة التالية بالضبط:\n"
+            "**الإجابة المباشرة:** [جملة أو جملتان]\n\n"
             "**التفاصيل:**\n"
-            "- [نقطة 1]\n- [نقطة 2]\n- [نقطة 3]\n"
-            "**التوصية:** [توصية واحدة عملية قابلة للتطبيق فوراً]"
+            "- [نقطة 1 مع رقم من البيانات]\n"
+            "- [نقطة 2]\n"
+            "- [نقطة 3]\n\n"
+            "**التوصية:** [توصية واحدة قابلة للتطبيق فوراً]"
         )
     else:
         prompt = (
             f"{ctx}\n\n"
-            "بناءً على هذه البيانات، اكتب تحليلاً تشغيلياً شاملاً منظماً كالتالي:\n"
-            "## ١. أبرز المؤشرات\n[٣ إلى ٥ نقاط حرجة]\n"
-            "## ٢. نقاط القوة\n[نقطتان أو ثلاث]\n"
-            "## ٣. نقاط الضعف والمخاطر\n[نقطتان أو ثلاث]\n"
-            "## ٤. توصيات فورية\n[٣ توصيات قابلة للتطبيق هذا الأسبوع]\n"
-            "## ٥. توصيات استراتيجية\n[٢ توصيات على المدى المتوسط]\n"
-            "اكتب بلغة عربية واضحة ومختصرة دون مقدمات."
+            "اكتب تحليلاً تشغيلياً شاملاً بالصيغة التالية:\n"
+            "## ١. أبرز المؤشرات\n- [٣ نقاط بأرقام من البيانات]\n\n"
+            "## ٢. نقاط القوة\n- [نقطتان أو ثلاث]\n\n"
+            "## ٣. نقاط الضعف\n- [نقطتان أو ثلاث]\n\n"
+            "## ٤. توصيات فورية\n- [٣ توصيات للأسبوع الحالي]\n\n"
+            "## ٥. توصيات استراتيجية\n- [توصيتان للربع القادم]\n\n"
+            "استخدم الأرقام الموجودة في البيانات فقط. لا مقدمات."
         )
 
     resp = client.chat.completions.create(
@@ -759,34 +777,15 @@ def call_ai(ctx: str, question: str = "") -> str:
             {"role": "system",
              "content": (
                  "أنت خبير تحليل بيانات تشغيلية لشركات النقل والمخازن. "
-                 "تحلل بدقة وتقدم إجابات منظمة وعملية بالعربية الفصحى. "
-                 "استخدم دائماً الأرقام الموجودة في البيانات المقدمة. "
-                 "لا تخترع أرقاماً غير موجودة."
+                 "تحلل بدقة بالعربية الفصحى وتستخدم الأرقام المقدمة فقط. "
+                 "إجاباتك منظمة وعملية ومختصرة."
              )},
             {"role": "user", "content": prompt},
         ],
         max_tokens=1400,
-        temperature=0.25,
+        temperature=0.2,
     )
     return resp.choices[0].message.content.strip()
-
-
-def text_to_speech(text: str) -> bytes:
-    """Convert Arabic text to speech using OpenAI TTS."""
-    api_key = st.secrets.get("OPENAI_API_KEY", "")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY غير موجود في secrets")
-    client = OpenAI(api_key=api_key)
-    # Clean markdown symbols for cleaner audio
-    clean = (text
-             .replace("##", "").replace("**", "").replace("*", "")
-             .replace("#", "").replace("-", "،").strip())
-    resp = client.audio.speech.create(
-        model="tts-1",
-        voice="alloy",
-        input=clean[:4000],  # TTS limit
-    )
-    return resp.content
 
 
 SUGGESTED_QUESTIONS = [
@@ -799,103 +798,60 @@ SUGGESTED_QUESTIONS = [
 ]
 
 
-def _ai_answer_card(answer: str, question: str, key_prefix: str):
-    """Display a structured AI answer with TTS button."""
-    import re
-
-    # Format markdown-like headers and bold to HTML
-    def md_to_html(txt: str) -> str:
-        # Bold **text**
-        txt = re.sub(r"\*\*(.*?)\*\*", r"<strong></strong>", txt)
-        # Headers ## → section title
-        txt = re.sub(r"^##\s+(.+)$",
-                     r'<div style="font-weight:800;color:#1a237e;'
-                     r'font-size:14px;margin:14px 0 6px;"></div>',
-                     txt, flags=re.MULTILINE)
-        # Bullets
-        txt = re.sub(r"^[-•]\s+(.+)$",
-                     r'<div style="padding:2px 0 2px 8px;'
-                     r'border-right:3px solid #3949ab;margin:3px 0;"></div>',
-                     txt, flags=re.MULTILINE)
-        txt = txt.replace(chr(10), "<br>")
-        return txt
-
-    formatted = md_to_html(answer)
-
-    st.markdown(f"""
-    <div dir="rtl" style="background:#f0f4ff;border:1px solid #c5cae9;
-    border-radius:12px;padding:18px 20px;margin-top:12px;">
-      <div style="font-size:11px;color:{TH['grey']};margin-bottom:10px;font-weight:700;">
-        📌 {question}
-      </div>
-      <div style="font-size:14px;color:#1a1a2e;line-height:1.85;">
-        {formatted}
-      </div>
-    </div>""", unsafe_allow_html=True)
-
-    # TTS button
-    tts_col1, tts_col2 = st.columns([1, 5])
-    with tts_col1:
-        if st.button("🔊 استمع", key=f"tts_{key_prefix}", use_container_width=True):
-            with st.spinner("🎙️ جاري توليد الصوت..."):
-                try:
-                    audio_bytes = text_to_speech(answer)
-                    st.session_state[f"audio_{key_prefix}"] = audio_bytes
-                except Exception as e:
-                    st.error(f"❌ خطأ في الصوت: {e}")
-
-    if st.session_state.get(f"audio_{key_prefix}"):
-        st.audio(st.session_state[f"audio_{key_prefix}"], format="audio/mp3")
-
+# =========================================
+# AI SECTION
+# =========================================
 
 def render_ai(fd: dict):
-    import datetime
-
-    st.markdown("""
-    <div dir="rtl" style="background:linear-gradient(135deg,#0a1628,#152238);
-    border:1px solid #1a3a60;border-radius:12px;padding:18px 22px;margin-bottom:16px;">
-    <h3 style="color:#64b5f6;margin:0 0 6px;">🤖 تحليل الذكاء الاصطناعي</h3>
-    <p style="color:#90caf9;font-size:12px;margin:0;">
-      تحليل شامل · إجابات منظمة · فلتر زمني · استماع صوتي
-    </p></div>""", unsafe_allow_html=True)
-
-    # ── Time period filter ─────────────────
     st.markdown(
-        f'<div dir="rtl" style="font-weight:700;color:{TH["title"]};'
-        f'font-size:13px;margin-bottom:8px;">📅 نطاق التحليل</div>',
+        '<div dir="rtl" style="background:linear-gradient(135deg,#0a1628,#152238);'
+        'border:1px solid #1a3a60;border-radius:12px;padding:18px 22px;margin-bottom:16px;">'
+        '<h3 style="color:#64b5f6;margin:0 0 6px;">🤖 تحليل الذكاء الاصطناعي</h3>'
+        '<p style="color:#90caf9;font-size:12px;margin:0;">'
+        'تحليل شامل · إجابات منظمة · فلتر زمني · استماع صوتي</p></div>',
         unsafe_allow_html=True,
     )
-    period_opts = {
-        "الأمس":         1,
-        "آخر 7 أيام":    7,
-        "آخر 30 يوم":   30,
-        "آخر 3 أشهر":   90,
-        "كل الفترة":     None,
+
+    # ── Period filter — relative to data max date ──
+    max_date = fd["max_date"]
+    st.markdown(
+        f'<div dir="rtl" style="font-weight:700;color:{TH["title"]};'
+        f'font-size:13px;margin-bottom:8px;">'
+        f'📅 نطاق التحليل (أحدث بيانات: {max_date.date()})</div>',
+        unsafe_allow_html=True,
+    )
+
+    PERIODS = {
+        "الأمس":       1,
+        "آخر 7 أيام":  7,
+        "آخر 30 يوم": 30,
+        "آخر 3 أشهر": 90,
+        "كل الفترة":   None,
     }
-    pcols = st.columns(len(period_opts))
+
     if "inv_period" not in st.session_state:
         st.session_state["inv_period"] = "كل الفترة"
 
-    for i, (label, days) in enumerate(period_opts.items()):
-        is_active = st.session_state["inv_period"] == label
-        btn_style = (
-            "background:#3949ab;color:white;border:none;" if is_active
-            else "background:#e8eaf6;color:#3949ab;border:1px solid #c5cae9;"
-        )
+    pcols = st.columns(len(PERIODS))
+    for i, label in enumerate(PERIODS):
+        is_sel = st.session_state["inv_period"] == label
         if pcols[i].button(
-            label, key=f"period_{i}",
+            label, key=f"prd_{i}",
             use_container_width=True,
-            type="primary" if is_active else "secondary",
+            type="primary" if is_sel else "secondary",
         ):
             st.session_state["inv_period"] = label
+            # Clear previous answers when period changes
+            for k in ["inv_ai_analysis","inv_ai_answer","aud_general","aud_answer"]:
+                st.session_state.pop(k, None)
+            st.rerun()
 
-    # Apply time filter to sarf + maint for AI context
     sel_period = st.session_state["inv_period"]
-    days_back  = period_opts[sel_period]
-    today      = pd.Timestamp.now().normalize()
+    days_back  = PERIODS[sel_period]
 
+    # Apply period filter relative to max_date
     if days_back:
-        cutoff   = today - pd.Timedelta(days=days_back)
+        cutoff   = max_date - pd.Timedelta(days=days_back)
         sarf_ai  = fd["sarf"][fd["sarf"]["التاريخ"] >= cutoff]
         maint_ai = fd["maint"][fd["maint"]["التاريخ"] >= cutoff]
         add_ai   = fd["add"][fd["add"]["التاريخ"] >= cutoff]
@@ -908,64 +864,58 @@ def render_ai(fd: dict):
 
     st.markdown(
         f'<div dir="rtl" style="font-size:11px;color:{TH["grey"]};margin:6px 0 14px;">'
-        f'🔍 فترة التحليل: <strong>{sel_period}</strong> — '
+        f'🔍 الفترة: <b>{sel_period}</b> — '
         f'{len(sarf_ai):,} سطر صرف · {len(maint_ai):,} أمر صيانة</div>',
         unsafe_allow_html=True,
     )
 
-    ctx = build_context(fd_ai, sel_period)
+    ctx = _build_ctx(fd_ai, sel_period)
 
-    # ── General AI report ──────────────────
+    # ── General Analysis ──────────────────
     st.markdown("---")
-    ai1, ai2 = st.columns([3, 1])
-    with ai1:
+    r1, r2 = st.columns([3, 1])
+    with r1:
         st.markdown(
             f'<div dir="rtl" style="font-weight:700;color:{TH["title"]};'
             f'font-size:14px;">📊 تحليل شامل — {sel_period}</div>',
             unsafe_allow_html=True,
         )
-    with ai2:
-        gen_btn = st.button("🚀 توليد التحليل", use_container_width=True,
-                            type="primary", key="inv_ai_gen")
-
-    if gen_btn:
-        with st.spinner("🧠 يحلل الذكاء الاصطناعي البيانات..."):
-            try:
-                analysis = call_ai(ctx)
-                st.session_state["inv_ai_analysis"] = analysis
-                st.session_state["inv_ai_period"]   = sel_period
-                st.session_state.pop("audio_general", None)
-            except Exception as e:
-                st.error(f"❌ خطأ: {e}")
+    with r2:
+        if st.button("🚀 توليد التحليل", use_container_width=True,
+                     type="primary", key="inv_ai_gen"):
+            with st.spinner("🧠 جاري التحليل..."):
+                try:
+                    analysis = _call_ai(ctx)
+                    st.session_state["inv_ai_analysis"] = analysis
+                    st.session_state["inv_ai_period"]   = sel_period
+                    st.session_state.pop("aud_general", None)
+                except Exception as e:
+                    st.error(f"❌ {e}")
 
     if st.session_state.get("inv_ai_analysis"):
-        period_tag = st.session_state.get("inv_ai_period", sel_period)
-        _ai_answer_card(
+        _answer_card(
             st.session_state["inv_ai_analysis"],
-            f"التحليل الشامل — {period_tag}",
-            "general"
+            f"التحليل الشامل — {st.session_state.get('inv_ai_period', sel_period)}",
+            "general",
         )
-        dl1, dl2 = st.columns([1, 5])
-        with dl1:
-            st.download_button(
-                "⬇️ تحميل",
-                data=st.session_state["inv_ai_analysis"].encode("utf-8"),
-                file_name="eagle_trans_analysis.txt",
-                mime="text/plain",
-                use_container_width=True,
-            )
+        st.download_button(
+            "⬇️ تحميل التحليل",
+            data=st.session_state["inv_ai_analysis"].encode("utf-8"),
+            file_name="eagle_trans_analysis.txt",
+            mime="text/plain",
+        )
 
     st.markdown("---")
 
-    # ── Suggested questions ────────────────
-    st.markdown(f"""
-    <div dir="rtl" style="margin-bottom:12px;">
-    <h4 style="color:{TH['title']};font-size:16px;font-weight:700;margin-bottom:4px;">
-      ⚡ أسئلة سريعة بالذكاء الاصطناعي
-    </h4>
-    <p style="color:{TH['grey']};font-size:12px;margin:0;">
-      اضغط على أي سؤال للحصول على إجابة فورية من بيانات ({sel_period})
-    </p></div>""", unsafe_allow_html=True)
+    # ── Quick Questions ───────────────────
+    st.markdown(
+        f'<div dir="rtl" style="margin-bottom:12px;">'
+        f'<h4 style="color:{TH["title"]};font-size:16px;font-weight:700;margin-bottom:4px;">'
+        f'⚡ أسئلة سريعة — {sel_period}</h4>'
+        f'<p style="color:{TH["grey"]};font-size:12px;margin:0;">'
+        f'اضغط على أي سؤال للحصول على إجابة فورية من البيانات</p></div>',
+        unsafe_allow_html=True,
+    )
 
     for i in range(0, len(SUGGESTED_QUESTIONS), 2):
         q1 = SUGGESTED_QUESTIONS[i]
@@ -979,11 +929,11 @@ def render_ai(fd: dict):
                 if st.button(q2, key=f"sq_{i+1}", use_container_width=True):
                     st.session_state["inv_active_q"] = q2
 
-    # Custom question
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    # ── Custom Question ───────────────────
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     custom_q = st.text_input(
         "✏️ اكتب سؤالك عن البيانات",
-        placeholder="مثال: ما هي الأصناف التي تجاوزت قيمتها 100 ألف جنيه؟",
+        placeholder="مثال: ما الأصناف التي تجاوزت قيمتها 100 ألف جنيه؟",
         key="inv_custom_q",
     )
     ask_btn = st.button("🔍 تحليل السؤال", key="inv_ask_btn", type="primary")
@@ -992,22 +942,21 @@ def render_ai(fd: dict):
     final_q  = custom_q if (ask_btn and custom_q) else active_q if active_q else ""
 
     if final_q:
-        with st.spinner(f"🧠 يحلل السؤال في إطار {sel_period}..."):
+        with st.spinner(f"🧠 يحلل السؤال في فترة ({sel_period})..."):
             try:
-                answer = call_ai(ctx, final_q)
+                answer = _call_ai(ctx, final_q)
                 st.session_state["inv_ai_answer"] = answer
                 st.session_state["inv_last_q"]    = final_q
-                st.session_state.pop("audio_answer", None)
-                if "inv_active_q" in st.session_state:
-                    del st.session_state["inv_active_q"]
+                st.session_state.pop("aud_answer", None)
+                st.session_state.pop("inv_active_q", None)
             except Exception as e:
                 st.error(f"❌ {e}")
 
     if st.session_state.get("inv_ai_answer"):
-        _ai_answer_card(
+        _answer_card(
             st.session_state["inv_ai_answer"],
             st.session_state.get("inv_last_q", ""),
-            "answer"
+            "answer",
         )
 
 
@@ -1016,7 +965,6 @@ def render_ai(fd: dict):
 # =========================================
 
 def run():
-
     st.markdown("""
     <style>
     * { direction: rtl; }
@@ -1028,19 +976,17 @@ def run():
     }
     </style>""", unsafe_allow_html=True)
 
-    # Header
-    st.markdown(f"""
-    <div dir="rtl" style="
-        background:linear-gradient(135deg,{TH['blue']},{TH['title']});
-        border-radius:14px;padding:22px 28px;margin-bottom:20px;
-        box-shadow:0 4px 16px rgba(57,73,171,.25);">
-      <h2 style="color:white;margin:0;font-size:24px;font-weight:800;">
-        📦 لوحة تحكم المخازن والصيانة
-      </h2>
-      <p style="color:rgba(255,255,255,.85);margin:8px 0 0;font-size:13px;">
-        تحليل الصرف · المشتريات · رصيد المخزن · أوامر الصيانة · ذكاء اصطناعي
-      </p>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(
+        f'<div dir="rtl" style="background:linear-gradient(135deg,{TH["blue"]},{TH["title"]});'
+        f'border-radius:14px;padding:22px 28px;margin-bottom:20px;'
+        f'box-shadow:0 4px 16px rgba(57,73,171,.25);">'
+        f'<h2 style="color:white;margin:0;font-size:24px;font-weight:800;">'
+        f'📦 لوحة تحكم المخازن والصيانة</h2>'
+        f'<p style="color:rgba(255,255,255,.85);margin:8px 0 0;font-size:13px;">'
+        f'تحليل الصرف · المشتريات · رصيد المخزن · أوامر الصيانة · ذكاء اصطناعي</p>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
     uploaded = st.file_uploader(
         "📂 ارفع ملف المخازن (Excel)",
@@ -1098,10 +1044,8 @@ def run():
     st.markdown("---")
     with st.expander("🗃️ عرض البيانات الخام", expanded=False):
         t1, t2, t3, t4 = st.tabs([
-            "📤 حركة الصرف",
-            "📥 حركة الإضافة",
-            "🔧 أوامر الصيانة",
-            "🚗 الأسطول",
+            "📤 حركة الصرف", "📥 حركة الإضافة",
+            "🔧 أوامر الصيانة", "🚗 الأسطول",
         ])
         with t1: st.dataframe(fd["sarf"],  use_container_width=True, hide_index=True)
         with t2: st.dataframe(fd["add"],   use_container_width=True, hide_index=True)
