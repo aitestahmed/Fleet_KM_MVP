@@ -90,12 +90,13 @@ def _base(title: str, h: int = 400) -> dict:
         paper_bgcolor=TH["bg"],
         plot_bgcolor=TH["plot_bg"],
         font=dict(color="#2c2c2c", family="Cairo, sans-serif", size=11),
-        margin=dict(l=10, r=10, t=56, b=100),   # bottom space for x labels
+        margin=dict(l=10, r=10, t=56, b=130),   # bottom space for bold x labels
         xaxis=dict(
-            tickfont=dict(size=10, color="#37474f", family="Cairo, sans-serif"),
+            tickfont=dict(size=11, color="#1a1a2e", family="Cairo, sans-serif",
+                          weight="bold" if False else None),  # bold via CSS override
             showgrid=False,
             linecolor="rgba(0,0,0,0.1)",
-            tickangle=-35,                        # angled labels → no overlap
+            tickangle=-40,
             automargin=True,
         ),
         yaxis=dict(
@@ -161,7 +162,7 @@ def vbar(labels, values, title: str,
         text=bar_text,
         textposition="inside",
         insidetextanchor="end",
-        textfont=dict(size=10, color="white", family="Cairo, sans-serif"),
+        textfont=dict(size=11, color="white", family="Cairo, sans-serif"),
         marker=dict(color=colors, line=dict(width=0)),
         customdata=hover,
         hovertemplate="%{customdata}<extra></extra>",
@@ -536,17 +537,36 @@ def render_maintenance(fd: dict):
         st.plotly_chart(fig, use_container_width=True)
 
     with c2:
-        outside = maint[maint["مكان الاصلاح"] != "الجراج"]
+        outside = maint[maint["مكان الاصلاح"] != "الجراج"].copy()
+        st.markdown(
+            f'<div dir="rtl" style="font-weight:700;color:{TH["title"]};'
+            f'font-size:14px;margin-bottom:10px;">🚧 أعطال خارج الجراج</div>',
+            unsafe_allow_html=True,
+        )
         if len(outside):
-            oc = outside["مكان الاصلاح"].value_counts().reset_index()
-            oc.columns = ["المكان", "العدد"]
-            fig2 = donut(
-                oc["المكان"].tolist(),
-                oc["العدد"].tolist(),
-                "🚧 أعطال خارج الجراج",
-                h=400,
+            # Pivot table: مكان × نوع الورشة → عدد الأوامر
+            pivot = (
+                outside.groupby(["مكان الاصلاح", "الورشة"])
+                .size()
+                .reset_index(name="عدد_الأوامر")
+                .pivot_table(index="مكان الاصلاح", columns="الورشة",
+                             values="عدد_الأوامر", aggfunc="sum", fill_value=0)
+                .reset_index()
             )
-            st.plotly_chart(fig2, use_container_width=True)
+            pivot.columns.name = None
+            pivot["الإجمالي"] = pivot.iloc[:, 1:].sum(axis=1)
+            pivot = pivot.sort_values("الإجمالي", ascending=False)
+            st.dataframe(pivot, use_container_width=True, hide_index=True, height=320)
+
+            # Summary cards
+            total_out = len(outside)
+            unique_locs = outside["مكان الاصلاح"].nunique()
+            st.markdown(
+                f'<div dir="rtl" style="font-size:12px;color:{TH["grey"]};margin-top:6px;">'
+                f'📍 <strong>{total_out}</strong> أمر خارج الجراج '
+                f'في <strong>{unique_locs}</strong> موقع مختلف</div>',
+                unsafe_allow_html=True,
+            )
         else:
             st.success("✅ جميع أعمال الصيانة تمت داخل الجراج")
 
@@ -660,7 +680,7 @@ def render_inventory_table(fd: dict):
 # AI ANALYSIS + SUGGESTED QUESTIONS
 # =========================================
 
-def build_context(fd: dict) -> str:
+def build_context(fd: dict, period_label: str = "كل الفترة") -> str:
     inv_all = fd["inv_full"]
     sarf    = fd["sarf"]
     add     = fd["add"]
@@ -680,7 +700,7 @@ def build_context(fd: dict) -> str:
     in_g_pct  = (maint["مكان الاصلاح"] == "الجراج").sum() / len(maint) * 100
 
     lines = [
-        f"بيانات مخازن وصيانة شركة Eagle Trans:",
+        f"بيانات مخازن وصيانة شركة Eagle Trans — الفترة: {period_label}",
         f"- إجمالي الصرف: {sarf['القيمة'].sum():,.0f} ج.م ({len(sarf):,} سطر)",
         f"- إجمالي المشتريات: {add['قيمة'].sum():,.0f} ج.م ({len(add):,} إضافة)",
         f"- قيمة المخزن: {total_stock:,.0f} ج.م ({len(inv_all):,} صنف، {zero_items:,} بدون رصيد)",
@@ -712,31 +732,61 @@ def call_ai(ctx: str, question: str = "") -> str:
     client = OpenAI(api_key=api_key)
 
     if question:
-        prompt = f"{ctx}\n\nالسؤال: {question}\n\nأجب بالعربية بإيجاز وتحليل دقيق."
+        prompt = (
+            f"{ctx}\n\n"
+            f"السؤال: {question}\n\n"
+            "أجب بالعربية الفصحى بصيغة منظمة كالتالي:\n"
+            "**الإجابة المباشرة:** [جملة أو جملتان]\n"
+            "**التفاصيل:**\n"
+            "- [نقطة 1]\n- [نقطة 2]\n- [نقطة 3]\n"
+            "**التوصية:** [توصية واحدة عملية قابلة للتطبيق فوراً]"
+        )
     else:
         prompt = (
             f"{ctx}\n\n"
-            "بناءً على هذه البيانات، اكتب تحليلاً تشغيلياً شاملاً باللغة العربية يشمل:\n"
-            "١. أبرز النتائج والمؤشرات الحرجة\n"
-            "٢. نقاط القوة في المخزن والصيانة\n"
-            "٣. نقاط الضعف والمخاطر\n"
-            "٤. توصيات عملية قابلة للتطبيق فوراً\n"
-            "٥. توصيات استراتيجية على المدى المتوسط\n"
-            "اجعل التحليل مباشراً ومنظماً بعناوين واضحة."
+            "بناءً على هذه البيانات، اكتب تحليلاً تشغيلياً شاملاً منظماً كالتالي:\n"
+            "## ١. أبرز المؤشرات\n[٣ إلى ٥ نقاط حرجة]\n"
+            "## ٢. نقاط القوة\n[نقطتان أو ثلاث]\n"
+            "## ٣. نقاط الضعف والمخاطر\n[نقطتان أو ثلاث]\n"
+            "## ٤. توصيات فورية\n[٣ توصيات قابلة للتطبيق هذا الأسبوع]\n"
+            "## ٥. توصيات استراتيجية\n[٢ توصيات على المدى المتوسط]\n"
+            "اكتب بلغة عربية واضحة ومختصرة دون مقدمات."
         )
 
     resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system",
-             "content": "أنت خبير تحليل بيانات تشغيلية لشركات النقل والمخازن. "
-                        "تحلل بدقة وتقدم توصيات عملية بالعربية الفصحى."},
+             "content": (
+                 "أنت خبير تحليل بيانات تشغيلية لشركات النقل والمخازن. "
+                 "تحلل بدقة وتقدم إجابات منظمة وعملية بالعربية الفصحى. "
+                 "استخدم دائماً الأرقام الموجودة في البيانات المقدمة. "
+                 "لا تخترع أرقاماً غير موجودة."
+             )},
             {"role": "user", "content": prompt},
         ],
-        max_tokens=1200,
-        temperature=0.3,
+        max_tokens=1400,
+        temperature=0.25,
     )
     return resp.choices[0].message.content.strip()
+
+
+def text_to_speech(text: str) -> bytes:
+    """Convert Arabic text to speech using OpenAI TTS."""
+    api_key = st.secrets.get("OPENAI_API_KEY", "")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY غير موجود في secrets")
+    client = OpenAI(api_key=api_key)
+    # Clean markdown symbols for cleaner audio
+    clean = (text
+             .replace("##", "").replace("**", "").replace("*", "")
+             .replace("#", "").replace("-", "،").strip())
+    resp = client.audio.speech.create(
+        model="tts-1",
+        voice="alloy",
+        input=clean[:4000],  # TTS limit
+    )
+    return resp.content
 
 
 SUGGESTED_QUESTIONS = [
@@ -749,62 +799,174 @@ SUGGESTED_QUESTIONS = [
 ]
 
 
+def _ai_answer_card(answer: str, question: str, key_prefix: str):
+    """Display a structured AI answer with TTS button."""
+    import re
+
+    # Format markdown-like headers and bold to HTML
+    def md_to_html(txt: str) -> str:
+        # Bold **text**
+        txt = re.sub(r"\*\*(.*?)\*\*", r"<strong></strong>", txt)
+        # Headers ## → section title
+        txt = re.sub(r"^##\s+(.+)$",
+                     r'<div style="font-weight:800;color:#1a237e;'
+                     r'font-size:14px;margin:14px 0 6px;"></div>',
+                     txt, flags=re.MULTILINE)
+        # Bullets
+        txt = re.sub(r"^[-•]\s+(.+)$",
+                     r'<div style="padding:2px 0 2px 8px;'
+                     r'border-right:3px solid #3949ab;margin:3px 0;"></div>',
+                     txt, flags=re.MULTILINE)
+        txt = txt.replace(chr(10), "<br>")
+        return txt
+
+    formatted = md_to_html(answer)
+
+    st.markdown(f"""
+    <div dir="rtl" style="background:#f0f4ff;border:1px solid #c5cae9;
+    border-radius:12px;padding:18px 20px;margin-top:12px;">
+      <div style="font-size:11px;color:{TH['grey']};margin-bottom:10px;font-weight:700;">
+        📌 {question}
+      </div>
+      <div style="font-size:14px;color:#1a1a2e;line-height:1.85;">
+        {formatted}
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+    # TTS button
+    tts_col1, tts_col2 = st.columns([1, 5])
+    with tts_col1:
+        if st.button("🔊 استمع", key=f"tts_{key_prefix}", use_container_width=True):
+            with st.spinner("🎙️ جاري توليد الصوت..."):
+                try:
+                    audio_bytes = text_to_speech(answer)
+                    st.session_state[f"audio_{key_prefix}"] = audio_bytes
+                except Exception as e:
+                    st.error(f"❌ خطأ في الصوت: {e}")
+
+    if st.session_state.get(f"audio_{key_prefix}"):
+        st.audio(st.session_state[f"audio_{key_prefix}"], format="audio/mp3")
+
+
 def render_ai(fd: dict):
+    import datetime
+
     st.markdown("""
     <div dir="rtl" style="background:linear-gradient(135deg,#0a1628,#152238);
     border:1px solid #1a3a60;border-radius:12px;padding:18px 22px;margin-bottom:16px;">
     <h3 style="color:#64b5f6;margin:0 0 6px;">🤖 تحليل الذكاء الاصطناعي</h3>
     <p style="color:#90caf9;font-size:12px;margin:0;">
-      تحليل شامل للمخزون والصيانة مع توصيات تشغيلية واستراتيجية
+      تحليل شامل · إجابات منظمة · فلتر زمني · استماع صوتي
     </p></div>""", unsafe_allow_html=True)
 
-    ctx = build_context(fd)
+    # ── Time period filter ─────────────────
+    st.markdown(
+        f'<div dir="rtl" style="font-weight:700;color:{TH["title"]};'
+        f'font-size:13px;margin-bottom:8px;">📅 نطاق التحليل</div>',
+        unsafe_allow_html=True,
+    )
+    period_opts = {
+        "الأمس":         1,
+        "آخر 7 أيام":    7,
+        "آخر 30 يوم":   30,
+        "آخر 3 أشهر":   90,
+        "كل الفترة":     None,
+    }
+    pcols = st.columns(len(period_opts))
+    if "inv_period" not in st.session_state:
+        st.session_state["inv_period"] = "كل الفترة"
+
+    for i, (label, days) in enumerate(period_opts.items()):
+        is_active = st.session_state["inv_period"] == label
+        btn_style = (
+            "background:#3949ab;color:white;border:none;" if is_active
+            else "background:#e8eaf6;color:#3949ab;border:1px solid #c5cae9;"
+        )
+        if pcols[i].button(
+            label, key=f"period_{i}",
+            use_container_width=True,
+            type="primary" if is_active else "secondary",
+        ):
+            st.session_state["inv_period"] = label
+
+    # Apply time filter to sarf + maint for AI context
+    sel_period = st.session_state["inv_period"]
+    days_back  = period_opts[sel_period]
+    today      = pd.Timestamp.now().normalize()
+
+    if days_back:
+        cutoff   = today - pd.Timedelta(days=days_back)
+        sarf_ai  = fd["sarf"][fd["sarf"]["التاريخ"] >= cutoff]
+        maint_ai = fd["maint"][fd["maint"]["التاريخ"] >= cutoff]
+        add_ai   = fd["add"][fd["add"]["التاريخ"] >= cutoff]
+    else:
+        sarf_ai  = fd["sarf"]
+        maint_ai = fd["maint"]
+        add_ai   = fd["add"]
+
+    fd_ai = {**fd, "sarf": sarf_ai, "maint": maint_ai, "add": add_ai}
+
+    st.markdown(
+        f'<div dir="rtl" style="font-size:11px;color:{TH["grey"]};margin:6px 0 14px;">'
+        f'🔍 فترة التحليل: <strong>{sel_period}</strong> — '
+        f'{len(sarf_ai):,} سطر صرف · {len(maint_ai):,} أمر صيانة</div>',
+        unsafe_allow_html=True,
+    )
+
+    ctx = build_context(fd_ai, sel_period)
 
     # ── General AI report ──────────────────
+    st.markdown("---")
     ai1, ai2 = st.columns([3, 1])
     with ai1:
-        st.info("💡 اضغط لتوليد تحليل شامل للمخزون والصيانة بالذكاء الاصطناعي")
+        st.markdown(
+            f'<div dir="rtl" style="font-weight:700;color:{TH["title"]};'
+            f'font-size:14px;">📊 تحليل شامل — {sel_period}</div>',
+            unsafe_allow_html=True,
+        )
     with ai2:
-        gen_btn = st.button("🚀 توليد التحليل", use_container_width=True, type="primary",
-                            key="inv_ai_gen")
+        gen_btn = st.button("🚀 توليد التحليل", use_container_width=True,
+                            type="primary", key="inv_ai_gen")
 
     if gen_btn:
         with st.spinner("🧠 يحلل الذكاء الاصطناعي البيانات..."):
             try:
                 analysis = call_ai(ctx)
                 st.session_state["inv_ai_analysis"] = analysis
+                st.session_state["inv_ai_period"]   = sel_period
+                st.session_state.pop("audio_general", None)
             except Exception as e:
                 st.error(f"❌ خطأ: {e}")
 
     if st.session_state.get("inv_ai_analysis"):
-        st.markdown(
-            f"<div dir='rtl' style='background:#f8faff;border:1px solid #c5cae9;"
-            f"border-radius:10px;padding:18px 20px;line-height:1.9;"
-            f"font-size:14px;color:#1a1a2e;'>"
-            f"{st.session_state['inv_ai_analysis'].replace(chr(10), '<br>')}"
-            f"</div>",
-            unsafe_allow_html=True,
+        period_tag = st.session_state.get("inv_ai_period", sel_period)
+        _ai_answer_card(
+            st.session_state["inv_ai_analysis"],
+            f"التحليل الشامل — {period_tag}",
+            "general"
         )
-        st.download_button(
-            "⬇️ تحميل التحليل",
-            data=st.session_state["inv_ai_analysis"].encode("utf-8"),
-            file_name="eagle_trans_ai_analysis.txt",
-            mime="text/plain",
-        )
+        dl1, dl2 = st.columns([1, 5])
+        with dl1:
+            st.download_button(
+                "⬇️ تحميل",
+                data=st.session_state["inv_ai_analysis"].encode("utf-8"),
+                file_name="eagle_trans_analysis.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
 
     st.markdown("---")
 
     # ── Suggested questions ────────────────
     st.markdown(f"""
-    <div dir="rtl" style="margin-bottom:14px;">
-    <h4 style="color:{TH['title']};font-size:16px;margin-bottom:4px;">
+    <div dir="rtl" style="margin-bottom:12px;">
+    <h4 style="color:{TH['title']};font-size:16px;font-weight:700;margin-bottom:4px;">
       ⚡ أسئلة سريعة بالذكاء الاصطناعي
     </h4>
     <p style="color:{TH['grey']};font-size:12px;margin:0;">
-      اضغط على أي سؤال للحصول على إجابة فورية من البيانات
+      اضغط على أي سؤال للحصول على إجابة فورية من بيانات ({sel_period})
     </p></div>""", unsafe_allow_html=True)
 
-    # Display suggested questions as buttons (2 per row)
     for i in range(0, len(SUGGESTED_QUESTIONS), 2):
         q1 = SUGGESTED_QUESTIONS[i]
         q2 = SUGGESTED_QUESTIONS[i+1] if i+1 < len(SUGGESTED_QUESTIONS) else None
@@ -819,36 +981,34 @@ def render_ai(fd: dict):
 
     # Custom question
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    custom_q = st.text_input("✏️ اكتب سؤالك عن البيانات",
-                             placeholder="مثال: ما هي الأصناف التي تجاوزت قيمتها 100 ألف جنيه؟",
-                             key="inv_custom_q")
-    ask_btn  = st.button("🔍 تحليل السؤال", key="inv_ask_btn", type="primary")
+    custom_q = st.text_input(
+        "✏️ اكتب سؤالك عن البيانات",
+        placeholder="مثال: ما هي الأصناف التي تجاوزت قيمتها 100 ألف جنيه؟",
+        key="inv_custom_q",
+    )
+    ask_btn = st.button("🔍 تحليل السؤال", key="inv_ask_btn", type="primary")
 
     active_q = st.session_state.get("inv_active_q", "")
     final_q  = custom_q if (ask_btn and custom_q) else active_q if active_q else ""
 
     if final_q:
-        with st.spinner("🧠 يحلل السؤال..."):
+        with st.spinner(f"🧠 يحلل السؤال في إطار {sel_period}..."):
             try:
                 answer = call_ai(ctx, final_q)
                 st.session_state["inv_ai_answer"] = answer
                 st.session_state["inv_last_q"]    = final_q
+                st.session_state.pop("audio_answer", None)
                 if "inv_active_q" in st.session_state:
                     del st.session_state["inv_active_q"]
             except Exception as e:
                 st.error(f"❌ {e}")
 
     if st.session_state.get("inv_ai_answer"):
-        st.markdown(f"""
-        <div dir="rtl" style="background:#e8f5e9;border:1px solid #a5d6a7;
-        border-radius:10px;padding:16px 18px;margin-top:12px;">
-          <div style="font-size:12px;color:{TH['grey']};margin-bottom:8px;">
-            📌 السؤال: <strong>{st.session_state.get('inv_last_q','')}</strong>
-          </div>
-          <div style="font-size:14px;color:#1a1a2e;line-height:1.8;">
-            {st.session_state['inv_ai_answer'].replace(chr(10), '<br>')}
-          </div>
-        </div>""", unsafe_allow_html=True)
+        _ai_answer_card(
+            st.session_state["inv_ai_answer"],
+            st.session_state.get("inv_last_q", ""),
+            "answer"
+        )
 
 
 # =========================================
