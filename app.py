@@ -12,7 +12,7 @@ from supabase import create_client
 # =========================================
 
 st.set_page_config(
-    page_title="Quantory AI Analytics",
+    page_title="Synaptory AI Analytics",
     layout="wide"
 )
 
@@ -94,13 +94,13 @@ def load_credits(supabase) -> None:
 
 if not st.session_state.logged_in:
 
-    st.title("Quantory AI Analytics")
-    st.subheader("Login")
+    st.title("Synaptory AI Analytics")
+    st.subheader("تسجيل الدخول")
 
-    email    = st.text_input("Email")
-    password = st.text_input("Password", type="password")
+    email    = st.text_input("البريد الإلكتروني")
+    password = st.text_input("كلمة المرور", type="password")
 
-    if st.button("Login"):
+    if st.button("دخول"):
 
         if not email or not password:
             st.error("⚠️ ادخل البريد وكلمة المرور")
@@ -279,15 +279,15 @@ import os
 
 # ── ICON MAP ─────────────────────────────
 _ICON_MAP = {
-    "sales":      ("📊", "Sales Dashboard"),
-    "fleet":      ("🚚", "Fleet Dashboard"),
-    "fuel":       ("⛽", "Fuel Dashboard"),
-    "inventory":  ("📦", "Inventory Dashboard"),
-    "operations": ("🚛", "Operations Dashboard"),
-    "trip":       ("🗺️", "Trip Dashboard"),
-    "finance":    ("💰", "Finance Dashboard"),
-    "hr":         ("👥", "HR Dashboard"),
-    "ops":        ("⚙️", "Ops Dashboard"),
+    "sales":      ("📊", "لوحة المبيعات"),
+    "fleet":      ("🚚", "لوحة الأسطول"),
+    "fuel":       ("⛽", "لوحة الوقود"),
+    "inventory":  ("📦", "لوحة المخازن"),
+    "operations": ("🚛", "لوحة التشغيل"),
+    "trip":       ("🗺️", "لوحة الرحلات"),
+    "finance":    ("💰", "لوحة المالية"),
+    "hr":         ("👥", "لوحة الموارد البشرية"),
+    "ops":        ("⚙️", "لوحة العمليات"),
 }
 
 def _make_label(module_name: str) -> str:
@@ -339,16 +339,16 @@ with st.sidebar:
 
     st.markdown("---")
 
-    st.success(f"Logged in: {st.session_state.user_email}")
+    st.success(f"مرحباً: {st.session_state.user_email}")
 
     st.divider()
 
     if st.session_state.company_name:
-        st.write(f"Company: {st.session_state.company_name}")
+        st.write(f"الشركة: {st.session_state.company_name}")
     else:
-        st.write("Company: -")
+        st.write("الشركة: -")
 
-    st.write("Role: admin")
+    st.write("الصلاحية: مدير")
 
     st.divider()
 
@@ -372,7 +372,7 @@ with st.sidebar:
                     _visible_credits.append((_sess_key, _lbl, _icon))
 
     if _visible_credits:
-        st.markdown("### 💳 Credits")
+        st.markdown("### 💳 الرصيد")
         for _sess_key, _lbl, _icon in _visible_credits:
             st.metric(
                 f"{_icon} {_lbl}",
@@ -383,7 +383,7 @@ with st.sidebar:
 
     # ── Navigation (dynamic) ─────────────
     page = st.radio(
-        "Navigation",
+        "التنقل",
         options=st.session_state.get("_dashboard_labels", ["—"]),
         key="nav_radio",
     )
@@ -391,7 +391,7 @@ with st.sidebar:
     st.divider()
 
     # ── Logout ───────────────────────────
-    if st.button("Logout"):
+    if st.button("تسجيل الخروج"):
         for _k in _session_defaults:
             st.session_state[_k] = _session_defaults[_k]
         for _k in ["fuel_report_html", "fuel_report_tokens",
@@ -408,7 +408,7 @@ st.markdown(
     """
     <div style="text-align:center;padding-top:10px">
       <div style="font-size:34px;font-weight:700;color:#1f77b4;letter-spacing:1px;">
-        Quantory
+        Synaptory
       </div>
       <div style="font-size:22px;color:#00c2ff;margin-top:6px;font-weight:600;">
         Data That Speaks
@@ -427,8 +427,8 @@ st.markdown(
 # MAIN PAGE
 # =========================================
 
-st.title("AI Analytics Platform")
-st.subheader(f"Client: {client}")
+st.title("Synaptory AI Analytics")
+st.subheader(f"العميل: {client}")
 
 
 # =========================================
