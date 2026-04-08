@@ -279,14 +279,15 @@ import os
 
 # ── ICON MAP ─────────────────────────────
 _ICON_MAP = {
-    "sales":     ("📊", "Sales Dashboard"),
-    "fleet":     ("🚚", "Fleet Dashboard"),
-    "fuel":      ("⛽", "Fuel Dashboard"),
-    "inventory": ("📦", "Inventory Dashboard"),
-    "trip":      ("🗺️", "Trip Dashboard"),
-    "finance":   ("💰", "Finance Dashboard"),
-    "hr":        ("👥", "HR Dashboard"),
-    "ops":       ("⚙️", "Ops Dashboard"),
+    "sales":      ("📊", "Sales Dashboard"),
+    "fleet":      ("🚚", "Fleet Dashboard"),
+    "fuel":       ("⛽", "Fuel Dashboard"),
+    "inventory":  ("📦", "Inventory Dashboard"),
+    "operations": ("🚛", "Operations Dashboard"),
+    "trip":       ("🗺️", "Trip Dashboard"),
+    "finance":    ("💰", "Finance Dashboard"),
+    "hr":         ("👥", "HR Dashboard"),
+    "ops":        ("⚙️", "Ops Dashboard"),
 }
 
 def _make_label(module_name: str) -> str:
