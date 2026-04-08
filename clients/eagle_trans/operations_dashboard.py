@@ -69,6 +69,27 @@ def _fmt(v: float) -> str:
     return f"{v:,.0f}"
 
 
+def _wrap(text: str, max_chars: int = 14) -> str:
+    """
+    Wrap long Arabic label into multiple lines using <br>.
+    Splits on spaces, keeping each line ≤ max_chars.
+    Falls back to hard-cut if no spaces found.
+    """
+    if len(text) <= max_chars:
+        return text
+    words = text.split(" ")
+    lines, cur = [], ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > max_chars:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = (cur + " " + w).strip() if cur else w
+    if cur:
+        lines.append(cur)
+    return "<br>".join(lines)
+
+
 def _base(title: str, h: int = 420) -> dict:
     return dict(
         title=dict(
@@ -104,13 +125,18 @@ def _base(title: str, h: int = 420) -> dict:
 
 
 def vbar(labels, values, title: str, colors=None,
-         unit: str = "", h: int = 420, fmt_fn=None) -> go.Figure:
-    """Vertical bars — full labels vertical, values annotated above."""
+         unit: str = "", h: int = 420, fmt_fn=None,
+         wrap_chars: int = 14) -> go.Figure:
+    """
+    Vertical bars — wrapped labels on x-axis, values annotated above bars.
+    wrap_chars: max chars per line before wrapping (default 14)
+    """
     if not labels:
         return go.Figure()
 
-    vals = list(values)
-    labs = [str(l) for l in labels]
+    vals     = list(values)
+    labs     = [str(l) for l in labels]           # full label for hover
+    x_labels = [_wrap(l, wrap_chars) for l in labs]  # wrapped for x-axis
     val_text = [fmt_fn(v) for v in vals] if fmt_fn else [_fmt(v) for v in vals]
 
     if colors is None:
@@ -127,7 +153,9 @@ def vbar(labels, values, title: str, colors=None,
     ]
 
     fig = go.Figure(go.Bar(
-        x=labs, y=vals, orientation="v",
+        x=x_labels,          # wrapped labels on axis
+        y=vals,
+        orientation="v",
         marker=dict(color=colors, line=dict(width=0)),
         customdata=hover,
         hovertemplate="%{customdata}<extra></extra>",
@@ -135,18 +163,26 @@ def vbar(labels, values, title: str, colors=None,
     ))
 
     vmax = max(abs(v) for v in vals) or 1
+
+    # Annotations above each bar — always visible regardless of bar height
     annotations = [
         dict(
-            x=lab, y=v + vmax * 0.02,
+            x=xl, y=v + vmax * 0.02,
             text=f"<b>{txt}</b>",
             showarrow=False,
             font=dict(size=11, color="#1a237e", family="Cairo, sans-serif"),
             xanchor="center", yanchor="bottom",
         )
-        for lab, v, txt in zip(labs, vals, val_text)
+        for xl, v, txt in zip(x_labels, vals, val_text)
     ]
 
+    # Dynamic bottom margin: more lines = more space needed
+    max_lines = max(xl.count("<br>") + 1 for xl in x_labels)
+    b_margin  = max(80, 40 + max_lines * 28)
+
     lay = _base(title, h)
+    lay["margin"]["b"] = b_margin
+    lay["xaxis"]["tickangle"] = 0 if max_lines > 1 else -45
     lay["annotations"] = annotations
     lay["yaxis"]["range"] = [0, vmax * 1.18]
     fig.update_layout(**lay)
