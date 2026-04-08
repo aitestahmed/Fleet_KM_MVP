@@ -190,6 +190,13 @@ def donut(labels, values, title: str, colors=None, h=360) -> go.Figure:
     return fig
 
 
+def _hex_to_rgba(hex_color: str, alpha: float = 0.1) -> str:
+    """Convert #rrggbb to rgba(r,g,b,alpha) — Plotly-safe."""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
 def line_chart(x, y, title, color=None, h=360, y_label="") -> go.Figure:
     color = color or TH["blue"]
     fig = go.Figure(go.Scatter(
@@ -197,7 +204,7 @@ def line_chart(x, y, title, color=None, h=360, y_label="") -> go.Figure:
         line=dict(color=color, width=2.5),
         marker=dict(size=5, color=color),
         fill="tozeroy",
-        fillcolor=f"{color}18",
+        fillcolor=_hex_to_rgba(color, 0.1),
         hovertemplate="%{x}<br>%{y:,.1f}" + (f" {y_label}" if y_label else "") + "<extra></extra>",
     ))
     fig.update_layout(
