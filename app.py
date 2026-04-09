@@ -419,7 +419,7 @@ st.markdown(
     """
     <div style="text-align:center;padding-top:10px">
       <div style="font-size:34px;font-weight:700;color:#1f77b4;letter-spacing:1px;">
-        Quantory
+        Synaptory
       </div>
       <div style="font-size:22px;color:#00c2ff;margin-top:6px;font-weight:600;">
         Data That Speaks
