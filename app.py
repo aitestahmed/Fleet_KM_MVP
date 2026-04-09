@@ -95,12 +95,12 @@ def load_credits(supabase) -> None:
 if not st.session_state.logged_in:
 
     st.title("Synaptory AI Analytics")
-    st.subheader("تسجيل الدخول")
+    st.subheader("Login")
 
-    email    = st.text_input("البريد الإلكتروني")
-    password = st.text_input("كلمة المرور", type="password")
+    email    = st.text_input("Email")
+    password = st.text_input("Password", type="password")
 
-    if st.button("دخول"):
+    if st.button("Login"):
 
         if not email or not password:
             st.error("⚠️ ادخل البريد وكلمة المرور")
@@ -279,15 +279,14 @@ import os
 
 # ── ICON MAP ─────────────────────────────
 _ICON_MAP = {
-    "sales":      ("📊", "لوحة المبيعات"),
-    "fleet":      ("🚚", "لوحة الأسطول"),
-    "fuel":       ("⛽", "لوحة الوقود"),
-    "inventory":  ("📦", "لوحة المخازن"),
-    "operations": ("🚛", "لوحة التشغيل"),
-    "trip":       ("🗺️", "لوحة الرحلات"),
-    "finance":    ("💰", "لوحة المالية"),
-    "hr":         ("👥", "لوحة الموارد البشرية"),
-    "ops":        ("⚙️", "لوحة العمليات"),
+    "sales":     ("📊", "Sales Dashboard"),
+    "fleet":     ("🚚", "Fleet Dashboard"),
+    "fuel":      ("⛽", "Fuel Dashboard"),
+    "inventory": ("📦", "Inventory Dashboard"),
+    "trip":      ("🗺️", "Trip Dashboard"),
+    "finance":   ("💰", "Finance Dashboard"),
+    "hr":        ("👥", "HR Dashboard"),
+    "ops":       ("⚙️", "Ops Dashboard"),
 }
 
 def _make_label(module_name: str) -> str:
@@ -335,20 +334,32 @@ st.session_state["_dashboard_labels"] = _dashboard_labels
 
 with st.sidebar:
 
-    st.image("LOGO.png", use_container_width=True)
+    st.markdown(
+        """
+        <div style="text-align:center;padding:16px 8px 8px;">
+          <div style="font-size:28px;font-weight:900;color:#1f77b4;
+               letter-spacing:2px;font-family:sans-serif;">
+            🔷 Synaptory
+          </div>
+          <div style="font-size:11px;color:#90caf9;letter-spacing:1px;
+               margin-top:4px;">AI Analytics</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.markdown("---")
 
-    st.success(f"مرحباً: {st.session_state.user_email}")
+    st.success(f"Logged in: {st.session_state.user_email}")
 
     st.divider()
 
     if st.session_state.company_name:
-        st.write(f"الشركة: {st.session_state.company_name}")
+        st.write(f"Company: {st.session_state.company_name}")
     else:
-        st.write("الشركة: -")
+        st.write("Company: -")
 
-    st.write("الصلاحية: مدير")
+    st.write("Role: admin")
 
     st.divider()
 
@@ -372,7 +383,7 @@ with st.sidebar:
                     _visible_credits.append((_sess_key, _lbl, _icon))
 
     if _visible_credits:
-        st.markdown("### 💳 الرصيد")
+        st.markdown("### 💳 Credits")
         for _sess_key, _lbl, _icon in _visible_credits:
             st.metric(
                 f"{_icon} {_lbl}",
@@ -383,7 +394,7 @@ with st.sidebar:
 
     # ── Navigation (dynamic) ─────────────
     page = st.radio(
-        "التنقل",
+        "Navigation",
         options=st.session_state.get("_dashboard_labels", ["—"]),
         key="nav_radio",
     )
@@ -391,7 +402,7 @@ with st.sidebar:
     st.divider()
 
     # ── Logout ───────────────────────────
-    if st.button("تسجيل الخروج"):
+    if st.button("Logout"):
         for _k in _session_defaults:
             st.session_state[_k] = _session_defaults[_k]
         for _k in ["fuel_report_html", "fuel_report_tokens",
@@ -408,7 +419,7 @@ st.markdown(
     """
     <div style="text-align:center;padding-top:10px">
       <div style="font-size:34px;font-weight:700;color:#1f77b4;letter-spacing:1px;">
-        Synaptory
+        Quantory
       </div>
       <div style="font-size:22px;color:#00c2ff;margin-top:6px;font-weight:600;">
         Data That Speaks
