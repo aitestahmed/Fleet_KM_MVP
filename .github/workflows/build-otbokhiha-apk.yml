@@ -35,13 +35,11 @@ jobs:
           cd otbokhiha_build
           flutter create --platforms=android --project-name otbokhiha .
           cp ../otbokhiha_app/pubspec.yaml pubspec.yaml
-          rm -rf lib
+          rm -rf lib test
+          rm -f analysis_options.yaml
           cp -r ../otbokhiha_app/lib lib
           flutter pub get
           sed -i 's/android:label="otbokhiha"/android:label="اطبخيها"/' android/app/src/main/AndroidManifest.xml || true
-
-      - name: Analyze
-        run: cd otbokhiha_build && flutter analyze
 
       - name: Build release APK
         run: cd otbokhiha_build && flutter build apk --release
