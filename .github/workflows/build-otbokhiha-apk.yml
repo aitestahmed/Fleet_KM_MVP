@@ -1,0 +1,54 @@
+name: Build Otbokhiha APK
+
+on:
+  push:
+    branches:
+      - apk-build-otbokhiha
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create Android project
+        run: |
+          rm -rf otbokhiha_build
+          mkdir otbokhiha_build
+          cd otbokhiha_build
+          flutter create --platforms=android --project-name otbokhiha .
+          cp ../otbokhiha_app/pubspec.yaml pubspec.yaml
+          rm -rf lib
+          cp -r ../otbokhiha_app/lib lib
+          flutter pub get
+          sed -i 's/android:label="otbokhiha"/android:label="اطبخيها"/' android/app/src/main/AndroidManifest.xml || true
+
+      - name: Analyze
+        run: cd otbokhiha_build && flutter analyze
+
+      - name: Build release APK
+        run: cd otbokhiha_build && flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: otbokhiha-apk
+          path: otbokhiha_build/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
